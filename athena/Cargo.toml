@@ -1,6 +1,11 @@
 [package]
 name = "athena"
 version = "0.1.0"
+authors = ["Lane Rettig <lane@spacemesh.io>"]
 edition = "2021"
 
 [dependencies]
+serde = "1.0"
+byteorder = "1.4"
+
+[dev-dependencies]
