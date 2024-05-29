@@ -3,7 +3,7 @@ pub mod interpreter;
 
 pub struct VM {
     pub memory: memory::Memory,
-    pub registers: [u32; 32], // 32 general-purpose registers
+    pub registers: [u32; 16], // 16 general-purpose registers for RV32E (embedded) ISA
     // Other components like program counter, etc.
 }
 
@@ -11,7 +11,7 @@ impl VM {
     pub fn new(memory_size: usize) -> Self {
         VM {
             memory: memory::Memory::new(memory_size),
-            registers: [0; 32],
+            registers: [0; 16],
             // Initialize other components
         }
     }

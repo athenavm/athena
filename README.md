@@ -1,6 +1,6 @@
 # Athena
 
-Athena is a prototype deterministic smart contract engine. It includes a virtual machine (VM) based on the RV32IM (RISC-V) ISA, an interpreter/compiler for running smart contract code, and related tooling. For more information on the Athena project and its goals see [Introducing Athena](https://spacemesh.io/blog/introducing-athena/) and the [Athena project updates](https://athenavm.github.io/).
+Athena is a prototype deterministic smart contract engine. It includes a virtual machine (VM) based on the [RV32EM][1] (RISC-V) ISA, an interpreter/compiler for running smart contract code, and related tooling. For more information on the Athena project and its goals see [Introducing Athena][2] and the [Athena project updates][3].
 
 ## Project Goals
 - **Developer Experience**: Provide a robust environment with extensive tooling support.
@@ -21,3 +21,7 @@ This project is licensed under the MIT License. Unless you explicitly state othe
 
 ## Disclaimer
 **Warning**: This code is not production quality and should not be used in production systems.
+
+[1]: https://five-embeddev.com/riscv-user-isa-manual/Priv-v1.12/rv32e.html
+[2]: https://spacemesh.io/blog/introducing-athena/
+[3]: https://athenavm.github.io/
