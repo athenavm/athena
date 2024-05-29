@@ -15,6 +15,7 @@ Athena is a prototype deterministic smart contract engine. It includes a virtual
 - **SIMD**: No support for Single Instruction, Multiple Data operations.
 - **Additional RISC-V Extensions**: No RISC-V extensions beyond the M extension.
 - **Interoperability**: At this time Athena is not intended to interoperate with, or target, other blockchain VMs.
+- **Full System Emulation**: Athena is not intended to run an operating system or standard application binaries. Try https://github.com/d0iasm/rvemu.
 
 ## License
 This project is licensed under the MIT License. Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work shall be identically licensed, without any additional terms or conditions.
