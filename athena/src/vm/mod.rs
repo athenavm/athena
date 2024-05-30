@@ -48,7 +48,10 @@ impl VM {
     }
 
     fn fetch_instruction(&self) -> u32 {
-        // Simplified fetch logic
-        0
+        let mut bytes = [0u8; 4];
+        for i in 0..4 {
+            bytes[i] = self.memory.load(self.pc + i);
+        }
+        u32::from_le_bytes(bytes)
     }
 }

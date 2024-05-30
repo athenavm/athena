@@ -1,5 +1,8 @@
 #[cfg(test)]
 mod tests {
+    extern crate sp1_core;
+
+    use sp1_core::runtime::Program;
     use athena::vm::{VM, interpreter::Instruction};
 
     #[test]
@@ -17,5 +20,31 @@ mod tests {
         assert_eq!(vm.registers[0], 5);
     }
 
-    // Add more tests for other instructions and operations
+    // #[test]
+    // fn test_load_program() {
+    //     let program = Program {
+    //         code: vec![0x00, 0x00, 0x00, 0x00], // Dummy code
+    //         entry_point: 0,
+    //     };
+    //     let mut vm = VM::new(1024);
+    //     vm.load_program(program);
+    //     assert_eq!(vm.pc, 0);
+    // }
+
+    #[test]
+  fn test_load_and_run_elf() {
+      let mut vm = VM::new(1024);
+
+      // Load the program from an ELF file
+      let program = Program::from_elf("../examples/hello_world/target/riscv32imac-unknown-none-elf/release/test_program");
+      // let program = Program::from_elf("../../sp1/examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
+
+      // Load the program into the VM
+      // vm.load_program(program);
+
+      // Run the VM
+      vm.run();
+
+      // Add assertions here to verify the expected behavior
+  }
 }
