@@ -1,10 +1,19 @@
-#![no_std]
+// #![no_std]
 #![no_main]
+sp1_zkvm::entrypoint!(main);
 
-use core::panic::PanicInfo;
+// #[no_mangle]
+// pub extern "C" fn _start() -> ! {
+//     let a: u32 = 5;
+//     let b: u32 = 3;
+//     let sum = add(a, b);
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+//     // We need a way to output `sum` for verification
+//     // Assuming a function `output` exists to demonstrate
+//     // output(sum);
+// }
+
+pub fn main() {
     let a: u32 = 5;
     let b: u32 = 3;
     let sum = add(a, b);
@@ -12,15 +21,15 @@ pub extern "C" fn _start() -> ! {
     // We need a way to output `sum` for verification
     // Assuming a function `output` exists to demonstrate
     // output(sum);
-
-    loop {}
 }
 
 fn add(x: u32, y: u32) -> u32 {
     x + y
 }
 
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
+// #[panic_handler]
+// fn panic(_info: &core::panic::PanicInfo) -> ! {
+//     unsafe {
+//       core::arch::asm!("unimp", options(noreturn));
+//     }
+// }

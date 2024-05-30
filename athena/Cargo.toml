@@ -5,6 +5,6 @@ authors = ["Lane Rettig <lane@spacemesh.io>"]
 edition = "2021"
 
 [dependencies]
-sp1-core = { git = "https://github.com/succinctlabs/sp1", branch = "main", package = "sp1-core" }
+sp1 = { workspace = true }
 
 [dev-dependencies]

@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
-    extern crate sp1_core;
+    extern crate sp1;
 
-    use sp1_core::runtime::Program;
+    use sp1::runtime::{Program, Runtime};
+    use sp1::utils::SP1CoreOpts;
     use athena::vm::{VM, interpreter::Instruction};
 
     #[test]
@@ -36,13 +37,16 @@ mod tests {
       let mut vm = VM::new(1024);
 
       // Load the program from an ELF file
-      let program = Program::from_elf("../examples/hello_world/target/riscv32im-unknown-none-elf/release/test_program");
+      // let program = Program::from_elf("../examples/hello_world/target/riscv32im-unknown-none-elf/release/test_program");
+      let program = Program::from_elf("../examples/hello_world/target/riscv32im-succinct-zkvm-elf/release/test_program");
+      let mut runtime = Runtime::new(program.clone(), SP1CoreOpts::default());
+      runtime.run().unwrap();
 
       // Load the program into the VM
       // vm.load_program(program);
 
       // Run the VM
-      vm.run();
+      // vm.run();
 
       // Add assertions here to verify the expected behavior
   }
