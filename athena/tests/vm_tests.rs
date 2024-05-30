@@ -36,8 +36,7 @@ mod tests {
       let mut vm = VM::new(1024);
 
       // Load the program from an ELF file
-      let program = Program::from_elf("../examples/hello_world/target/riscv32imac-unknown-none-elf/release/test_program");
-      // let program = Program::from_elf("../../sp1/examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
+      let program = Program::from_elf("../examples/hello_world/target/riscv32im-unknown-none-elf/release/test_program");
 
       // Load the program into the VM
       // vm.load_program(program);
