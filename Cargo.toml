@@ -1,9 +1,10 @@
 [workspace]
 members = [
   "athena",
+]
+exclude = [
   "examples/hello_world",
 ]
 
 [workspace.dependencies]
 sp1 = { git = "https://github.com/succinctlabs/sp1", rev = "3c0dae88", package = "sp1-core" }
-sp1-zkvm = { git = "https://github.com/succinctlabs/sp1", rev = "3c0dae88", package = "sp1-zkvm" }

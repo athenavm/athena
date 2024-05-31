@@ -16,7 +16,7 @@ sp1_zkvm::entrypoint!(main);
 pub fn main() {
     let a: u32 = 5;
     let b: u32 = 3;
-    let sum = add(a, b);
+    let _sum = add(a, b);
 
     // We need a way to output `sum` for verification
     // Assuming a function `output` exists to demonstrate

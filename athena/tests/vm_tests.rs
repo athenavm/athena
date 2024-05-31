@@ -2,7 +2,7 @@
 mod tests {
     extern crate sp1;
 
-    use athena::vm::{VM, interpreter::Instruction};
+    use athena::vm::VM;
 
     // #[test]
     // fn test_vm_creation() {
@@ -33,7 +33,9 @@ mod tests {
     #[test]
   fn test_load_and_run_elf() {
       let mut vm = VM::new("../examples/hello_world/target/riscv32im-succinct-zkvm-elf/release/test_program");
-      vm.run();
+
+      // ignore error for now
+      let _ = vm.run();
 
       // Add assertions here to verify the expected behavior
   }
