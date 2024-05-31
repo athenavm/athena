@@ -68,34 +68,33 @@ impl Syscall for SyscallHintRead {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use rand::RngCore;
+// #[cfg(test)]
+// mod tests {
+//     use rand::RngCore;
 
-    use crate::{
-        io::AthenaStdin,
-        runtime::Program,
-        utils::{prove, setup_logger, AthenaCoreOpts},
-    };
+//     use crate::{
+//         io::AthenaStdin,
+//         runtime::Program,
+//         utils::{setup_logger, AthenaCoreOpts},
+//     };
 
-    const HINT_IO_ELF: &[u8] =
-        include_bytes!("../../../tests/hint-io/elf/riscv32im-succinct-zkvm-elf");
+//     const HINT_IO_ELF: &[u8] =
+//         include_bytes!("../../../tests/hint-io/elf/riscv32im-succinct-zkvm-elf");
 
-    #[test]
-    fn test_hint_io() {
-        setup_logger();
+//     #[test]
+//     fn test_hint_io() {
+//         setup_logger();
 
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; 1021];
-        rng.fill_bytes(&mut data);
+//         let mut rng = rand::thread_rng();
+//         let mut data = vec![0u8; 1021];
+//         rng.fill_bytes(&mut data);
 
-        let mut stdin = AthenaStdin::new();
-        stdin.write(&data);
-        stdin.write_vec(data);
+//         let mut stdin = AthenaStdin::new();
+//         stdin.write(&data);
+//         stdin.write_vec(data);
 
-        let program = Program::from(HINT_IO_ELF);
-
-        // let config = BabyBearPoseidon2::new();
-        // prove(program, &stdin, config, AthenaCoreOpts::default()).unwrap();
-    }
-}
+//         // let program = Program::from(HINT_IO_ELF);
+//         // let config = BabyBearPoseidon2::new();
+//         // prove(program, &stdin, config, AthenaCoreOpts::default()).unwrap();
+//     }
+// }

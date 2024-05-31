@@ -827,7 +827,7 @@ pub mod tests {
     use crate::{
         runtime::Register,
         utils::{
-            tests::{FIBONACCI_ELF, PANIC_ELF, SSZ_WITHDRAWALS_ELF},
+            tests::{FIBONACCI_ELF, PANIC_ELF},
             AthenaCoreOpts,
         },
     };
@@ -845,10 +845,6 @@ pub mod tests {
 
     pub fn fibonacci_program() -> Program {
         Program::from(FIBONACCI_ELF)
-    }
-
-    pub fn ssz_withdrawals_program() -> Program {
-        Program::from(SSZ_WITHDRAWALS_ELF)
     }
 
     pub fn panic_program() -> Program {
