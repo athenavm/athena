@@ -7,7 +7,7 @@ use crate::runtime::{Register, Runtime};
 use crate::syscall::{
     SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallWrite,
 };
-use crate::{runtime::ExecutionRecord, runtime::MemoryReadRecord, runtime::MemoryWriteRecord};
+use crate::{runtime::MemoryReadRecord, runtime::MemoryWriteRecord};
 
 /// A system call is invoked by the the `ecall` instruction with a specific value in register t0.
 /// The syscall number is a 32-bit integer, with the following layout (in litte-endian format)
@@ -93,10 +93,6 @@ impl<'a> SyscallContext<'a> {
             exit_code: 0,
             rt: runtime,
         }
-    }
-
-    pub fn record_mut(&mut self) -> &mut ExecutionRecord {
-        &mut self.rt.record
     }
 
     pub fn current_shard(&self) -> u32 {

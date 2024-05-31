@@ -12,9 +12,6 @@ pub use tracer::*;
 #[cfg(test)]
 pub use programs::*;
 
-use crate::{memory::MemoryCols, operations::field::params::Limbs};
-use generic_array::ArrayLength;
-
 pub const fn indices_arr<const N: usize>() -> [usize; N] {
     let mut indices_arr = [0; N];
     let mut i = 0;

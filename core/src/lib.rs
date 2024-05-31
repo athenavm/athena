@@ -23,4 +23,16 @@ pub mod syscall;
 pub mod utils;
 
 #[allow(unused_imports)]
-use runtime::{Program, Runtime};
+use crate::runtime::{Program, Runtime};
+
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn test_load_and_run_elf() {
+    let program = Program::from_elf("../examples/hello_world/target/riscv32im-succinct-zkvm-elf/release/test_program");
+    let mut runtime = Runtime::new(program.clone(), AthenaCoreOpts::default());
+    runtime.run()?;
+
+    // Add assertions here to verify the expected behavior
+  }
+}

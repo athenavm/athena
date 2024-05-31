@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use p3_field::Field;
 use serde::{Deserialize, Serialize};
 
 /// An opcode specifies which operation to execute.
@@ -110,11 +109,5 @@ impl Opcode {
             Opcode::REMU => "remu",
             Opcode::UNIMP => "unimp",
         }
-    }
-}
-
-impl Opcode {
-    pub fn as_field<F: Field>(self) -> F {
-        F::from_canonical_u32(self as u32)
     }
 }

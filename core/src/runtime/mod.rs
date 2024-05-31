@@ -27,7 +27,6 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use crate::memory::MemoryInitializeFinalizeEvent;
 use crate::utils::AthenaCoreOpts;
 
 /// An implementation of a runtime for the Athena RISC-V zkVM.
@@ -218,12 +217,6 @@ impl Runtime {
                 // If addr has a specific value to be initialized with, use that, otherwise 0.
                 let value = self.state.uninitialized_memory.remove(&addr).unwrap_or(0);
 
-                // Do not emit memory initialize events for address 0 as that is done in initialize.
-                if addr != 0 {
-                    self.record
-                        .memory_initialize_events
-                        .push(MemoryInitializeFinalizeEvent::initialize(addr, value, true));
-                }
                 entry.insert(MemoryRecord {
                     value,
                     shard: 0,
@@ -266,12 +259,6 @@ impl Runtime {
                 // If addr has a specific value to be initialized with, use that, otherwise 0.
                 let value = self.state.uninitialized_memory.remove(&addr).unwrap_or(0);
 
-                // Do not emit memory initialize events for address 0 as that is done in initialize.
-                if addr != 0 {
-                    self.record
-                        .memory_initialize_events
-                        .push(MemoryInitializeFinalizeEvent::initialize(addr, value, true));
-                }
                 entry.insert(MemoryRecord {
                     value,
                     shard: 0,
@@ -790,11 +777,6 @@ impl Runtime {
             );
         }
 
-        // Create init event for register 0 because it needs to be the first row in MemoryInit.
-        self.record
-            .memory_initialize_events
-            .push(MemoryInitializeFinalizeEvent::initialize(0, 0, true));
-
         tracing::info!("starting execution");
     }
 
@@ -889,22 +871,6 @@ impl Runtime {
                 timestamp: 0,
             },
         };
-        memory_finalize_events.push(MemoryInitializeFinalizeEvent::finalize_from_record(
-            0,
-            addr_0_final_record,
-        ));
-
-        for addr in self.state.memory.keys() {
-            if addr == &0 {
-                continue; // We handle addr = 0 separately above.
-            }
-
-            let record = *self.state.memory.get(addr).unwrap();
-
-            memory_finalize_events.push(MemoryInitializeFinalizeEvent::finalize_from_record(
-                *addr, &record,
-            ));
-        }
     }
 
     fn get_syscall(&mut self, code: SyscallCode) -> Option<&Arc<dyn Syscall>> {

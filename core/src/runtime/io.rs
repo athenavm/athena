@@ -29,14 +29,6 @@ impl Runtime {
         }
     }
 
-    pub fn write_proof(
-        &mut self,
-        proof: ShardProof<BabyBearPoseidon2>,
-        vk: StarkVerifyingKey<BabyBearPoseidon2>,
-    ) {
-        self.state.proof_stream.push((proof, vk));
-    }
-
     pub fn read_public_values<T: DeserializeOwned>(&mut self) -> T {
         let result = bincode::deserialize_from::<_, T>(self);
         result.unwrap()
@@ -57,7 +49,7 @@ pub mod tests {
     use super::*;
     use crate::runtime::Program;
     use crate::utils::tests::IO_ELF;
-    use crate::utils::{self, prove_simple, AthenaCoreOpts};
+    use crate::utils::{self, AthenaCoreOpts};
     use serde::Deserialize;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
