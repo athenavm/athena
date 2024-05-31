@@ -4,7 +4,7 @@ use nohash_hasher::BuildNoHashHasher;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-use super::{ExecutionRecord, MemoryAccessRecord, MemoryRecord};
+use super::MemoryRecord;
 
 /// Holds data describing the current state of a program's execution.
 #[serde_as]
@@ -40,6 +40,12 @@ pub struct ExecutionState {
 
     /// A ptr to the current position in the input stream incremented by HINT_READ opcode.
     pub input_stream_ptr: usize,
+
+    /// A stream of public values from the program (global to entire program).
+    pub public_values_stream: Vec<u8>,
+
+    /// A ptr to the current position in the public values stream, incremented when reading from public_values_stream.
+    pub public_values_stream_ptr: usize,
 }
 
 impl ExecutionState {
@@ -55,6 +61,8 @@ impl ExecutionState {
             uninitialized_memory: HashMap::default(),
             input_stream: Vec::new(),
             input_stream_ptr: 0,
+            public_values_stream: Vec::new(),
+            public_values_stream_ptr: 0,
         }
     }
 }
@@ -73,12 +81,6 @@ pub(crate) struct ForkState {
 
     /// Only contains the original memory values for addresses that have been modified
     pub(crate) memory_diff: HashMap<u32, Option<MemoryRecord>, BuildNoHashHasher<u32>>,
-
-    /// Full record from original state
-    pub(crate) op_record: MemoryAccessRecord,
-
-    /// Full shard from original state
-    pub(crate) record: ExecutionRecord,
 
     // Emit events from original state
     pub(crate) emit_events: bool,

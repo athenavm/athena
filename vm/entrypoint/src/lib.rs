@@ -12,32 +12,29 @@ extern crate alloc;
 #[macro_export]
 macro_rules! entrypoint {
     ($path:path) => {
-        const ZKVM_ENTRY: fn() = $path;
+        const VM_ENTRY: fn() = $path;
 
         use $crate::heap::SimpleAlloc;
 
         #[global_allocator]
         static HEAP: SimpleAlloc = SimpleAlloc;
 
-        mod zkvm_generated_main {
+        mod vm_generated_main {
 
             #[no_mangle]
             fn main() {
-                super::ZKVM_ENTRY()
+                super::VM_ENTRY()
             }
         }
     };
 }
 
-#[cfg(all(target_os = "zkvm", feature = "libm"))]
-mod libm;
-
 /// The number of 32 bit words that the public values digest is composed of.
 pub const PV_DIGEST_NUM_WORDS: usize = 8;
 pub const POSEIDON_NUM_WORDS: usize = 8;
 
-#[cfg(target_os = "zkvm")]
-mod zkvm {
+#[cfg(target_os = "athena")]
+mod vm {
     use crate::syscalls::syscall_halt;
 
     use cfg_if::cfg_if;
@@ -97,7 +94,7 @@ mod zkvm {
 
     static GETRANDOM_WARNING_ONCE: std::sync::Once = std::sync::Once::new();
 
-    fn zkvm_getrandom(s: &mut [u8]) -> Result<(), Error> {
+    fn vm_getrandom(s: &mut [u8]) -> Result<(), Error> {
         use rand::Rng;
         use rand::SeedableRng;
 
@@ -111,5 +108,5 @@ mod zkvm {
         Ok(())
     }
 
-    register_custom_getrandom!(zkvm_getrandom);
+    register_custom_getrandom!(vm_getrandom);
 }

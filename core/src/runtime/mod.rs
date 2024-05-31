@@ -43,14 +43,6 @@ pub struct Runtime {
     /// The state of the execution.
     pub state: ExecutionState,
 
-    /// The trace of the execution.
-    pub record: ExecutionRecord,
-
-    /// The maximum size of each shard.
-    pub shard_size: u32,
-
-    pub shard_batch_size: u32,
-
     /// A counter for the number of cycles that have been executed in certain functions.
     pub cycle_tracker: HashMap<String, (u64, u32)>,
 
@@ -95,12 +87,6 @@ impl Runtime {
         // Create a shared reference to the program.
         let program = Arc::new(program);
 
-        // Create a default record with the program.
-        let record = ExecutionRecord {
-            program: program.clone(),
-            ..Default::default()
-        };
-
         // If TRACE_FILE is set, initialize the trace buffer.
         let trace_buf = if let Ok(trace_file) = std::env::var("TRACE_FILE") {
             let file = File::create(trace_file).unwrap();
@@ -118,11 +104,8 @@ impl Runtime {
             .unwrap_or(0);
 
         Self {
-            record,
             state: ExecutionState::new(program.pc_start),
             program,
-            shard_size: (opts.shard_size as u32) * 4,
-            shard_batch_size: opts.shard_batch_size as u32,
             cycle_tracker: HashMap::new(),
             io_buf: HashMap::new(),
             trace_buf,
@@ -138,10 +121,9 @@ impl Runtime {
     pub fn recover(program: Program, state: ExecutionState, opts: AthenaCoreOpts) -> Self {
         let mut runtime = Self::new(program, opts);
         runtime.state = state;
-        let index: u32 = (runtime.state.global_clk / (runtime.shard_size / 4) as u64)
+        let index: u32 = runtime.state.global_clk
             .try_into()
             .unwrap();
-        runtime.record.index = index + 1;
         runtime
     }
 
@@ -186,14 +168,8 @@ impl Runtime {
         self.state.clk + *position as u32
     }
 
-    /// Get the current shard.
-    #[inline]
-    pub fn shard(&self) -> u32 {
-        self.state.current_shard
-    }
-
     /// Read a word from memory and create an access record.
-    pub fn mr(&mut self, addr: u32, shard: u32, timestamp: u32) -> MemoryReadRecord {
+    pub fn mr(&mut self, addr: u32, timestamp: u32) -> MemoryReadRecord {
         // Get the memory record entry.
         let entry = self.state.memory.entry(addr);
 
@@ -219,23 +195,20 @@ impl Runtime {
 
                 entry.insert(MemoryRecord {
                     value,
-                    shard: 0,
                     timestamp: 0,
                 })
             }
         };
         let value = record.value;
-        let prev_shard = record.shard;
         let prev_timestamp = record.timestamp;
-        record.shard = shard;
         record.timestamp = timestamp;
 
         // Construct the memory read record.
-        MemoryReadRecord::new(value, shard, timestamp, prev_shard, prev_timestamp)
+        MemoryReadRecord::new(value, timestamp, prev_timestamp)
     }
 
     /// Write a word to memory and create an access record.
-    pub fn mw(&mut self, addr: u32, value: u32, shard: u32, timestamp: u32) -> MemoryWriteRecord {
+    pub fn mw(&mut self, addr: u32, value: u32, timestamp: u32) -> MemoryWriteRecord {
         // Get the memory record entry.
         let entry = self.state.memory.entry(addr);
 
@@ -261,25 +234,20 @@ impl Runtime {
 
                 entry.insert(MemoryRecord {
                     value,
-                    shard: 0,
                     timestamp: 0,
                 })
             }
         };
         let prev_value = record.value;
-        let prev_shard = record.shard;
         let prev_timestamp = record.timestamp;
         record.value = value;
-        record.shard = shard;
         record.timestamp = timestamp;
 
         // Construct the memory write record.
         MemoryWriteRecord::new(
             value,
-            shard,
             timestamp,
             prev_value,
-            prev_shard,
             prev_timestamp,
         )
     }
@@ -290,7 +258,7 @@ impl Runtime {
         assert_valid_memory_access!(addr, position);
 
         // Read the address from memory and create a memory read record.
-        let record = self.mr(addr, self.shard(), self.timestamp(&position));
+        let record = self.mr(addr, self.timestamp(&position));
 
         record.value
     }
@@ -301,7 +269,7 @@ impl Runtime {
         assert_valid_memory_access!(addr, position);
 
         // Read the address from memory and create a memory read record.
-        let record = self.mw(addr, value, self.shard(), self.timestamp(&position));
+        let record = self.mw(addr, value, self.timestamp(&position));
     }
 
     /// Read from a register.
@@ -346,9 +314,6 @@ impl Runtime {
     /// Set the destination register with the result and emit an ALU event.
     fn alu_rw(&mut self, instruction: Instruction, rd: Register, a: u32, b: u32, c: u32) {
         self.rw(rd, a);
-        if self.emit_events {
-            self.emit_alu(self.state.clk, instruction.opcode, a, b, c);
-        }
     }
 
     /// Fetch the input operand values for a load instruction.
@@ -743,13 +708,6 @@ impl Runtime {
         // Increment the clock.
         self.state.global_clk += 1;
 
-        // If there's not enough cycles left for another instruction, move to the next shard.
-        // We multiply by 4 because clk is incremented by 4 for each normal instruction.
-        if !self.unconstrained && self.max_syscall_cycles + self.state.clk >= self.shard_size {
-            self.state.current_shard += 1;
-            self.state.clk = 0;
-        }
-
         Ok(self.state.pc.wrapping_sub(self.program.pc_base)
             >= (self.program.instructions.len() * 4) as u32)
     }
@@ -771,7 +729,6 @@ impl Runtime {
                 *addr,
                 MemoryRecord {
                     value: *value,
-                    shard: 0,
                     timestamp: 0,
                 },
             );
@@ -806,20 +763,10 @@ impl Runtime {
 
         // Loop until we've executed `self.shard_batch_size` shards if `self.shard_batch_size` is set.
         let mut done = false;
-        let mut current_shard = self.state.current_shard;
-        let mut num_shards_executed = 0;
         loop {
             if self.execute_cycle()? {
                 done = true;
                 break;
-            }
-
-            if self.shard_batch_size > 0 && current_shard != self.state.current_shard {
-                num_shards_executed += 1;
-                current_shard = self.state.current_shard;
-                if num_shards_executed == self.shard_batch_size {
-                    break;
-                }
             }
         }
 
@@ -856,9 +803,6 @@ impl Runtime {
             buf.flush().unwrap();
         }
 
-        // SECTION: Set up all MemoryInitializeFinalizeEvents needed for memory argument.
-        let memory_finalize_events = &mut self.record.memory_finalize_events;
-
         // We handle the addr = 0 case separately, as we constrain it to be 0 in the first row
         // of the memory finalize table so it must be first in the array of events.
         let addr_0_record = self.state.memory.get(&0u32);
@@ -867,7 +811,6 @@ impl Runtime {
             Some(record) => record,
             None => &MemoryRecord {
                 value: 0,
-                shard: 0,
                 timestamp: 0,
             },
         };
