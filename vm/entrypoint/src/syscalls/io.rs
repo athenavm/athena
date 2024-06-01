@@ -1,5 +1,5 @@
 cfg_if::cfg_if! {
-    if #[cfg(target_os = "athena")] {
+    if #[cfg(target_os = "zkvm")] {
         use core::arch::asm;
     }
 }
@@ -8,7 +8,7 @@ cfg_if::cfg_if! {
 #[no_mangle]
 pub extern "C" fn syscall_write(fd: u32, write_buf: *const u8, nbytes: usize) {
     cfg_if::cfg_if! {
-        if #[cfg(target_os = "athena")] {
+        if #[cfg(target_os = "zkvm")] {
             unsafe {
                 asm!(
                     "ecall",
@@ -27,7 +27,7 @@ pub extern "C" fn syscall_write(fd: u32, write_buf: *const u8, nbytes: usize) {
 #[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn syscall_hint_len() -> usize {
-    #[cfg(target_os = "athena")]
+    #[cfg(target_os = "zkvm")]
     unsafe {
         let len;
         asm!(
@@ -38,14 +38,14 @@ pub extern "C" fn syscall_hint_len() -> usize {
         len
     }
 
-    #[cfg(not(target_os = "athena"))]
+    #[cfg(not(target_os = "zkvm"))]
     unreachable!()
 }
 
 #[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn syscall_hint_read(ptr: *mut u8, len: usize) {
-    #[cfg(target_os = "athena")]
+    #[cfg(target_os = "zkvm")]
     unsafe {
         asm!(
             "ecall",
@@ -55,6 +55,6 @@ pub extern "C" fn syscall_hint_read(ptr: *mut u8, len: usize) {
         );
     }
 
-    #[cfg(not(target_os = "athena"))]
+    #[cfg(not(target_os = "zkvm"))]
     unreachable!()
 }

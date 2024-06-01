@@ -1,6 +1,6 @@
 // #![no_std]
 #![no_main]
-sp1_zkvm::entrypoint!(main);
+athena_vm::entrypoint!(main);
 
 // #[no_mangle]
 // pub extern "C" fn _start() -> ! {

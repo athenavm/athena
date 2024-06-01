@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(target_os = "athena")] {
+    if #[cfg(target_os = "zkvm")] {
         use core::arch::asm;
     }
 }
@@ -9,7 +9,7 @@ cfg_if! {
 /// Halts the program.
 #[allow(unused_variables)]
 pub extern "C" fn syscall_halt(exit_code: u8) -> ! {
-    #[cfg(target_os = "athena")]
+    #[cfg(target_os = "zkvm")]
     unsafe {
         asm!(
             "ecall",
@@ -19,6 +19,6 @@ pub extern "C" fn syscall_halt(exit_code: u8) -> ! {
         unreachable!()
     }
 
-    #[cfg(not(target_os = "athena"))]
+    #[cfg(not(target_os = "zkvm"))]
     unreachable!()
 }

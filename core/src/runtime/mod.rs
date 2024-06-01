@@ -762,19 +762,14 @@ impl Runtime {
         }
 
         // Loop until we've executed `self.shard_batch_size` shards if `self.shard_batch_size` is set.
-        let mut done = false;
         loop {
-            if self.execute_cycle()? {
-                done = true;
-                break;
+            return if self.execute_cycle()? {
+              self.postprocess();
+              Ok(true)
+            } else {
+              Ok(false)
             }
         }
-
-        if done {
-            self.postprocess();
-        }
-
-        Ok(done)
     }
 
     fn postprocess(&mut self) {
