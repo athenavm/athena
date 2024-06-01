@@ -1,5 +1,5 @@
 #![no_main]
-sp1_zkvm::entrypoint!(main);
+athena_vm::entrypoint!(main);
 
 use serde::{Deserialize, Serialize};
 
@@ -23,5 +23,5 @@ pub fn main() {
         b: p1.b && p2.b,
     };
     println!("Addition of 2 points: {:?}", p3);
-    sp1_zkvm::io::commit(&p3);
+    athena_vm::io::write(&p3);
 }
