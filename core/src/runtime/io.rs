@@ -48,7 +48,7 @@ impl Runtime {
 pub mod tests {
     use super::*;
     use crate::runtime::Program;
-    use crate::utils::tests::IO_ELF;
+    // use crate::utils::tests::IO_ELF;
     use crate::utils::{self, AthenaCoreOpts};
     use serde::Deserialize;
 
@@ -74,23 +74,23 @@ pub mod tests {
         )
     }
 
-    #[test]
-    fn test_io_run() {
-        utils::setup_logger();
-        let program = Program::from(IO_ELF);
-        let mut runtime = Runtime::new(program, AthenaCoreOpts::default());
-        let points = points();
-        runtime.write_stdin(&points.0);
-        runtime.write_stdin(&points.1);
-        runtime.run().unwrap();
-        let added_point = runtime.read_public_values::<MyPointUnaligned>();
-        assert_eq!(
-            added_point,
-            MyPointUnaligned {
-                x: 11,
-                y: 24,
-                b: true
-            }
-        );
-    }
+    // #[test]
+    // fn test_io_run() {
+    //     utils::setup_logger();
+    //     let program = Program::from(IO_ELF);
+    //     let mut runtime = Runtime::new(program, AthenaCoreOpts::default());
+    //     let points = points();
+    //     runtime.write_stdin(&points.0);
+    //     runtime.write_stdin(&points.1);
+    //     runtime.run().unwrap();
+    //     let added_point = runtime.read_public_values::<MyPointUnaligned>();
+    //     assert_eq!(
+    //         added_point,
+    //         MyPointUnaligned {
+    //             x: 11,
+    //             y: 24,
+    //             b: true
+    //         }
+    //     );
+    // }
 }

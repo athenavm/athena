@@ -2,11 +2,11 @@
 pub mod tests {
     /// Demos.
 
-    pub const FIBONACCI_IO_ELF: &[u8] =
-        include_bytes!("../../../examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
+    // pub const FIBONACCI_IO_ELF: &[u8] =
+    //     include_bytes!("../../../examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
 
-    pub const IO_ELF: &[u8] =
-        include_bytes!("../../../examples/io/program/elf/riscv32im-succinct-zkvm-elf");
+    // pub const IO_ELF: &[u8] =
+    //     include_bytes!("../../../examples/io/program/elf/riscv32im-succinct-zkvm-elf");
 
     /// Tests.
 

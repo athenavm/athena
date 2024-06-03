@@ -269,7 +269,7 @@ impl Runtime {
         assert_valid_memory_access!(addr, position);
 
         // Read the address from memory and create a memory read record.
-        let record = self.mw(addr, value, self.timestamp(&position));
+        let _ = self.mw(addr, value, self.timestamp(&position));
     }
 
     /// Read from a register.
@@ -353,16 +353,11 @@ impl Runtime {
 
     /// Execute the given instruction over the current state of the runtime.
     fn execute_instruction(&mut self, instruction: Instruction) -> Result<(), ExecutionError> {
-        let mut pc = self.state.pc;
-        let mut clk = self.state.clk;
-        let mut exit_code = 0u32;
-
         let mut next_pc = self.state.pc.wrapping_add(4);
 
         let rd: Register;
         let (a, b, c): (u32, u32, u32);
         let (addr, memory_read_value): (u32, u32);
-        let mut memory_store_value: Option<u32> = None;
 
         match instruction.opcode {
             // Arithmetic instructions.
@@ -422,7 +417,6 @@ impl Runtime {
                 (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
                 let value = (memory_read_value).to_le_bytes()[(addr % 4) as usize];
                 a = ((value as i8) as i32) as u32;
-                memory_store_value = Some(memory_read_value);
                 self.rw(rd, a);
             }
             Opcode::LH => {
@@ -436,7 +430,6 @@ impl Runtime {
                     _ => unreachable!(),
                 };
                 a = ((value as i16) as i32) as u32;
-                memory_store_value = Some(memory_read_value);
                 self.rw(rd, a);
             }
             Opcode::LW => {
@@ -445,14 +438,12 @@ impl Runtime {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::LW, addr));
                 }
                 a = memory_read_value;
-                memory_store_value = Some(memory_read_value);
                 self.rw(rd, a);
             }
             Opcode::LBU => {
                 (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
                 let value = (memory_read_value).to_le_bytes()[(addr % 4) as usize];
                 a = value as u32;
-                memory_store_value = Some(memory_read_value);
                 self.rw(rd, a);
             }
             Opcode::LHU => {
@@ -466,7 +457,6 @@ impl Runtime {
                     _ => unreachable!(),
                 };
                 a = (value as u16) as u32;
-                memory_store_value = Some(memory_read_value);
                 self.rw(rd, a);
             }
 
@@ -480,7 +470,6 @@ impl Runtime {
                     3 => ((a & 0x000000FF) << 24) + (memory_read_value & 0x00FFFFFF),
                     _ => unreachable!(),
                 };
-                memory_store_value = Some(value);
                 self.mw_cpu(align(addr), value, MemoryAccessPosition::Memory);
             }
             Opcode::SH => {
@@ -493,7 +482,6 @@ impl Runtime {
                     1 => ((a & 0x0000FFFF) << 16) + (memory_read_value & 0x0000FFFF),
                     _ => unreachable!(),
                 };
-                memory_store_value = Some(value);
                 self.mw_cpu(align(addr), value, MemoryAccessPosition::Memory);
             }
             Opcode::SW => {
@@ -502,7 +490,6 @@ impl Runtime {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::SW, addr));
                 }
                 let value = a;
-                memory_store_value = Some(value);
                 self.mw_cpu(align(addr), value, MemoryAccessPosition::Memory);
             }
 
@@ -608,13 +595,9 @@ impl Runtime {
                     };
 
                 // Allow the syscall impl to modify state.clk/pc (exit unconstrained does this)
-                clk = self.state.clk;
-                pc = self.state.pc;
-
                 self.rw(t0, a);
                 next_pc = precompile_next_pc;
                 self.state.clk += precompile_cycles;
-                exit_code = returned_exit_code;
             }
             Opcode::EBREAK => {
                 return Err(ExecutionError::Breakpoint());

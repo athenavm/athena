@@ -70,18 +70,6 @@ impl ExecutionState {
 /// Holds data to track changes made to the runtime since a fork point.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ForkState {
-    /// Original global_clk
-    pub(crate) global_clk: u64,
-
-    /// Original clk
-    pub(crate) clk: u32,
-
-    /// Original program counter
-    pub(crate) pc: u32,
-
     /// Only contains the original memory values for addresses that have been modified
     pub(crate) memory_diff: HashMap<u32, Option<MemoryRecord>, BuildNoHashHasher<u32>>,
-
-    // Emit events from original state
-    pub(crate) emit_events: bool,
 }
