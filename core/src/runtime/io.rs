@@ -47,9 +47,7 @@ impl Runtime {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::runtime::Program;
     // use crate::utils::tests::IO_ELF;
-    use crate::utils::{self, AthenaCoreOpts};
     use serde::Deserialize;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]

@@ -1,4 +1,4 @@
-use athena_sdk::{utils, ProverClient, AthenaStdin};
+use athena_sdk::{utils, ExecutionClient, AthenaStdin};
 
 /// The ELF we want to execute inside the zkVM.
 const ELF: &[u8] = include_bytes!("../../program/elf/riscv32im-succinct-zkvm-elf");
@@ -14,7 +14,7 @@ fn main() {
     stdin.write(&n);
 
     // Only execute the program and get a `AthenaPublicValues` object.
-    let client = ProverClient::new();
+    let client = ExecutionClient::new();
     let mut public_values = client.execute(ELF, stdin).unwrap();
 
     println!("generated proof");

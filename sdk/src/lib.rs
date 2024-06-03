@@ -15,17 +15,17 @@ pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::utils::AthenaCoreOpts;
 
 /// A client for interacting with Athena.
-pub struct ProverClient {}
+pub struct ExecutionClient {}
 
-impl ProverClient {
-    /// Creates a new [ProverClient].
+impl ExecutionClient {
+    /// Creates a new [ExecutionClient].
     ///
     /// ### Examples
     ///
     /// ```no_run
-    /// use athena_sdk::ProverClient;
+    /// use athena_sdk::ExecutionClient;
     ///
-    /// let client = ProverClient::new();
+    /// let client = ExecutionClient::new();
     /// ```
     pub fn new() -> Self {
       Self {}
@@ -38,13 +38,13 @@ impl ProverClient {
     ///
     /// ### Examples
     /// ```no_run
-    /// use athena_sdk::{ProverClient, AthenaStdin};
+    /// use athena_sdk::{ExecutionClient, AthenaStdin};
     ///
     /// // Load the program.
     /// let elf = include_bytes!("../../examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
     ///
     /// // Initialize the prover client.
-    /// let client = ProverClient::new();
+    /// let client = ExecutionClient::new();
     ///
     /// // Setup the inputs.
     /// let mut stdin = AthenaStdin::new();
@@ -63,7 +63,7 @@ impl ProverClient {
     }
 }
 
-impl Default for ProverClient {
+impl Default for ExecutionClient {
     fn default() -> Self {
         Self::new()
     }
@@ -72,12 +72,12 @@ impl Default for ProverClient {
 #[cfg(test)]
 mod tests {
 
-    use crate::{utils, ProverClient, AthenaStdin};
+    use crate::{utils, ExecutionClient, AthenaStdin};
 
     #[test]
     fn test_execute() {
         utils::setup_logger();
-        let client = ProverClient::new();
+        let client = ExecutionClient::new();
         let elf =
             include_bytes!("../../examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
         let mut stdin = AthenaStdin::new();
@@ -89,7 +89,7 @@ mod tests {
     #[should_panic]
     fn test_execute_panic() {
         utils::setup_logger();
-        let client = ProverClient::new();
+        let client = ExecutionClient::new();
         let elf = include_bytes!("../../tests/panic/elf/riscv32im-succinct-zkvm-elf");
         let mut stdin = AthenaStdin::new();
         stdin.write(&10usize);
