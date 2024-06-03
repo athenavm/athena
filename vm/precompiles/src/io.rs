@@ -57,6 +57,20 @@ pub fn read<T: DeserializeOwned>() -> T {
     bincode::deserialize(&vec).expect("deserialization failed")
 }
 
+pub fn write<T: Serialize>(value: &T) {
+  let writer = SyscallWriter {
+      fd: FD_PUBLIC_VALUES,
+  };
+  bincode::serialize_into(writer, value).expect("serialization failed");
+}
+
+pub fn write_slice(buf: &[u8]) {
+  let mut my_writer = SyscallWriter {
+      fd: FD_PUBLIC_VALUES,
+  };
+  my_writer.write_all(buf).unwrap();
+}
+
 pub fn hint<T: Serialize>(value: &T) {
     let writer = SyscallWriter { fd: FD_HINT };
     bincode::serialize_into(writer, value).expect("serialization failed");
