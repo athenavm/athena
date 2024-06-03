@@ -1,4 +1,5 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::utils::Buffer;
 
 /// Standard input for the prover.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -7,6 +8,12 @@ pub struct AthenaStdin {
     /// a vec of bytes at a time.
     pub buffer: Vec<Vec<u8>>,
     pub ptr: usize,
+}
+
+/// Public values for the runner.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AthenaPublicValues {
+    buffer: Buffer,
 }
 
 impl AthenaStdin {
@@ -55,4 +62,58 @@ impl AthenaStdin {
     pub fn write_vec(&mut self, vec: Vec<u8>) {
         self.buffer.push(vec);
     }
+}
+
+impl AthenaPublicValues {
+  /// Create a new `AthenaPublicValues`.
+  pub const fn new() -> Self {
+      Self {
+          buffer: Buffer::new(),
+      }
+  }
+
+  pub fn bytes(&self) -> String {
+      format!("0x{}", hex::encode(self.buffer.data.clone()))
+  }
+
+  /// Create a `AthenaPublicValues` from a slice of bytes.
+  pub fn from(data: &[u8]) -> Self {
+      Self {
+          buffer: Buffer::from(data),
+      }
+  }
+
+  pub fn as_slice(&self) -> &[u8] {
+      self.buffer.data.as_slice()
+  }
+
+  pub fn to_vec(&self) -> Vec<u8> {
+      self.buffer.data.clone()
+  }
+
+  /// Read a value from the buffer.
+  pub fn read<T: Serialize + DeserializeOwned>(&mut self) -> T {
+      self.buffer.read()
+  }
+
+  /// Read a slice of bytes from the buffer.
+  pub fn read_slice(&mut self, slice: &mut [u8]) {
+      self.buffer.read_slice(slice);
+  }
+
+  /// Write a value to the buffer.
+  pub fn write<T: Serialize + DeserializeOwned>(&mut self, data: &T) {
+      self.buffer.write(data);
+  }
+
+  /// Write a slice of bytes to the buffer.
+  pub fn write_slice(&mut self, slice: &[u8]) {
+      self.buffer.write_slice(slice);
+  }
+}
+
+impl AsRef<[u8]> for AthenaPublicValues {
+  fn as_ref(&self) -> &[u8] {
+      &self.buffer.data
+  }
 }
