@@ -83,7 +83,7 @@ pub enum ExecutionError {
 
 impl Runtime {
     // Create a new runtime from a program.
-    pub fn new(program: Program, opts: AthenaCoreOpts) -> Self {
+    pub fn new(program: Program, _opts: AthenaCoreOpts) -> Self {
         // Create a shared reference to the program.
         let program = Arc::new(program);
 
@@ -121,9 +121,6 @@ impl Runtime {
     pub fn recover(program: Program, state: ExecutionState, opts: AthenaCoreOpts) -> Self {
         let mut runtime = Self::new(program, opts);
         runtime.state = state;
-        let index: u32 = runtime.state.global_clk
-            .try_into()
-            .unwrap();
         runtime
     }
 
@@ -312,7 +309,7 @@ impl Runtime {
     }
 
     /// Set the destination register with the result and emit an ALU event.
-    fn alu_rw(&mut self, instruction: Instruction, rd: Register, a: u32, b: u32, c: u32) {
+    fn alu_rw(&mut self, _instruction: Instruction, rd: Register, a: u32, _b: u32, _c: u32) {
         self.rw(rd, a);
     }
 
@@ -414,13 +411,13 @@ impl Runtime {
 
             // Load instructions.
             Opcode::LB => {
-                (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
+                (rd, _, _, addr, memory_read_value) = self.load_rr(instruction);
                 let value = (memory_read_value).to_le_bytes()[(addr % 4) as usize];
                 a = ((value as i8) as i32) as u32;
                 self.rw(rd, a);
             }
             Opcode::LH => {
-                (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
+                (rd, _, _, addr, memory_read_value) = self.load_rr(instruction);
                 if addr % 2 != 0 {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::LH, addr));
                 }
@@ -433,7 +430,7 @@ impl Runtime {
                 self.rw(rd, a);
             }
             Opcode::LW => {
-                (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
+                (rd, _, _, addr, memory_read_value) = self.load_rr(instruction);
                 if addr % 4 != 0 {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::LW, addr));
                 }
@@ -441,13 +438,13 @@ impl Runtime {
                 self.rw(rd, a);
             }
             Opcode::LBU => {
-                (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
+                (rd, _, _, addr, memory_read_value) = self.load_rr(instruction);
                 let value = (memory_read_value).to_le_bytes()[(addr % 4) as usize];
                 a = value as u32;
                 self.rw(rd, a);
             }
             Opcode::LHU => {
-                (rd, b, c, addr, memory_read_value) = self.load_rr(instruction);
+                (rd, _, _, addr, memory_read_value) = self.load_rr(instruction);
                 if addr % 2 != 0 {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::LHU, addr));
                 }
@@ -462,7 +459,7 @@ impl Runtime {
 
             // Store instructions.
             Opcode::SB => {
-                (a, b, c, addr, memory_read_value) = self.store_rr(instruction);
+                (a, _, _, addr, memory_read_value) = self.store_rr(instruction);
                 let value = match addr % 4 {
                     0 => (a & 0x000000FF) + (memory_read_value & 0xFFFFFF00),
                     1 => ((a & 0x000000FF) << 8) + (memory_read_value & 0xFFFF00FF),
@@ -473,7 +470,7 @@ impl Runtime {
                 self.mw_cpu(align(addr), value, MemoryAccessPosition::Memory);
             }
             Opcode::SH => {
-                (a, b, c, addr, memory_read_value) = self.store_rr(instruction);
+                (a, _, _, addr, memory_read_value) = self.store_rr(instruction);
                 if addr % 2 != 0 {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::SH, addr));
                 }
@@ -485,7 +482,7 @@ impl Runtime {
                 self.mw_cpu(align(addr), value, MemoryAccessPosition::Memory);
             }
             Opcode::SW => {
-                (a, b, c, addr, _) = self.store_rr(instruction);
+                (a, _, _, addr, _) = self.store_rr(instruction);
                 if addr % 4 != 0 {
                     return Err(ExecutionError::InvalidMemoryAccess(Opcode::SW, addr));
                 }
@@ -534,7 +531,6 @@ impl Runtime {
             // Jump instructions.
             Opcode::JAL => {
                 let (rd, imm) = instruction.j_type();
-                (b, c) = (imm, 0);
                 a = self.state.pc + 4;
                 self.rw(rd, a);
                 next_pc = self.state.pc.wrapping_add(imm);
@@ -550,8 +546,7 @@ impl Runtime {
             // Upper immediate instructions.
             Opcode::AUIPC => {
                 let (rd, imm) = instruction.u_type();
-                (b, c) = (imm, imm);
-                a = self.state.pc.wrapping_add(b);
+                a = self.state.pc.wrapping_add(imm);
                 self.rw(rd, a);
             }
 
@@ -567,7 +562,7 @@ impl Runtime {
 
                 let syscall_impl = self.get_syscall(syscall).cloned();
                 let mut precompile_rt = SyscallContext::new(self);
-                let (precompile_next_pc, precompile_cycles, returned_exit_code) =
+                let (precompile_next_pc, precompile_cycles, _returned_exit_code) =
                     if let Some(syscall_impl) = syscall_impl {
                         // Executing a syscall optionally returns a value to write to the t0 register.
                         // If it returns None, we just keep the syscall_id in t0.
@@ -780,18 +775,6 @@ impl Runtime {
         if let Some(ref mut buf) = self.trace_buf {
             buf.flush().unwrap();
         }
-
-        // We handle the addr = 0 case separately, as we constrain it to be 0 in the first row
-        // of the memory finalize table so it must be first in the array of events.
-        let addr_0_record = self.state.memory.get(&0u32);
-
-        let addr_0_final_record = match addr_0_record {
-            Some(record) => record,
-            None => &MemoryRecord {
-                value: 0,
-                timestamp: 0,
-            },
-        };
     }
 
     fn get_syscall(&mut self, code: SyscallCode) -> Option<&Arc<dyn Syscall>> {
