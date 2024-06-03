@@ -1,0 +1,21 @@
+[package]
+version = "0.1.0"
+name = "fibonacci-script"
+edition = "2021"
+default-run = "fibonacci-script"
+
+[dependencies]
+itertools = "0.12.1"
+athena-sdk = { path = "../../../sdk" }
+sha2 = "0.10.8"
+
+[build-dependencies]
+athena-helper = { path = "../../../helper" }
+
+[[bin]]
+name = "execute"
+path = "bin/execute.rs"
+
+[[bin]]
+name = "fibonacci-script"
+path = "src/main.rs"

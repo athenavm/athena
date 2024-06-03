@@ -1,6 +1,8 @@
 [workspace]
 members = [
   "core",
+  "helper",
+  "sdk",
   "vm/entrypoint",
   "vm/precompiles",
 ]

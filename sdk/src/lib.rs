@@ -9,11 +9,10 @@ pub mod utils {
     pub use athena_core::utils::setup_logger;
 }
 
-use std::{env, fmt::Debug};
-
 use anyhow::{Ok, Result};
-use athena_core::runtime::{ExecutionError, Runtime};
-use athena_core::io::{AthenaPublicValues, AthenaStdin};
+use athena_core::runtime::{Program, Runtime};
+pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
+use athena_core::utils::AthenaCoreOpts;
 
 /// A client for interacting with Athena.
 pub struct ProverClient {}
