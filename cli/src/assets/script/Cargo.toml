@@ -1,0 +1,11 @@
+[workspace]
+[package]
+version = "0.1.0"
+name = "unnamed-script"
+edition = "2021"
+
+[dependencies]
+athena-sdk = { git = "https://github.com/athenavm/athena.git", branch = "main" }
+
+[build-dependencies]
+athena-helper = { git = "https://github.com/athenavm/athena.git", branch = "main" }

@@ -1,0 +1,38 @@
+[package]
+name = "athena-cli"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+vergen = { version = "8", default-features = false, features = [
+  "build",
+  "git",
+  "git2",
+] }
+
+[dependencies]
+anyhow = { version = "1.0.83", features = ["backtrace"] }
+athena-sdk = { path = "../sdk" }
+athena-core = { path = "../core" }
+cargo_metadata = "0.18.1"
+clap = { version = "4.5.4", features = ["derive", "env"] }
+reqwest = { version = "0.12.4", features = [
+  "stream",
+  "json",
+  "rustls-tls",
+], default-features = false }
+futures-util = "0.3.30"
+indicatif = "0.17.8"
+tokio = { version = "1", features = ["full"] }
+dirs = "5.0"
+serde = { version = "1", features = ["derive"] }
+rand = "0.8"
+downloader = { version = "0.2", default-features = false, features = [
+  "rustls-tls",
+] }
+serde_json = "1.0.117"
+yansi = "1.0.1"
+hex = "0.4.3"
+anstyle = "1.0.7"
+target-lexicon = "0.12.14"
+tempfile = "3.10.1"
