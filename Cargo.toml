@@ -10,5 +10,6 @@ members = [
 exclude = [
   "examples/hello_world",
 ]
+resolver = "2"
 
 [workspace.dependencies]

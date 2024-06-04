@@ -35,7 +35,7 @@ pub enum AthenaCliCommands {
 
 fn main() -> Result<()> {
     let Cargo::Execute(args) = Cargo::parse();
-    let command = args.command.unwrap_or(AthenaCliCommands::Execute(args.prove));
+    let command = args.command.unwrap_or(AthenaCliCommands::Execute(args.execute));
     match command {
         AthenaCliCommands::New(cmd) => cmd.run(),
         AthenaCliCommands::Build(cmd) => cmd.run(),

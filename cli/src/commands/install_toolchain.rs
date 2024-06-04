@@ -1,11 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
 use dirs::home_dir;
+use futures::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::{distributions::Alphanumeric, Rng};
 use reqwest::Client;
-use athena_sdk::artifacts::download_file;
+use std::cmp::min;
 use std::fs::{self};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::process::Command;
 
 #[cfg(target_family = "unix")]
@@ -151,4 +153,41 @@ impl InstallToolchainCmd {
 
         Ok(())
     }
+}
+
+pub async fn download_file(
+  client: &Client,
+  url: &str,
+  file: &mut fs::File,
+) -> std::result::Result<(), String> {
+  let res = client
+      .get(url)
+      .send()
+      .await
+      .or(Err(format!("Failed to GET from '{}'", &url)))?;
+  let total_size = res
+      .content_length()
+      .ok_or(format!("Failed to get content length from '{}'", &url))?;
+
+  let pb = ProgressBar::new(total_size);
+  pb.set_style(ProgressStyle::default_bar()
+      .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})").unwrap()
+      .progress_chars("#>-"));
+  println!("Downloading {}", url);
+
+  let mut downloaded: u64 = 0;
+  let mut stream = res.bytes_stream();
+
+  while let Some(item) = stream.next().await {
+      let chunk = item.or(Err("Error while downloading file"))?;
+      file.write_all(&chunk)
+          .or(Err("Error while writing to file"))?;
+      let new = min(downloaded + (chunk.len() as u64), total_size);
+      downloaded = new;
+      pb.set_position(new);
+  }
+
+  let msg = format!("Downloaded {} to {:?}", url, file);
+  pb.finish_with_message(msg);
+  Ok(())
 }
