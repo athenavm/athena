@@ -11,7 +11,7 @@ use athena_cli::{
 #[derive(Parser)]
 #[command(name = "cargo", bin_name = "cargo")]
 pub enum Cargo {
-    Execute(AthenaCli),
+    Athena(AthenaCli),
 }
 
 #[derive(clap::Args)]
@@ -34,7 +34,7 @@ pub enum AthenaCliCommands {
 }
 
 fn main() -> Result<()> {
-    let Cargo::Execute(args) = Cargo::parse();
+    let Cargo::Athena(args) = Cargo::parse();
     let command = args.command.unwrap_or(AthenaCliCommands::Execute(args.execute));
     match command {
         AthenaCliCommands::New(cmd) => cmd.run(),

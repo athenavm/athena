@@ -64,7 +64,7 @@ fn execute_build_cmd(
 
     let mut cmd = Command::new("cargo");
     cmd.current_dir(program_dir)
-        .args(["prove", "build"])
+        .args(["athena", "build"])
         .env_remove("RUSTC")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
