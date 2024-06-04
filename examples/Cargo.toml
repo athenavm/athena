@@ -1,5 +1,7 @@
 [workspace]
 members = [
   "fibonacci/script",
+  "hello_world/script",
   "io/script",
 ]
+resolver = "2"

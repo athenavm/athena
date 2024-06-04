@@ -7,9 +7,7 @@ members = [
   "vm/entrypoint",
   "vm/precompiles",
 ]
-exclude = [
-  "examples/hello_world",
-]
+exclude = ["examples/target"]
 resolver = "2"
 
 [workspace.dependencies]
