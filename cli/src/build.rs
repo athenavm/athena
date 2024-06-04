@@ -11,12 +11,12 @@ use std::{
 fn get_docker_image() -> String {
     // Get the docker image name from the environment variable
     std::env::var("ATHENA_DOCKER_IMAGE")
-        .unwrap_or_else(|_| "ghcr.io/succinctlabs/sp1:latest".to_string())
+        .unwrap_or_else(|_| "ghcr.io/athenavm/athena:latest".to_string())
 }
 
 #[derive(Parser)]
 pub(crate) struct BuildArgs {
-    #[clap(long, action, help = "Ignore Rust version check.")]
+    #[clap(long, action, help = "Use Dockerized build.")]
     pub(crate) docker: bool,
     #[clap(long, action, help = "Ignore Rust version check.")]
     pub(crate) ignore_rust_version: bool,
