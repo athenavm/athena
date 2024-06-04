@@ -130,6 +130,7 @@ main() {
 
     # Download and extract the binaries archive
     say "downloading latest cargo-athena"
+    say "from: $BIN_ARCHIVE_URL"
     if [ "$PLATFORM" = "win32" ]; then
       tmp="$(mktemp -d 2>/dev/null || echo ".")/cargo-athena.zip"
       ensure download "$BIN_ARCHIVE_URL" "$tmp"
