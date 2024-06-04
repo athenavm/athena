@@ -31,12 +31,7 @@ main() {
       --arch)           shift; ATHUP_ARCH=$1;;
       --platform)       shift; ATHUP_PLATFORM=$1;;
       -h|--help)
-        usag   _____  ____  ___
-  / ___/ / __ \<  /
-  \__ \ / /_/ // /                        A performant, 100%% open-source,
- ___/ // ____// /                              general-purpose zkVM.
-/____//_/    /_/
-e
+        usage
         exit 0
         ;;
       *)
