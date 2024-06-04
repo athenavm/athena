@@ -51,7 +51,7 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
             "-v",
             workspace_root_path.as_str(),
             image.as_str(),
-            "prove",
+            "athena",
             "build",
         ];
         if args.ignore_rust_version {
