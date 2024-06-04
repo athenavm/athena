@@ -32,7 +32,7 @@ jobs:
         with:
           pull_token: ${{ secrets.PULL_TOKEN }}
 
-      # If it's a nightly release, tag with the release time. If the tag is `main`, we want to use 
+      # If it's a nightly release, tag with the release time. If the tag is `main`, we want to use
       # `latest` as the tag name. Else, use the tag name as is.
       - name: Compute release name and tag
         id: release_info
@@ -126,12 +126,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
           cache-on-failure: true
-      
+
       - name: Install go
         uses: actions/setup-go@v5
         with:
           go-version: '^1.22.1'
-        
+
       - name: Check go installation
         run: |
           go version
@@ -165,9 +165,9 @@ jobs:
 
           [[ "$target" == *windows* ]] && exe=".exe"
 
-          RUSTFLAGS='-C target-feature=+crt-static' cargo build --release -p sp1-cli --target "$target" "${flags[@]}"
+          RUSTFLAGS='-C target-feature=+crt-static' cargo build --release -p athena-cli --target "$target" "${flags[@]}"
 
-          bins=(cargo-prove)
+          bins=(cargo-athena)
           for name in "${bins[@]}"; do
             bin=./target/$target/release/$name$exe
             file "$bin" || true
@@ -185,18 +185,18 @@ jobs:
         shell: bash
         run: |
           if [ "$PLATFORM_NAME" == "linux" ]; then
-            tar -czvf "cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-prove
-            echo "file_name=cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            tar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
+            echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
             # We need to use gtar here otherwise the archive is corrupt.
             # See: https://github.com/actions/virtual-environments/issues/2619
-            gtar -czvf "cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-prove
-            echo "file_name=cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            gtar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
+            echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           else
             cd ./target/${TARGET}/release
-            7z a -tzip "cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-prove.exe
-            mv "cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
-            echo "file_name=cargo_prove_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
+            7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-athena.exe
+            mv "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
+            echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
           fi
 
       # Creates the release for this specific version
@@ -209,7 +209,6 @@ jobs:
           body: ${{ needs.prepare.outputs.changelog }}
           files: |
             ${{ steps.artifacts.outputs.file_name }}
-            ${{ steps.man.outputs.cargo_prove_man }}
 
       # If this is a nightly release, it also updates the release
       # tagged `nightly` for compatibility with `foundryup`
@@ -223,7 +222,6 @@ jobs:
           body: ${{ needs.prepare.outputs.changelog }}
           files: |
             ${{ steps.artifacts.outputs.file_name }}
-            ${{ steps.man.outputs.cargo_prove_man }}
 
   cleanup:
     name: Release cleanup
