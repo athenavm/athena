@@ -17,6 +17,9 @@ Athena is a prototype deterministic smart contract engine. It includes a virtual
 - **Interoperability**: At this time Athena is not intended to interoperate with, or target, other blockchain VMs.
 - **Full System Emulation**: Athena is not intended to run an operating system or standard application binaries. Try https://github.com/d0iasm/rvemu.
 
+## Acknowledgements
+The overall project structure and a large portion of the core code was copied from [SP1][4] under the MIT license with gratitude. Other projects that have been influential on the Athena design include [RiscZero][5] and [PolkaVM][6].
+
 ## License
 This project is licensed under the MIT License. Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work shall be identically licensed, without any additional terms or conditions.
 
@@ -26,3 +29,7 @@ This project is licensed under the MIT License. Unless you explicitly state othe
 [1]: https://five-embeddev.com/riscv-user-isa-manual/Priv-v1.12/rv32e.html
 [2]: https://spacemesh.io/blog/introducing-athena/
 [3]: https://athenavm.github.io/
+[4]: https://github.com/succinctlabs/sp1/
+[5]: https://github.com/risc0/risc0/
+[6]: https://github.com/koute/polkavm
+
