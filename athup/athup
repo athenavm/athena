@@ -143,7 +143,7 @@ main() {
       bin_path="$ATHENA_BIN_DIR/$bin"
 
       # Print installed msg
-      say "installed - $(ensure "$bin_path" execute --version)"
+      say "installed - $(ensure "$bin_path" athena --version)"
 
       # Check if the default path of the binary is not in ATHENA_BIN_DIR
       which_path="$(command -v "$bin" || true)"
@@ -161,7 +161,7 @@ EOF
     done
 
     say "installing rust toolchain"
-    ensure "$bin_path" execute install-toolchain
+    ensure "$bin_path" athena install-toolchain
     say "installed rust toolchain"
 
     say "done!"
