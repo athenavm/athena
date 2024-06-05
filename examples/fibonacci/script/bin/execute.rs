@@ -17,7 +17,7 @@ fn main() {
     let client = ExecutionClient::new();
     let mut public_values = client.execute(ELF, stdin).unwrap();
 
-    println!("generated proof");
+    println!("successful execution");
 
     // Read and verify the output.
     let _ = public_values.read::<u32>();
