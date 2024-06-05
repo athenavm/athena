@@ -17,7 +17,6 @@ athena-core = { path = "../core" }
 cargo_metadata = "0.18.1"
 clap = { version = "4.5.4", features = ["derive", "env"] }
 futures = "0.3.30"
-reqwest-middleware = "0.3.1"
 reqwest = { version = "0.12.4", features = [
   "stream",
   "json",
@@ -29,12 +28,8 @@ tokio = { version = "1", features = ["full"] }
 dirs = "5.0"
 serde = { version = "1", features = ["derive"] }
 rand = "0.8"
-downloader = { version = "0.2", default-features = false, features = [
-  "rustls-tls",
-] }
 serde_json = "1.0.117"
 yansi = "1.0.1"
 hex = "0.4.3"
 anstyle = "1.0.7"
 target-lexicon = "0.12.14"
-tempfile = "3.10.1"
