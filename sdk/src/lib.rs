@@ -90,7 +90,7 @@ mod tests {
     fn test_execute_panic() {
         utils::setup_logger();
         let client = ExecutionClient::new();
-        let elf = include_bytes!("../../tests/panic/elf/riscv32im-succinct-zkvm-elf");
+        let elf = include_bytes!("../../tests/panic/elf/panic-test");
         let mut stdin = AthenaStdin::new();
         stdin.write(&10usize);
         client.execute(elf, stdin).unwrap();

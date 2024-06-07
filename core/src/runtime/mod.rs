@@ -805,11 +805,11 @@ pub mod tests {
     }
 
     pub fn fibonacci_program() -> Program {
-        Program::from(FIBONACCI_ELF)
+        Program::from(TEST_FIBONACCI_ELF)
     }
 
     pub fn panic_program() -> Program {
-        Program::from(PANIC_ELF)
+        Program::from(TEST_PANIC_ELF)
     }
 
     #[test]

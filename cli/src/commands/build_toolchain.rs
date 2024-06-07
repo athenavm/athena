@@ -5,7 +5,7 @@ use std::{path::PathBuf, process::Command};
 use crate::{get_target, CommandExecutor, RUSTUP_TOOLCHAIN_NAME};
 
 #[derive(Parser)]
-#[command(name = "build-toolchain", about = "Build the cargo-prove toolchain.")]
+#[command(name = "build-toolchain", about = "Build the cargo-athena toolchain.")]
 pub struct BuildToolchainCmd {}
 
 impl BuildToolchainCmd {

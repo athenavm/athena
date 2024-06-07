@@ -120,7 +120,7 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
         .join(root_package_name.unwrap());
     let elf_dir = metadata.target_directory.parent().unwrap().join("elf");
     fs::create_dir_all(&elf_dir)?;
-    let result_elf_path = elf_dir.join("riscv32em-athena-zkvm-elf");
+    let result_elf_path = elf_dir.join(root_package_name.unwrap());
     fs::copy(elf_path, &result_elf_path)?;
 
     Ok(result_elf_path)
