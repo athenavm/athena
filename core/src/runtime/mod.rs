@@ -788,7 +788,7 @@ pub mod tests {
     use crate::{
         runtime::Register,
         utils::{
-            tests::{FIBONACCI_ELF, PANIC_ELF},
+            tests::{TEST_FIBONACCI_ELF, TEST_PANIC_ELF},
             AthenaCoreOpts,
         },
     };

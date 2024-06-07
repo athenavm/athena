@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::utils::Buffer;
 
-/// Standard input for the prover.
+/// Standard input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AthenaStdin {
     /// Input stored as a vec of vec of bytes. It's stored this way because the read syscall reads

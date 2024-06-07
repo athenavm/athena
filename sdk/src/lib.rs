@@ -41,9 +41,9 @@ impl ExecutionClient {
     /// use athena_sdk::{ExecutionClient, AthenaStdin};
     ///
     /// // Load the program.
-    /// let elf = include_bytes!("../../examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
+    /// let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     ///
-    /// // Initialize the prover client.
+    /// // Initialize the execution client.
     /// let client = ExecutionClient::new();
     ///
     /// // Setup the inputs.
@@ -79,7 +79,7 @@ mod tests {
         utils::setup_logger();
         let client = ExecutionClient::new();
         let elf =
-            include_bytes!("../../examples/fibonacci/program/elf/riscv32im-succinct-zkvm-elf");
+            include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
         let mut stdin = AthenaStdin::new();
         stdin.write(&10usize);
         client.execute(elf, stdin).unwrap();
