@@ -11,8 +11,7 @@ athena_vm::entrypoint!(main);
 pub fn main() {
     // Read an input to the program.
     //
-    // Behind the scenes, this compiles down to a custom system call which handles reading inputs
-    // from the prover.
+    // Behind the scenes, this compiles down to a custom system call which handles reading inputs.
     let n = athena_vm::io::read::<u32>();
 
     // Write n to public input
@@ -31,7 +30,7 @@ pub fn main() {
     // Write the output of the program.
     //
     // Behind the scenes, this also compiles down to a custom system call which handles writing
-    // outputs to the prover.
+    // outputs.
     athena_vm::io::write(&a);
     athena_vm::io::write(&b);
 }

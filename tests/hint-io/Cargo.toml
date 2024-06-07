@@ -5,4 +5,4 @@ name = "hint-io-test"
 edition = "2021"
 
 [dependencies]
-athena-vm = { path = "../../vm/entrypoint" }
+athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }

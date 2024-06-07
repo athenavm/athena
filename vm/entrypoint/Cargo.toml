@@ -13,4 +13,5 @@ rand = "0.8.5"
 
 [features]
 interface = []
+rv32e = []
 verify = []
