@@ -75,6 +75,29 @@ impl BuildToolchainCmd {
         std::fs::write(&config_file, config_toml)
             .with_context(|| format!("while writing configuration to {:?}", config_file))?;
 
+        // Apply patches
+        let patch1 = include_str!("../patches/rust.patch");
+        std::fs::write(&rust_dir.join("rust.patch"), patch1)
+            .with_context(|| format!("while writing patch to {:?}", rust_dir.join("rust.patch")))?;
+        Command::new("patch")
+            .args(["-p1", "-i", "rust.patch"])
+            .current_dir(&rust_dir)
+            .run()?;
+        let patch2 = include_str!("../patches/compiler-rt.patch");
+        std::fs::write(&rust_dir.join("compiler.patch"), patch2)
+            .with_context(|| format!("while writing patch to {:?}", rust_dir.join("compiler.patch")))?;
+        Command::new("patch")
+            .args(["-p1", "-i", "compiler.patch"])
+            .current_dir(&rust_dir)
+            .run()?;
+        let patch3 = include_str!("../patches/llvm-D70401.patch");
+        std::fs::write(&rust_dir.join("llvm.patch"), patch3)
+            .with_context(|| format!("while writing patch to {:?}", rust_dir.join("llvm.patch")))?;
+        Command::new("patch")
+            .args(["-p1", "-i", "llvm.patch"])
+            .current_dir(&rust_dir)
+            .run()?;
+
         // Build the toolchain (stage 1).
         Command::new("python3")
             .env(
