@@ -788,7 +788,7 @@ pub mod tests {
     use crate::{
         runtime::Register,
         utils::{
-            tests::{FIBONACCI_ELF, PANIC_ELF},
+            tests::{TEST_FIBONACCI_ELF, TEST_PANIC_ELF},
             AthenaCoreOpts,
         },
     };
@@ -805,11 +805,11 @@ pub mod tests {
     }
 
     pub fn fibonacci_program() -> Program {
-        Program::from(FIBONACCI_ELF)
+        Program::from(TEST_FIBONACCI_ELF)
     }
 
     pub fn panic_program() -> Program {
-        Program::from(PANIC_ELF)
+        Program::from(TEST_PANIC_ELF)
     }
 
     #[test]

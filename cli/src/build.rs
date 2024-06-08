@@ -28,7 +28,7 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
     let root_package = metadata.root_package();
     let root_package_name = root_package.as_ref().map(|p| &p.name);
 
-    let build_target = "riscv32im-succinct-zkvm-elf";
+    let build_target = "riscv32em-athena-zkvm-elf";
     if args.docker {
         let image = get_docker_image();
 
@@ -120,7 +120,7 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
         .join(root_package_name.unwrap());
     let elf_dir = metadata.target_directory.parent().unwrap().join("elf");
     fs::create_dir_all(&elf_dir)?;
-    let result_elf_path = elf_dir.join("riscv32im-succinct-zkvm-elf");
+    let result_elf_path = elf_dir.join(root_package_name.unwrap());
     fs::copy(elf_path, &result_elf_path)?;
 
     Ok(result_elf_path)

@@ -3,7 +3,7 @@
 use athena_sdk::{utils, ExecutionClient, AthenaStdin};
 
 /// The ELF we want to execute inside the zkVM.
-const ELF: &[u8] = include_bytes!("../../program/elf/riscv32im-succinct-zkvm-elf");
+const ELF: &[u8] = include_bytes!("../../program/elf/unnamed-program");
 
 fn main() {
     // Setup logging.

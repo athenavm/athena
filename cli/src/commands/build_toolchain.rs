@@ -5,7 +5,7 @@ use std::{path::PathBuf, process::Command};
 use crate::{get_target, CommandExecutor, RUSTUP_TOOLCHAIN_NAME};
 
 #[derive(Parser)]
-#[command(name = "build-toolchain", about = "Build the cargo-prove toolchain.")]
+#[command(name = "build-toolchain", about = "Build the cargo-athena toolchain.")]
 pub struct BuildToolchainCmd {}
 
 impl BuildToolchainCmd {
@@ -15,10 +15,10 @@ impl BuildToolchainCmd {
         let build_dir = std::env::var("ATHENA_BUILD_DIR");
 
         // Clone our rust fork, if necessary.
-        let rust_dir = match build_dir {
+        let repo_dir = match build_dir {
             Ok(build_dir) => {
                 println!("Detected ATHENA_BUILD_DIR, skipping cloning rust.");
-                PathBuf::from(build_dir).join("rust")
+                PathBuf::from(build_dir)
             }
             Err(_) => {
                 let temp_dir = std::env::temp_dir();
@@ -26,9 +26,23 @@ impl BuildToolchainCmd {
                 if dir.exists() {
                     std::fs::remove_dir_all(&dir)?;
                 }
+                let rustdir = dir.join("rust");
 
                 println!("No ATHENA_BUILD_DIR detected, cloning rust.");
-                let repo_url = match github_access_token {
+                let repo_url = match github_access_token.clone() {
+                    Ok(github_access_token) => {
+                        println!("Detected GITHUB_ACCESS_TOKEN, using it to clone rust.");
+                        format!(
+                            "https://{}@github.com/athenavm/rustc-rv32e-toolchain",
+                            github_access_token
+                        )
+                    }
+                    Err(_) => {
+                        println!("No GITHUB_ACCESS_TOKEN detected. If you get throttled by Github, set it to bypass the rate limit.");
+                        "ssh://git@github.com/athenavm/rustc-rv32e-toolchain".to_string()
+                    }
+                };
+                let rust_repo_url = match github_access_token {
                     Ok(github_access_token) => {
                         println!("Detected GITHUB_ACCESS_TOKEN, using it to clone rust.");
                         format!(
@@ -45,35 +59,56 @@ impl BuildToolchainCmd {
                     .args([
                         "clone",
                         &repo_url,
-                        "--depth=1",
-                        "--single-branch",
-                        "--branch=succinct",
                         "athena-rust",
                     ])
                     .current_dir(&temp_dir)
                     .run()?;
                 Command::new("git")
-                    .args(["reset", "--hard"])
+                    .args([
+                        "clone",
+                        &rust_repo_url,
+                        "--depth=1",
+                        "--single-branch",
+                        "--branch=succinct",
+                    ])
                     .current_dir(&dir)
                     .run()?;
                 Command::new("git")
+                    .args(["reset", "--hard"])
+                    .current_dir(&rustdir)
+                    .run()?;
+                Command::new("git")
                     .args(["submodule", "update", "--init", "--recursive", "--progress"])
-                    .current_dir(&dir)
+                    .current_dir(&rustdir)
                     .run()?;
                 dir
             }
         };
+        let rust_dir = repo_dir.join("rust");
 
         // Install our config.toml.
         let ci = std::env::var("CI").unwrap_or("false".to_string()) == "true";
-        let config_toml = if ci {
-            include_str!("config-ci.toml")
+        let config_file_src = if ci {
+            "patches/config.ci.toml"
         } else {
-            include_str!("config.toml")
+            "patches/config.toml"
         };
-        let config_file = rust_dir.join("config.toml");
-        std::fs::write(&config_file, config_toml)
-            .with_context(|| format!("while writing configuration to {:?}", config_file))?;
+        std::fs::copy(&repo_dir.join(config_file_src), &rust_dir.join("config.toml"))
+            .with_context(|| format!("while copying configuration from {:?} to {:?}", repo_dir.join(config_file_src), rust_dir.join("config.toml")))?;
+
+        // Apply patches
+        Command::new("patch")
+            .args(["-f", "-p1", "-i", repo_dir.join("patches/rust.patch").to_str().unwrap()])
+            .current_dir(&rust_dir)
+            .run()?;
+        Command::new("patch")
+            .args(["-f", "-p1", "-i", repo_dir.join("patches/compiler-rt.patch").to_str().unwrap()])
+            .current_dir(&rust_dir.join("src/llvm-project"))
+            .run()?;
+        Command::new("patch")
+            .args(["-f", "-p1", "-i", repo_dir.join("patches/llvm-D70401.patch").to_str().unwrap()])
+            .current_dir(&rust_dir.join("src/llvm-project"))
+            .run()?;
 
         // Build the toolchain (stage 1).
         Command::new("python3")
