@@ -56,13 +56,13 @@ impl BuildToolchainCmd {
             Ok(github_access_token) => {
                 println!("Detected GITHUB_ACCESS_TOKEN, using it to clone rust.");
                 format!(
-                    "https://{}@github.com/succinctlabs/rust",
+                    "https://{}@github.com/rust-lang/rust.git",
                     github_access_token
                 )
             }
             Err(_) => {
                 println!("No GITHUB_ACCESS_TOKEN detected. If you get throttled by Github, set it to bypass the rate limit.");
-                "ssh://git@github.com/succinctlabs/rust".to_string()
+                "ssh://git@github.com/rust-lang/rust.git".to_string()
             }
         };
         Command::new("git")
@@ -70,19 +70,20 @@ impl BuildToolchainCmd {
                 "clone",
                 &rust_repo_url,
                 "--depth=1",
-                "--single-branch",
-                "--branch=succinct",
-                "rust",
             ])
             .current_dir(&toolchain_dir)
             .run()?;
         let rust_dir = toolchain_dir.join("rust");
         Command::new("git")
-            .args(["reset", "--hard"])
+            .args(["fetch", "--depth=1", "origin", "9b00956e56009bab2aa15d7bff10916599e3d6d6"])
             .current_dir(&rust_dir)
             .run()?;
         Command::new("git")
-            .args(["submodule", "update", "--init", "--recursive", "--progress"])
+            .args(["checkout", "FETCH_HEAD"])
+            .current_dir(&rust_dir)
+            .run()?;
+        Command::new("git")
+            .args(["submodule", "update", "--init", "--recursive", "--depth=1", "--progress"])
             .current_dir(&rust_dir)
             .run()?;
 
@@ -101,19 +102,11 @@ impl BuildToolchainCmd {
             .args(["-f", "-p1", "-i", toolchain_dir.join("patches/rust.patch").to_str().unwrap()])
             .current_dir(&rust_dir)
             .run()?;
-        Command::new("patch")
-            .args(["-f", "-p1", "-i", toolchain_dir.join("patches/compiler-rt.patch").to_str().unwrap()])
-            .current_dir(&rust_dir.join("src/llvm-project"))
-            .run()?;
-        Command::new("patch")
-            .args(["-f", "-p1", "-i", toolchain_dir.join("patches/llvm-D70401.patch").to_str().unwrap()])
-            .current_dir(&rust_dir.join("src/llvm-project"))
-            .run()?;
 
         // Build the toolchain (stage 1).
         Command::new("python3")
             .env(
-                "CARGO_TARGET_RISCV32IM_SUCCINCT_ZKVM_ELF_RUSTFLAGS",
+                "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
                 "-Cpasses=loweratomic",
             )
             .args(["x.py", "build"])
@@ -123,7 +116,7 @@ impl BuildToolchainCmd {
         // Build the toolchain (stage 2).
         Command::new("python3")
             .env(
-                "CARGO_TARGET_RISCV32IM_SUCCINCT_ZKVM_ELF_RUSTFLAGS",
+                "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
                 "-Cpasses=loweratomic",
             )
             .args(["x.py", "build", "--stage", "2"])
