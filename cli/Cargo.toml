@@ -13,7 +13,7 @@ vergen = { version = "8", default-features = false, features = [
 [dependencies]
 anyhow = { version = "1.0.83", features = ["backtrace"] }
 athena-sdk = { path = "../sdk" }
-athena-core = { path = "../core" }
+athena-core = { path = "../core", features = ["rv32e"] }
 cargo_metadata = "0.18.1"
 clap = { version = "4.5.4", features = ["derive", "env"] }
 futures = "0.3.30"
