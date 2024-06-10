@@ -21,7 +21,7 @@ Athena is a prototype deterministic smart contract engine. It includes a virtual
 The overall project structure and a large portion of the core code was copied from [SP1][4] under the MIT license with gratitude. Other projects that have been influential on the Athena design include [RiscZero][5] and [PolkaVM][6].
 
 ## License
-This project is licensed under the MIT License. Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work shall be identically licensed, without any additional terms or conditions.
+This project is dual-licensed under both the Apache and MIT Licenses, at your option. Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions. See [Rationale of Apache dual licensing][7].
 
 ## Disclaimer
 **Warning**: This code is not production quality and should not be used in production systems.
@@ -32,4 +32,4 @@ This project is licensed under the MIT License. Unless you explicitly state othe
 [4]: https://github.com/succinctlabs/sp1/
 [5]: https://github.com/risc0/risc0/
 [6]: https://github.com/koute/polkavm
-
+[7]: https://internals.rust-lang.org/t/rationale-of-apache-dual-licensing/
