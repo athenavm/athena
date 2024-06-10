@@ -62,7 +62,7 @@ impl BuildToolchainCmd {
             }
             Err(_) => {
                 println!("No GITHUB_ACCESS_TOKEN detected. If you get throttled by Github, set it to bypass the rate limit.");
-                "ssh://git@github.com/rust-lang/rust.git".to_string()
+                "https://github.com/rust-lang/rust.git".to_string()
             }
         };
         Command::new("git")

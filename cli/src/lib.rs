@@ -45,7 +45,7 @@ pub async fn get_toolchain_download_url(client: &Client, target: String) -> Stri
     // Get latest tag from https://api.github.com/repos/succinctlabs/rust/releases/latest
     // and use it to construct the download URL.
     let json = client
-        .get("https://api.github.com/repos/succinctlabs/rust/releases/latest")
+        .get("https://api.github.com/repos/athenavm/rustc-rv32e-toolchain/releases/latest")
         .send()
         .await
         .unwrap()
@@ -55,7 +55,7 @@ pub async fn get_toolchain_download_url(client: &Client, target: String) -> Stri
     let tag = json["tag_name"].as_str().unwrap();
 
     let url = format!(
-        "https://github.com/succinctlabs/rust/releases/download/{}/rust-toolchain-{}.tar.gz",
+        "https://github.com/athenavm/rustc-rv32e-toolchain/releases/download/{}/rust-toolchain-{}.tar.gz",
         tag, target
     );
 
