@@ -55,7 +55,7 @@ pub async fn get_toolchain_download_url(client: &Client, target: String) -> Stri
 
     let url = format!(
         "https://github.com/athenavm/rustc-rv32e-toolchain/releases/download/{}/athena-rust-toolchain-{}-{}.tar.gz",
-        tag, tag, target
+        tag, target, tag
     );
 
     url
