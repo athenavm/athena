@@ -1,4 +1,4 @@
- pub use athcon_vm::{Capabilities, MessageKind, Revision, StatusCode, StorageStatus};
+ pub use athcon_vm::{MessageKind, Revision, StatusCode, StorageStatus};
 
  pub const ADDRESS_LENGTH: usize = 24;
  pub const BYTES32_LENGTH: usize = 32;

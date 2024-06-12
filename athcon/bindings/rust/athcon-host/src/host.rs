@@ -12,30 +12,17 @@
      fn get_storage(&mut self, addr: &Address, key: &Bytes32) -> Bytes32;
      fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
      fn get_balance(&mut self, addr: &Address) -> Bytes32;
-     fn get_code_size(&mut self, addr: &Address) -> usize;
-     fn get_code_hash(&mut self, addr: &Address) -> Bytes32;
-     fn copy_code(
-         &mut self,
-         addr: &Address,
-         offset: &usize,
-         buffer_data: &*mut u8,
-         buffer_size: &usize,
-     ) -> usize;
-     fn selfdestruct(&mut self, addr: &Address, beneficiary: &Address);
-     fn get_tx_context(&mut self) -> (Bytes32, Address, Address, i64, i64, i64, Bytes32, Bytes32);
+     fn get_tx_context(&mut self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
      fn get_block_hash(&mut self, number: i64) -> Bytes32;
-     fn emit_log(&mut self, addr: &Address, topics: &Vec<Bytes32>, data: &Bytes);
      fn call(
          &mut self,
          kind: MessageKind,
-         destination: &Address,
+         recipient: &Address,
          sender: &Address,
          value: &Bytes32,
          input: &Bytes,
          gas: i64,
          depth: i32,
-         is_static: bool,
-         salt: &Bytes32,
      ) -> (Vec<u8>, i64, Address, StatusCode);
  }
 
@@ -45,14 +32,9 @@
          get_storage: Some(get_storage),
          set_storage: Some(set_storage),
          get_balance: Some(get_balance),
-         get_code_size: Some(get_code_size),
-         get_code_hash: Some(get_code_hash),
-         copy_code: Some(copy_code),
-         selfdestruct: Some(selfdestruct),
          call: Some(call),
          get_tx_context: Some(get_tx_context),
          get_block_hash: Some(get_block_hash),
-         emit_log: Some(emit_log),
      }
  }
 
@@ -101,62 +83,15 @@
      };
  }
 
- unsafe extern "C" fn get_code_size(
-     context: *mut ffi::athcon_host_context,
-     address: *const ffi::athcon_address,
- ) -> usize {
-     return (*(context as *mut ExtendedContext))
-         .hctx
-         .get_code_size(&(*address).bytes);
- }
-
- unsafe extern "C" fn get_code_hash(
-     context: *mut ffi::athcon_host_context,
-     address: *const ffi::athcon_address,
- ) -> ffi::athcon_bytes32 {
-     return ffi::athcon_bytes32 {
-         bytes: (*(context as *mut ExtendedContext))
-             .hctx
-             .get_code_hash(&(*address).bytes),
-     };
- }
-
- unsafe extern "C" fn copy_code(
-     context: *mut ffi::athcon_host_context,
-     address: *const ffi::athcon_address,
-     code_offset: usize,
-     buffer_data: *mut u8,
-     buffer_size: usize,
- ) -> usize {
-     return (*(context as *mut ExtendedContext)).hctx.copy_code(
-         &(*address).bytes,
-         &code_offset,
-         &buffer_data,
-         &buffer_size,
-     );
- }
-
- unsafe extern "C" fn selfdestruct(
-     context: *mut ffi::athcon_host_context,
-     address: *const ffi::athcon_address,
-     beneficiary: *const ffi::athcon_address,
- ) {
-     (*(context as *mut ExtendedContext))
-         .hctx
-         .selfdestruct(&(*address).bytes, &(*beneficiary).bytes)
- }
-
  unsafe extern "C" fn get_tx_context(context: *mut ffi::athcon_host_context) -> ffi::athcon_tx_context {
-     let (gas_price, origin, coinbase, number, timestamp, gas_limit, difficulty, chain_id) =
+     let (gas_price, origin, height, timestamp, gas_limit, chain_id) =
          (*(context as *mut ExtendedContext)).hctx.get_tx_context();
      return ffi::athcon_tx_context {
          tx_gas_price: athcon_sys::athcon_bytes32 { bytes: gas_price },
          tx_origin: athcon_sys::athcon_address { bytes: origin },
-         block_coinbase: athcon_sys::athcon_address { bytes: coinbase },
-         block_number: number,
+         block_height: height,
          block_timestamp: timestamp,
          block_gas_limit: gas_limit,
-         block_difficulty: athcon_sys::athcon_bytes32 { bytes: difficulty },
          chain_id: athcon_sys::athcon_bytes32 { bytes: chain_id },
      };
  }
@@ -170,25 +105,6 @@
              .hctx
              .get_block_hash(number),
      };
- }
-
- unsafe extern "C" fn emit_log(
-     context: *mut ffi::athcon_host_context,
-     address: *const ffi::athcon_address,
-     data: *const u8,
-     data_size: usize,
-     topics: *const ffi::athcon_bytes32,
-     topics_count: usize,
- ) {
-     let ts = &std::slice::from_raw_parts(topics, topics_count)
-         .iter()
-         .map(|topic| topic.bytes)
-         .collect::<Vec<_>>();
-     (*(context as *mut ExtendedContext)).hctx.emit_log(
-         &(*address).bytes,
-         &ts,
-         &std::slice::from_raw_parts(data, data_size),
-     );
  }
 
  unsafe extern "C" fn release(result: *const ffi::athcon_result) {
@@ -206,14 +122,12 @@
      let (output, gas_left, create_address, status_code) =
          (*(context as *mut ExtendedContext)).hctx.call(
              msg.kind,
-             &msg.destination.bytes,
+             &msg.recipient.bytes,
              &msg.sender.bytes,
              &msg.value.bytes,
              &std::slice::from_raw_parts(msg.input_data, msg.input_size),
              msg.gas,
              msg.depth,
-             msg.flags != 0,
-             &msg.create2_salt.bytes,
          );
      let ptr = output.as_ptr();
      let len = output.len();
@@ -227,6 +141,5 @@
          create_address: ffi::athcon_address {
              bytes: create_address,
          },
-         padding: [0u8; 4],
      };
  }

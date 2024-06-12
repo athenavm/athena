@@ -38,7 +38,6 @@ pub enum SetOptionError {
 pub struct ExecutionResult {
     status_code: StatusCode,
     gas_left: i64,
-    gas_refund: i64,
     output: Option<Vec<u8>>,
     create_address: Option<Address>,
 }
@@ -72,13 +71,11 @@ impl ExecutionResult {
     pub fn new(
         _status_code: StatusCode,
         _gas_left: i64,
-        _gas_refund: i64,
         _output: Option<&[u8]>,
     ) -> Self {
         ExecutionResult {
             status_code: _status_code,
             gas_left: _gas_left,
-            gas_refund: _gas_refund,
             output: _output.map(|s| s.to_vec()),
             create_address: None,
         }
@@ -86,17 +83,17 @@ impl ExecutionResult {
 
     /// Create failure result.
     pub fn failure() -> Self {
-        ExecutionResult::new(StatusCode::ATHCON_FAILURE, 0, 0, None)
+        ExecutionResult::new(StatusCode::ATHCON_FAILURE, 0, None)
     }
 
     /// Create a revert result.
     pub fn revert(_gas_left: i64, _output: Option<&[u8]>) -> Self {
-        ExecutionResult::new(StatusCode::ATHCON_REVERT, _gas_left, 0, _output)
+        ExecutionResult::new(StatusCode::ATHCON_REVERT, _gas_left, _output)
     }
 
     /// Create a successful result.
-    pub fn success(_gas_left: i64, _gas_refund: i64, _output: Option<&[u8]>) -> Self {
-        ExecutionResult::new(StatusCode::ATHCON_SUCCESS, _gas_left, _gas_refund, _output)
+    pub fn success(_gas_left: i64, _output: Option<&[u8]>) -> Self {
+        ExecutionResult::new(StatusCode::ATHCON_SUCCESS, _gas_left, _output)
     }
 
     /// Read the status code.
@@ -107,11 +104,6 @@ impl ExecutionResult {
     /// Read the amount of gas left.
     pub fn gas_left(&self) -> i64 {
         self.gas_left
-    }
-
-    /// Read the amount of gas refunded.
-    pub fn gas_refund(&self) -> i64 {
-        self.gas_refund
     }
 
     /// Read the output returned.
@@ -255,49 +247,6 @@ impl<'a> ExecutionContext<'a> {
         }
     }
 
-    /// Get code size of an account.
-    pub fn get_code_size(&self, address: &Address) -> usize {
-        unsafe {
-            assert!((*self.host).get_code_size.is_some());
-            (*self.host).get_code_size.unwrap()(self.context, address as *const Address)
-        }
-    }
-
-    /// Get code hash of an account.
-    pub fn get_code_hash(&self, address: &Address) -> Bytes32 {
-        unsafe {
-            assert!((*self.host).get_code_size.is_some());
-            (*self.host).get_code_hash.unwrap()(self.context, address as *const Address)
-        }
-    }
-
-    /// Copy code of an account.
-    pub fn copy_code(&self, address: &Address, code_offset: usize, buffer: &mut [u8]) -> usize {
-        unsafe {
-            assert!((*self.host).copy_code.is_some());
-            (*self.host).copy_code.unwrap()(
-                self.context,
-                address as *const Address,
-                code_offset,
-                // FIXME: ensure that alignment of the array elements is OK
-                buffer.as_mut_ptr(),
-                buffer.len(),
-            )
-        }
-    }
-
-    /// Self-destruct the current account.
-    pub fn selfdestruct(&mut self, address: &Address, beneficiary: &Address) -> bool {
-        unsafe {
-            assert!((*self.host).selfdestruct.is_some());
-            (*self.host).selfdestruct.unwrap()(
-                self.context,
-                address as *const Address,
-                beneficiary as *const Address,
-            )
-        }
-    }
-
     /// Call to another account.
     pub fn call(&mut self, message: &ExecutionMessage) -> ExecutionResult {
         // There is no need to make any kind of copies here, because the caller
@@ -347,22 +296,6 @@ impl<'a> ExecutionContext<'a> {
             (*self.host).get_block_hash.unwrap()(self.context, num)
         }
     }
-
-    /// Emit a log.
-    pub fn emit_log(&mut self, address: &Address, data: &[u8], topics: &[Bytes32]) {
-        unsafe {
-            assert!((*self.host).emit_log.is_some());
-            (*self.host).emit_log.unwrap()(
-                self.context,
-                address as *const Address,
-                // FIXME: ensure that alignment of the array elements is OK
-                data.as_ptr(),
-                data.len(),
-                topics.as_ptr(),
-                topics.len(),
-            )
-        }
-    }
 }
 
 impl From<ffi::athcon_result> for ExecutionResult {
@@ -370,7 +303,6 @@ impl From<ffi::athcon_result> for ExecutionResult {
         let ret = Self {
             status_code: result.status_code,
             gas_left: result.gas_left,
-            gas_refund: result.gas_refund,
             output: if result.output_data.is_null() {
                 assert_eq!(result.output_size, 0);
                 None
@@ -443,14 +375,13 @@ impl From<ExecutionResult> for ffi::athcon_result {
         Self {
             status_code: value.status_code,
             gas_left: value.gas_left,
-            gas_refund: value.gas_refund,
             output_data: buffer,
             output_size: len,
             release: Some(release_stack_result),
             create_address: if value.create_address.is_some() {
                 value.create_address.unwrap()
             } else {
-                Address { bytes: [0u8; 20] }
+                Address { bytes: [0u8; 24] }
             },
         }
     }
@@ -511,11 +442,10 @@ mod tests {
 
     #[test]
     fn result_new() {
-        let r = ExecutionResult::new(StatusCode::ATHCON_FAILURE, 420, 21, None);
+        let r = ExecutionResult::new(StatusCode::ATHCON_FAILURE, 420,  None);
 
         assert_eq!(r.status_code(), StatusCode::ATHCON_FAILURE);
         assert_eq!(r.gas_left(), 420);
-        assert_eq!(r.gas_refund(), 21);
         assert!(r.output().is_none());
         assert!(r.create_address().is_none());
     }
@@ -539,18 +469,16 @@ mod tests {
         let f = ffi::athcon_result {
             status_code: StatusCode::ATHCON_SUCCESS,
             gas_left: 1337,
-            gas_refund: 21,
             output_data: Box::into_raw(Box::new([0xde, 0xad, 0xbe, 0xef])) as *const u8,
             output_size: 4,
             release: Some(test_result_dispose),
-            create_address: Address { bytes: [0u8; 20] },
+            create_address: Address { bytes: [0u8; 24] },
         };
 
         let r: ExecutionResult = f.into();
 
         assert_eq!(r.status_code(), StatusCode::ATHCON_SUCCESS);
         assert_eq!(r.gas_left(), 1337);
-        assert_eq!(r.gas_refund(), 21);
         assert!(r.output().is_some());
         assert_eq!(r.output().unwrap().len(), 4);
         assert!(r.create_address().is_some());
@@ -570,7 +498,6 @@ mod tests {
         unsafe {
             assert_eq!((*f).status_code, StatusCode::ATHCON_FAILURE);
             assert_eq!((*f).gas_left, 420);
-            assert_eq!((*f).gas_refund, 21);
             assert!(!(*f).output_data.is_null());
             assert_eq!((*f).output_size, 5);
             assert_eq!(
@@ -593,7 +520,6 @@ mod tests {
         unsafe {
             assert_eq!((*f).status_code, StatusCode::ATHCON_FAILURE);
             assert_eq!((*f).gas_left, 420);
-            assert_eq!((*f).gas_refund, 21);
             assert!((*f).output_data.is_null());
             assert_eq!((*f).output_size, 0);
             assert_eq!((*f).create_address.bytes, [0u8; 20]);
@@ -616,7 +542,6 @@ mod tests {
         unsafe {
             assert_eq!(f.status_code, StatusCode::ATHCON_FAILURE);
             assert_eq!(f.gas_left, 420);
-            assert_eq!(f.gas_refund, 21);
             assert!(!f.output_data.is_null());
             assert_eq!(f.output_size, 5);
             assert_eq!(
@@ -638,7 +563,6 @@ mod tests {
         unsafe {
             assert_eq!(f.status_code, StatusCode::ATHCON_FAILURE);
             assert_eq!(f.gas_left, 420);
-            assert_eq!(f.gas_refund, 21);
             assert!(f.output_data.is_null());
             assert_eq!(f.output_size, 0);
             assert_eq!(f.create_address.bytes, [0u8; 20]);
@@ -651,8 +575,8 @@ mod tests {
     #[test]
     fn message_new_with_input() {
         let input = vec![0xc0, 0xff, 0xee];
-        let recipient = Address { bytes: [32u8; 20] };
-        let sender = Address { bytes: [128u8; 20] };
+        let recipient = Address { bytes: [32u8; 24] };
+        let sender = Address { bytes: [128u8; 24] };
         let value = Uint256 { bytes: [0u8; 32] };
 
         let ret = ExecutionMessage::new(
@@ -678,8 +602,8 @@ mod tests {
 
     #[test]
     fn message_new_with_code() {
-        let recipient = Address { bytes: [32u8; 20] };
-        let sender = Address { bytes: [128u8; 20] };
+        let recipient = Address { bytes: [32u8; 24] };
+        let sender = Address { bytes: [128u8; 24] };
         let value = Uint256 { bytes: [0u8; 32] };
         let code = vec![0x5f, 0x5f, 0xfd];
 
@@ -706,8 +630,8 @@ mod tests {
 
     #[test]
     fn message_from_ffi() {
-        let recipient = Address { bytes: [32u8; 20] };
-        let sender = Address { bytes: [128u8; 20] };
+        let recipient = Address { bytes: [32u8; 24] };
+        let sender = Address { bytes: [128u8; 24] };
         let value = Uint256 { bytes: [0u8; 32] };
 
         let msg = ffi::athcon_message {
@@ -738,8 +662,8 @@ mod tests {
     #[test]
     fn message_from_ffi_with_input() {
         let input = vec![0xc0, 0xff, 0xee];
-        let recipient = Address { bytes: [32u8; 20] };
-        let sender = Address { bytes: [128u8; 20] };
+        let recipient = Address { bytes: [32u8; 24] };
+        let sender = Address { bytes: [128u8; 24] };
         let value = Uint256 { bytes: [0u8; 32] };
 
         let msg = ffi::athcon_message {
@@ -770,8 +694,8 @@ mod tests {
 
     #[test]
     fn message_from_ffi_with_code() {
-        let recipient = Address { bytes: [32u8; 20] };
-        let sender = Address { bytes: [128u8; 20] };
+        let recipient = Address { bytes: [32u8; 24] };
+        let sender = Address { bytes: [128u8; 24] };
         let value = Uint256 { bytes: [0u8; 32] };
         let code = vec![0x5f, 0x5f, 0xfd];
 
@@ -806,7 +730,7 @@ mod tests {
     ) -> ffi::athcon_tx_context {
         ffi::athcon_tx_context {
             tx_gas_price: Uint256 { bytes: [0u8; 32] },
-            tx_origin: Address { bytes: [0u8; 20] },
+            tx_origin: Address { bytes: [0u8; 24] },
             block_height: 42,
             block_timestamp: 235117,
             block_gas_limit: 105023,
@@ -840,7 +764,6 @@ mod tests {
                 StatusCode::ATHCON_INTERNAL_ERROR
             },
             gas_left: 2,
-            gas_refund: 0,
             // NOTE: we are passing the input pointer here, but for testing the lifetime is ok
             output_data: msg.input_data,
             output_size: msg.input_size,
@@ -873,22 +796,7 @@ mod tests {
 
         assert_eq!(a.block_gas_limit, b.block_gas_limit);
         assert_eq!(a.block_timestamp, b.block_timestamp);
-        assert_eq!(a.block_number, b.block_number);
-    }
-
-    #[test]
-    fn get_code_size() {
-        // This address is useless. Just a dummy parameter for the interface function.
-        let test_addr = Address { bytes: [0u8; 20] };
-        let host = get_dummy_host_interface();
-        let host_context = std::ptr::null_mut();
-
-        let exe_context = ExecutionContext::new(&host, host_context);
-
-        let a: usize = 105023;
-        let b = exe_context.get_code_size(&test_addr);
-
-        assert_eq!(a, b);
+        assert_eq!(a.block_height, b.block_height);
     }
 
     #[test]

@@ -16,50 +16,50 @@
 
  enum_from_primitive! {
  #[derive(Debug)]
- pub enum athconLoaderErrorCode {
+ pub enum AthconLoaderErrorCode {
      /** The loader succeeded. */
-     athconLoaderSucces = 0,
+     AthconLoaderSuccess = 0,
 
      /** The loader cannot open the given file name. */
-     athconLoaderCannotOpen = 1,
+     AthconLoaderCannotOpen = 1,
 
      /** The VM create function not found. */
-     athconLoaderSymbolNotFound = 2,
+     AthconLoaderSymbolNotFound = 2,
 
      /** The invalid argument value provided. */
-     athconLoaderInvalidArgument = 3,
+     AthconLoaderInvalidArgument = 3,
 
      /** The creation of a VM instance has failed. */
-     athconLoaderInstanceCreationFailure = 4,
+     AthconLoaderInstanceCreationFailure = 4,
 
      /** The ABI version of the VM instance has mismatched. */
-     athconLoaderAbiVersionMismatch = 5,
+     AthconLoaderAbiVersionMismatch = 5,
 
      /** The VM option is invalid. */
-     athconLoaderInvalidOptionName = 6,
+     AthconLoaderInvalidOptionName = 6,
 
      /** The VM option value is invalid. */
-     athconLoaderInvalidOptionValue = 7,
+     AthconLoaderInvalidOptionValue = 7,
  }
  }
 
- fn error(err: athconLoaderErrorCode) -> Result<athconLoaderErrorCode, &'static str> {
+ fn error(err: AthconLoaderErrorCode) -> Result<AthconLoaderErrorCode, &'static str> {
      match err {
-         athconLoaderErrorCode::athconLoaderSucces => Ok(athconLoaderErrorCode::athconLoaderSucces),
+         AthconLoaderErrorCode::AthconLoaderSuccess => Ok(AthconLoaderErrorCode::AthconLoaderSuccess),
          _ => unsafe { Err(CStr::from_ptr(athcon_last_error_msg()).to_str().unwrap()) },
      }
  }
 
  pub fn load_and_create(
      fname: &str,
- ) -> (*mut ffi::athcon_vm, Result<athconLoaderErrorCode, &'static str>) {
+ ) -> (*mut ffi::athcon_vm, Result<AthconLoaderErrorCode, &'static str>) {
      let c_str = CString::new(fname).unwrap();
      unsafe {
          let mut error_code: i32 = 0;
          let instance = athcon_load_and_create(c_str.as_ptr() as *const c_char, &mut error_code);
          return (
              instance,
-             error(athconLoaderErrorCode::from_i32(error_code).unwrap()),
+             error(AthconLoaderErrorCode::from_i32(error_code).unwrap()),
          );
      }
  }

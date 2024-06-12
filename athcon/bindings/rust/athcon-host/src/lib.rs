@@ -3,7 +3,7 @@
  pub mod host;
  mod loader;
  pub mod types;
- pub use crate::loader::{load_and_create, athconLoaderErrorCode};
+ pub use crate::loader::{load_and_create, AthconLoaderErrorCode};
  use crate::types::*;
  use athcon_sys as ffi;
  use std::ffi::CStr;
@@ -12,12 +12,12 @@
      fn athcon_create() -> *mut ffi::athcon_vm;
  }
 
- pub struct athconVm {
+ pub struct AthconVm {
      handle: *mut ffi::athcon_vm,
      host_interface: *mut ffi::athcon_host_interface,
  }
 
- impl athconVm {
+ impl AthconVm {
      pub fn get_abi_version(&self) -> i32 {
          unsafe {
              let version: i32 = (*self.handle).abi_version;
@@ -48,7 +48,6 @@
          ctx: &mut dyn host::HostContext,
          rev: Revision,
          kind: MessageKind,
-         is_static: bool,
          depth: i32,
          gas: i64,
          destination: &Address,
@@ -56,32 +55,22 @@
          input: &Bytes,
          value: &Bytes32,
          code: &Bytes,
-         create2_salt: &Bytes32,
      ) -> (&Bytes, i64, StatusCode) {
          let ext_ctx = host::ExtendedContext { hctx: ctx };
-         let mut athcon_flags: u32 = 0;
-         unsafe {
-             if is_static {
-                 athcon_flags |=
-                     std::mem::transmute::<ffi::athcon_flags, u32>(ffi::athcon_flags::ATHCON_STATIC);
-             }
-         }
          let athcon_message = Box::into_raw(Box::new({
              ffi::athcon_message {
                  kind: kind,
-                 flags: athcon_flags,
                  depth: depth,
                  gas: gas,
-                 destination: ffi::athcon_address {
+                 recipient: ffi::athcon_address {
                      bytes: *destination,
                  },
                  sender: ffi::athcon_address { bytes: *sender },
                  input_data: input.as_ptr(),
                  input_size: input.len(),
                  value: ffi::athcon_uint256be { bytes: *value },
-                 create2_salt: ffi::athcon_bytes32 {
-                     bytes: *create2_salt,
-                 },
+                 code: code.as_ptr(),
+                 code_size: code.len(),
              }
          }));
          unsafe {
@@ -104,19 +93,12 @@
              );
          }
      }
-
-     pub fn has_capability(&self, capability: Capabilities) -> bool {
-         unsafe {
-             std::mem::transmute::<Capabilities, u32>(capability)
-                 == ((*self.handle).get_capabilities.unwrap())(self.handle)
-         }
-     }
  }
 
- pub fn load(fname: &str) -> (athconVm, Result<athconLoaderErrorCode, &'static str>) {
+ pub fn load(fname: &str) -> (AthconVm, Result<AthconLoaderErrorCode, &'static str>) {
      let (instance, ec) = load_and_create(fname);
      (
-         athconVm {
+         AthconVm {
              handle: instance,
              host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
          },
@@ -124,9 +106,9 @@
      )
  }
 
- pub fn create() -> athconVm {
+ pub fn create() -> AthconVm {
      unsafe {
-         athconVm {
+         AthconVm {
              handle: athcon_create(),
              host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
          }

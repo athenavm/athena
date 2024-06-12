@@ -1,11 +1,11 @@
-use crate::athconVm;
+use crate::AthconVm;
 
 use std::ops::{Deref, DerefMut};
 
 /// Container struct for ATHCON instances and user-defined data.
 pub struct AthconContainer<T>
 where
-    T: athconVm + Sized,
+    T: AthconVm + Sized,
 {
     #[allow(dead_code)]
     instance: ::athcon_sys::athcon_vm,
@@ -14,7 +14,7 @@ where
 
 impl<T> AthconContainer<T>
 where
-    T: athconVm + Sized,
+    T: AthconVm + Sized,
 {
     /// Basic constructor.
     pub fn new(_instance: ::athcon_sys::athcon_vm) -> Box<Self> {
@@ -44,7 +44,7 @@ where
 
 impl<T> Deref for AthconContainer<T>
 where
-    T: athconVm,
+    T: AthconVm,
 {
     type Target = T;
 
@@ -55,7 +55,7 @@ where
 
 impl<T> DerefMut for AthconContainer<T>
 where
-    T: athconVm,
+    T: AthconVm,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.vm
@@ -70,7 +70,7 @@ mod tests {
 
     struct TestVm {}
 
-    impl athconVm for TestVm {
+    impl AthconVm for TestVm {
         fn init() -> Self {
             TestVm {}
         }
