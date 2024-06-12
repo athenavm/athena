@@ -108,11 +108,15 @@
  }
 
  unsafe extern "C" fn release(result: *const ffi::athcon_result) {
-     drop(std::slice::from_raw_parts(
-         (*result).output_data,
-         (*result).output_size,
-     ));
- }
+  // Recreate the Vec<u8> from the raw parts to take ownership back
+  // This allows Rust to properly free the allocated memory when the Vec goes out of scope
+  let _output = Vec::from_raw_parts(
+      (*result).output_data as *mut u8,
+      (*result).output_size,
+      (*result).output_size,
+  );
+  // No need to explicitly call drop here; it will be dropped when _output goes out of scope
+}
 
  pub unsafe extern "C" fn call(
      context: *mut ffi::athcon_host_context,
@@ -130,6 +134,7 @@
              msg.depth,
          );
      let ptr = output.as_ptr();
+     // Prevent Rust from automatically freeing the memory
      let len = output.len();
      mem::forget(output);
      return ffi::athcon_result {
