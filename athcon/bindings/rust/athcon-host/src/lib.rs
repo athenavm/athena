@@ -1,9 +1,6 @@
- #[macro_use]
  extern crate enum_primitive;
  pub mod host;
- mod loader;
  pub mod types;
- pub use crate::loader::{load_and_create, AthconLoaderErrorCode};
  use crate::types::*;
  use athcon_sys as ffi;
  use std::ffi::CStr;
@@ -93,17 +90,6 @@
              );
          }
      }
- }
-
- pub fn load(fname: &str) -> (AthconVm, Result<AthconLoaderErrorCode, &'static str>) {
-     let (instance, ec) = load_and_create(fname);
-     (
-         AthconVm {
-             handle: instance,
-             host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
-         },
-         ec,
-     )
  }
 
  pub fn create() -> AthconVm {
