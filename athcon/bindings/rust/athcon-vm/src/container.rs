@@ -3,7 +3,7 @@ use crate::athconVm;
 use std::ops::{Deref, DerefMut};
 
 /// Container struct for ATHCON instances and user-defined data.
-pub struct athconContainer<T>
+pub struct AthconContainer<T>
 where
     T: athconVm + Sized,
 {
@@ -12,7 +12,7 @@ where
     vm: T,
 }
 
-impl<T> athconContainer<T>
+impl<T> AthconContainer<T>
 where
     T: athconVm + Sized,
 {
@@ -30,7 +30,7 @@ where
     /// This function expects a valid instance to be passed.
     pub unsafe fn from_ffi_pointer(instance: *mut ::athcon_sys::athcon_vm) -> Box<Self> {
         assert!(!instance.is_null(), "from_ffi_pointer received NULL");
-        Box::from_raw(instance as *mut athconContainer<T>)
+        Box::from_raw(instance as *mut AthconContainer<T>)
     }
 
     /// Convert boxed self into an FFI pointer, surrendering ownership of the heap data.
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<T> Deref for athconContainer<T>
+impl<T> Deref for AthconContainer<T>
 where
     T: athconVm,
 {
@@ -53,7 +53,7 @@ where
     }
 }
 
-impl<T> DerefMut for athconContainer<T>
+impl<T> DerefMut for AthconContainer<T>
 where
     T: athconVm,
 {
@@ -91,18 +91,10 @@ mod tests {
         athcon_sys::athcon_tx_context {
             tx_gas_price: Uint256::default(),
             tx_origin: Address::default(),
-            block_coinbase: Address::default(),
-            block_number: 0,
+            block_height: 0,
             block_timestamp: 0,
             block_gas_limit: 0,
-            block_prev_randao: Uint256::default(),
             chain_id: Uint256::default(),
-            block_base_fee: Uint256::default(),
-            blob_base_fee: Uint256::default(),
-            blob_hashes: std::ptr::null(),
-            blob_hashes_count: 0,
-            initcodes: std::ptr::null(),
-            initcodes_count: 0,
         }
     }
 
@@ -122,7 +114,6 @@ mod tests {
 
         let message = ::athcon_sys::athcon_message {
             kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
-            flags: 0,
             depth: 0,
             gas: 0,
             recipient: ::athcon_sys::athcon_address::default(),
@@ -130,8 +121,6 @@ mod tests {
             input_data: std::ptr::null(),
             input_size: 0,
             value: ::athcon_sys::athcon_uint256be::default(),
-            create2_salt: ::athcon_sys::athcon_bytes32::default(),
-            code_address: ::athcon_sys::athcon_address::default(),
             code: std::ptr::null(),
             code_size: 0,
         };
@@ -142,27 +131,18 @@ mod tests {
             get_storage: None,
             set_storage: None,
             get_balance: None,
-            get_code_size: None,
-            get_code_hash: None,
-            copy_code: None,
-            selfdestruct: None,
             call: None,
             get_tx_context: Some(get_dummy_tx_context),
             get_block_hash: None,
-            emit_log: None,
-            access_account: None,
-            access_storage: None,
-            get_transient_storage: None,
-            set_transient_storage: None,
         };
         let host_context = std::ptr::null_mut();
 
         let mut context = ExecutionContext::new(&host, host_context);
-        let container = athconContainer::<TestVm>::new(instance);
+        let container = AthconContainer::<TestVm>::new(instance);
         assert_eq!(
             container
                 .execute(
-                    athcon_sys::athcon_revision::ATHCON_PETERSBURG,
+                    athcon_sys::athcon_revision::ATHCON_FRONTIER,
                     &code,
                     &message,
                     Some(&mut context)
@@ -171,14 +151,14 @@ mod tests {
             ::athcon_sys::athcon_status_code::ATHCON_FAILURE
         );
 
-        let ptr = unsafe { athconContainer::into_ffi_pointer(container) };
+        let ptr = unsafe { AthconContainer::into_ffi_pointer(container) };
 
         let mut context = ExecutionContext::new(&host, host_context);
-        let container = unsafe { athconContainer::<TestVm>::from_ffi_pointer(ptr) };
+        let container = unsafe { AthconContainer::<TestVm>::from_ffi_pointer(ptr) };
         assert_eq!(
             container
                 .execute(
-                    athcon_sys::athcon_revision::ATHCON_PETERSBURG,
+                    athcon_sys::athcon_revision::ATHCON_FRONTIER,
                     &code,
                     &message,
                     Some(&mut context)

@@ -12,14 +12,8 @@ pub type Uint256 = ffi::athcon_uint256be;
 /// ATHCON call kind.
 pub type MessageKind = ffi::athcon_call_kind;
 
-/// ATHCON message (call) flags.
-pub type MessageFlags = ffi::athcon_flags;
-
 /// ATHCON status code.
 pub type StatusCode = ffi::athcon_status_code;
-
-/// ATHCON access status.
-pub type AccessStatus = ffi::athcon_access_status;
 
 /// ATHCON storage status.
 pub type StorageStatus = ffi::athcon_storage_status;
@@ -54,30 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn message_kind() {
-        assert_eq!(MessageKind::ATHCON_CALL, ffi::athcon_call_kind::ATHCON_CALL);
-        assert_eq!(
-            MessageKind::ATHCON_CALLCODE,
-            ffi::athcon_call_kind::ATHCON_CALLCODE
-        );
-        assert_eq!(
-            MessageKind::ATHCON_DELEGATECALL,
-            ffi::athcon_call_kind::ATHCON_DELEGATECALL
-        );
-        assert_eq!(MessageKind::ATHCON_CREATE, ffi::athcon_call_kind::ATHCON_CREATE);
-        assert_eq!(MessageKind::ATHCON_CREATE2, ffi::athcon_call_kind::ATHCON_CREATE2);
-        assert_eq!(
-            MessageKind::ATHCON_EOFCREATE,
-            ffi::athcon_call_kind::ATHCON_EOFCREATE
-        );
-    }
-
-    #[test]
-    fn message_flags() {
-        assert_eq!(MessageFlags::ATHCON_STATIC, ffi::athcon_flags::ATHCON_STATIC);
-    }
-
-    #[test]
     fn status_code() {
         assert_eq!(
             StatusCode::ATHCON_SUCCESS,
@@ -86,18 +56,6 @@ mod tests {
         assert_eq!(
             StatusCode::ATHCON_FAILURE,
             ffi::athcon_status_code::ATHCON_FAILURE
-        );
-    }
-
-    #[test]
-    fn access_status() {
-        assert_eq!(
-            AccessStatus::ATHCON_ACCESS_COLD,
-            ffi::athcon_access_status::ATHCON_ACCESS_COLD
-        );
-        assert_eq!(
-            AccessStatus::ATHCON_ACCESS_WARM,
-            ffi::athcon_access_status::ATHCON_ACCESS_WARM
         );
     }
 

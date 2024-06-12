@@ -3,12 +3,12 @@
 mod container;
 mod types;
 
-pub use container::athconContainer;
+pub use container::AthconContainer;
 pub use athcon_sys as ffi;
 pub use types::*;
 
 /// Trait ATHCON VMs have to implement.
-pub trait athconVm {
+pub trait AthconVm {
     /// This is called once at initialisation time.
     fn init() -> Self;
 
@@ -47,15 +47,12 @@ pub struct ExecutionResult {
 #[derive(Debug)]
 pub struct ExecutionMessage {
     kind: MessageKind,
-    flags: u32,
     depth: i32,
     gas: i64,
     recipient: Address,
     sender: Address,
     input: Option<Vec<u8>>,
     value: Uint256,
-    create2_salt: Bytes32,
-    code_address: Address,
     code: Option<Vec<u8>>,
 }
 
@@ -132,28 +129,22 @@ impl ExecutionResult {
 impl ExecutionMessage {
     pub fn new(
         kind: MessageKind,
-        flags: u32,
         depth: i32,
         gas: i64,
         recipient: Address,
         sender: Address,
         input: Option<&[u8]>,
         value: Uint256,
-        create2_salt: Bytes32,
-        code_address: Address,
         code: Option<&[u8]>,
     ) -> Self {
         ExecutionMessage {
             kind,
-            flags,
             depth,
             gas,
             recipient,
             sender,
             input: input.map(|s| s.to_vec()),
             value,
-            create2_salt,
-            code_address,
             code: code.map(|s| s.to_vec()),
         }
     }
@@ -161,11 +152,6 @@ impl ExecutionMessage {
     /// Read the message kind.
     pub fn kind(&self) -> MessageKind {
         self.kind
-    }
-
-    /// Read the message flags.
-    pub fn flags(&self) -> u32 {
-        self.flags
     }
 
     /// Read the call depth.
@@ -196,16 +182,6 @@ impl ExecutionMessage {
     /// Read the value of the message.
     pub fn value(&self) -> &Uint256 {
         &self.value
-    }
-
-    /// Read the salt for CREATE2. Only valid if the message kind is CREATE2.
-    pub fn create2_salt(&self) -> &Bytes32 {
-        &self.create2_salt
-    }
-
-    /// Read the code address of the message.
-    pub fn code_address(&self) -> &Address {
-        &self.code_address
     }
 
     /// Read the optional init code.
@@ -348,7 +324,6 @@ impl<'a> ExecutionContext<'a> {
         // athcon_message doesn't have a release() method we could abstract it with.
         let message = ffi::athcon_message {
             kind: message.kind(),
-            flags: message.flags(),
             depth: message.depth(),
             gas: message.gas(),
             recipient: *message.recipient(),
@@ -356,8 +331,6 @@ impl<'a> ExecutionContext<'a> {
             input_data,
             input_size,
             value: *message.value(),
-            create2_salt: *message.create2_salt(),
-            code_address: *message.code_address(),
             code: code_data,
             code_size,
         };
@@ -387,26 +360,6 @@ impl<'a> ExecutionContext<'a> {
                 data.len(),
                 topics.as_ptr(),
                 topics.len(),
-            )
-        }
-    }
-
-    /// Access an account.
-    pub fn access_account(&mut self, address: &Address) -> AccessStatus {
-        unsafe {
-            assert!((*self.host).access_account.is_some());
-            (*self.host).access_account.unwrap()(self.context, address as *const Address)
-        }
-    }
-
-    /// Access a storage key.
-    pub fn access_storage(&mut self, address: &Address, key: &Bytes32) -> AccessStatus {
-        unsafe {
-            assert!((*self.host).access_storage.is_some());
-            (*self.host).access_storage.unwrap()(
-                self.context,
-                address as *const Address,
-                key as *const Bytes32,
             )
         }
     }
@@ -499,7 +452,6 @@ impl From<ExecutionResult> for ffi::athcon_result {
             } else {
                 Address { bytes: [0u8; 20] }
             },
-            padding: [0u8; 4],
         }
     }
 }
@@ -516,7 +468,6 @@ impl From<&ffi::athcon_message> for ExecutionMessage {
     fn from(message: &ffi::athcon_message) -> Self {
         ExecutionMessage {
             kind: message.kind,
-            flags: message.flags,
             depth: message.depth,
             gas: message.gas,
             recipient: message.recipient,
@@ -530,8 +481,6 @@ impl From<&ffi::athcon_message> for ExecutionMessage {
                 Some(from_buf_raw::<u8>(message.input_data, message.input_size))
             },
             value: message.value,
-            create2_salt: message.create2_salt,
-            code_address: message.code_address,
             code: if message.code.is_null() {
                 assert_eq!(message.code_size, 0);
                 None
@@ -595,7 +544,6 @@ mod tests {
             output_size: 4,
             release: Some(test_result_dispose),
             create_address: Address { bytes: [0u8; 20] },
-            padding: [0u8; 4],
         };
 
         let r: ExecutionResult = f.into();
@@ -706,25 +654,19 @@ mod tests {
         let recipient = Address { bytes: [32u8; 20] };
         let sender = Address { bytes: [128u8; 20] };
         let value = Uint256 { bytes: [0u8; 32] };
-        let create2_salt = Bytes32 { bytes: [255u8; 32] };
-        let code_address = Address { bytes: [64u8; 20] };
 
         let ret = ExecutionMessage::new(
             MessageKind::ATHCON_CALL,
-            44,
             66,
             4466,
             recipient,
             sender,
             Some(&input),
             value,
-            create2_salt,
-            code_address,
             None,
         );
 
         assert_eq!(ret.kind(), MessageKind::ATHCON_CALL);
-        assert_eq!(ret.flags(), 44);
         assert_eq!(ret.depth(), 66);
         assert_eq!(ret.gas(), 4466);
         assert_eq!(*ret.recipient(), recipient);
@@ -732,8 +674,6 @@ mod tests {
         assert!(ret.input().is_some());
         assert_eq!(*ret.input().unwrap(), input);
         assert_eq!(*ret.value(), value);
-        assert_eq!(*ret.create2_salt(), create2_salt);
-        assert_eq!(*ret.code_address(), code_address);
     }
 
     #[test]
@@ -741,33 +681,25 @@ mod tests {
         let recipient = Address { bytes: [32u8; 20] };
         let sender = Address { bytes: [128u8; 20] };
         let value = Uint256 { bytes: [0u8; 32] };
-        let create2_salt = Bytes32 { bytes: [255u8; 32] };
-        let code_address = Address { bytes: [64u8; 20] };
         let code = vec![0x5f, 0x5f, 0xfd];
 
         let ret = ExecutionMessage::new(
             MessageKind::ATHCON_CALL,
-            44,
             66,
             4466,
             recipient,
             sender,
             None,
             value,
-            create2_salt,
-            code_address,
             Some(&code),
         );
 
         assert_eq!(ret.kind(), MessageKind::ATHCON_CALL);
-        assert_eq!(ret.flags(), 44);
         assert_eq!(ret.depth(), 66);
         assert_eq!(ret.gas(), 4466);
         assert_eq!(*ret.recipient(), recipient);
         assert_eq!(*ret.sender(), sender);
         assert_eq!(*ret.value(), value);
-        assert_eq!(*ret.create2_salt(), create2_salt);
-        assert_eq!(*ret.code_address(), code_address);
         assert!(ret.code().is_some());
         assert_eq!(*ret.code().unwrap(), code);
     }
@@ -777,12 +709,9 @@ mod tests {
         let recipient = Address { bytes: [32u8; 20] };
         let sender = Address { bytes: [128u8; 20] };
         let value = Uint256 { bytes: [0u8; 32] };
-        let create2_salt = Bytes32 { bytes: [255u8; 32] };
-        let code_address = Address { bytes: [64u8; 20] };
 
         let msg = ffi::athcon_message {
             kind: MessageKind::ATHCON_CALL,
-            flags: 44,
             depth: 66,
             gas: 4466,
             recipient,
@@ -790,8 +719,6 @@ mod tests {
             input_data: std::ptr::null(),
             input_size: 0,
             value,
-            create2_salt,
-            code_address,
             code: std::ptr::null(),
             code_size: 0,
         };
@@ -799,15 +726,12 @@ mod tests {
         let ret: ExecutionMessage = (&msg).into();
 
         assert_eq!(ret.kind(), msg.kind);
-        assert_eq!(ret.flags(), msg.flags);
         assert_eq!(ret.depth(), msg.depth);
         assert_eq!(ret.gas(), msg.gas);
         assert_eq!(*ret.recipient(), msg.recipient);
         assert_eq!(*ret.sender(), msg.sender);
         assert!(ret.input().is_none());
         assert_eq!(*ret.value(), msg.value);
-        assert_eq!(*ret.create2_salt(), msg.create2_salt);
-        assert_eq!(*ret.code_address(), msg.code_address);
         assert!(ret.code().is_none());
     }
 
@@ -817,12 +741,9 @@ mod tests {
         let recipient = Address { bytes: [32u8; 20] };
         let sender = Address { bytes: [128u8; 20] };
         let value = Uint256 { bytes: [0u8; 32] };
-        let create2_salt = Bytes32 { bytes: [255u8; 32] };
-        let code_address = Address { bytes: [64u8; 20] };
 
         let msg = ffi::athcon_message {
             kind: MessageKind::ATHCON_CALL,
-            flags: 44,
             depth: 66,
             gas: 4466,
             recipient,
@@ -830,8 +751,6 @@ mod tests {
             input_data: input.as_ptr(),
             input_size: input.len(),
             value,
-            create2_salt,
-            code_address,
             code: std::ptr::null(),
             code_size: 0,
         };
@@ -839,7 +758,6 @@ mod tests {
         let ret: ExecutionMessage = (&msg).into();
 
         assert_eq!(ret.kind(), msg.kind);
-        assert_eq!(ret.flags(), msg.flags);
         assert_eq!(ret.depth(), msg.depth);
         assert_eq!(ret.gas(), msg.gas);
         assert_eq!(*ret.recipient(), msg.recipient);
@@ -847,8 +765,6 @@ mod tests {
         assert!(ret.input().is_some());
         assert_eq!(*ret.input().unwrap(), input);
         assert_eq!(*ret.value(), msg.value);
-        assert_eq!(*ret.create2_salt(), msg.create2_salt);
-        assert_eq!(*ret.code_address(), msg.code_address);
         assert!(ret.code().is_none());
     }
 
@@ -857,13 +773,10 @@ mod tests {
         let recipient = Address { bytes: [32u8; 20] };
         let sender = Address { bytes: [128u8; 20] };
         let value = Uint256 { bytes: [0u8; 32] };
-        let create2_salt = Bytes32 { bytes: [255u8; 32] };
-        let code_address = Address { bytes: [64u8; 20] };
         let code = vec![0x5f, 0x5f, 0xfd];
 
         let msg = ffi::athcon_message {
             kind: MessageKind::ATHCON_CALL,
-            flags: 44,
             depth: 66,
             gas: 4466,
             recipient,
@@ -871,8 +784,6 @@ mod tests {
             input_data: std::ptr::null(),
             input_size: 0,
             value,
-            create2_salt,
-            code_address,
             code: code.as_ptr(),
             code_size: code.len(),
         };
@@ -880,15 +791,12 @@ mod tests {
         let ret: ExecutionMessage = (&msg).into();
 
         assert_eq!(ret.kind(), msg.kind);
-        assert_eq!(ret.flags(), msg.flags);
         assert_eq!(ret.depth(), msg.depth);
         assert_eq!(ret.gas(), msg.gas);
         assert_eq!(*ret.recipient(), msg.recipient);
         assert_eq!(*ret.sender(), msg.sender);
         assert!(ret.input().is_none());
         assert_eq!(*ret.value(), msg.value);
-        assert_eq!(*ret.create2_salt(), msg.create2_salt);
-        assert_eq!(*ret.code_address(), msg.code_address);
         assert!(ret.code().is_some());
         assert_eq!(*ret.code().unwrap(), code);
     }
@@ -899,18 +807,10 @@ mod tests {
         ffi::athcon_tx_context {
             tx_gas_price: Uint256 { bytes: [0u8; 32] },
             tx_origin: Address { bytes: [0u8; 20] },
-            block_coinbase: Address { bytes: [0u8; 20] },
-            block_number: 42,
+            block_height: 42,
             block_timestamp: 235117,
             block_gas_limit: 105023,
-            block_prev_randao: Uint256 { bytes: [0xaa; 32] },
             chain_id: Uint256::default(),
-            block_base_fee: Uint256::default(),
-            blob_base_fee: Uint256::default(),
-            blob_hashes: std::ptr::null(),
-            blob_hashes_count: 0,
-            initcodes: std::ptr::null(),
-            initcodes_count: 0,
         }
     }
 
@@ -946,7 +846,6 @@ mod tests {
             output_size: msg.input_size,
             release: None,
             create_address: Address::default(),
-            padding: [0u8; 4],
         }
     }
 
@@ -957,18 +856,9 @@ mod tests {
             get_storage: None,
             set_storage: None,
             get_balance: None,
-            get_code_size: Some(get_dummy_code_size),
-            get_code_hash: None,
-            copy_code: None,
-            selfdestruct: None,
             call: Some(execute_call),
             get_tx_context: Some(get_dummy_tx_context),
             get_block_hash: None,
-            emit_log: None,
-            access_account: None,
-            access_storage: None,
-            get_transient_storage: None,
-            set_transient_storage: None,
         }
     }
 
@@ -1012,14 +902,11 @@ mod tests {
         let message = ExecutionMessage::new(
             MessageKind::ATHCON_CALL,
             0,
-            0,
             6566,
             test_addr,
             test_addr,
             None,
             Uint256::default(),
-            Bytes32::default(),
-            test_addr,
             None,
         );
 
@@ -1045,14 +932,11 @@ mod tests {
         let message = ExecutionMessage::new(
             MessageKind::ATHCON_CALL,
             0,
-            0,
             6566,
             test_addr,
             test_addr,
             Some(&data),
             Uint256::default(),
-            Bytes32::default(),
-            test_addr,
             None,
         );
 

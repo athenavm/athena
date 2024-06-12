@@ -84,8 +84,6 @@ struct athcon_message
      * This is the address of the account which storage/balance/nonce is going to be modified
      * by the message execution. In case of ::ATHCON_CALL, this is also the account where the
      * message value athcon_message::value is going to be transferred.
-     * For ::ATHCON_CALLCODE or ::ATHCON_DELEGATECALL, this may be different from
-     * the athcon_message::code_address.
      */
     athcon_address recipient;
 
