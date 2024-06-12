@@ -489,7 +489,6 @@ mod tests {
         let r = ExecutionResult::new(
             StatusCode::ATHCON_FAILURE,
             420,
-            21,
             Some(&[0xc0, 0xff, 0xee, 0x71, 0x75]),
         );
 
@@ -504,7 +503,7 @@ mod tests {
                 std::slice::from_raw_parts((*f).output_data, 5) as &[u8],
                 &[0xc0, 0xff, 0xee, 0x71, 0x75]
             );
-            assert_eq!((*f).create_address.bytes, [0u8; 20]);
+            assert_eq!((*f).create_address.bytes, [0u8; 24]);
             if (*f).release.is_some() {
                 (*f).release.unwrap()(f);
             }
@@ -513,7 +512,7 @@ mod tests {
 
     #[test]
     fn result_into_heap_ffi_empty_data() {
-        let r = ExecutionResult::new(StatusCode::ATHCON_FAILURE, 420, 21, None);
+        let r = ExecutionResult::new(StatusCode::ATHCON_FAILURE, 420, None);
 
         let f: *const ffi::athcon_result = r.into();
         assert!(!f.is_null());
@@ -522,7 +521,7 @@ mod tests {
             assert_eq!((*f).gas_left, 420);
             assert!((*f).output_data.is_null());
             assert_eq!((*f).output_size, 0);
-            assert_eq!((*f).create_address.bytes, [0u8; 20]);
+            assert_eq!((*f).create_address.bytes, [0u8; 24]);
             if (*f).release.is_some() {
                 (*f).release.unwrap()(f);
             }
@@ -534,7 +533,6 @@ mod tests {
         let r = ExecutionResult::new(
             StatusCode::ATHCON_FAILURE,
             420,
-            21,
             Some(&[0xc0, 0xff, 0xee, 0x71, 0x75]),
         );
 
@@ -548,7 +546,7 @@ mod tests {
                 std::slice::from_raw_parts(f.output_data, 5) as &[u8],
                 &[0xc0, 0xff, 0xee, 0x71, 0x75]
             );
-            assert_eq!(f.create_address.bytes, [0u8; 20]);
+            assert_eq!(f.create_address.bytes, [0u8; 24]);
             if f.release.is_some() {
                 f.release.unwrap()(&f);
             }
@@ -557,7 +555,7 @@ mod tests {
 
     #[test]
     fn result_into_stack_ffi_empty_data() {
-        let r = ExecutionResult::new(StatusCode::ATHCON_FAILURE, 420, 21, None);
+        let r = ExecutionResult::new(StatusCode::ATHCON_FAILURE, 420, None);
 
         let f: ffi::athcon_result = r.into();
         unsafe {
@@ -565,7 +563,7 @@ mod tests {
             assert_eq!(f.gas_left, 420);
             assert!(f.output_data.is_null());
             assert_eq!(f.output_size, 0);
-            assert_eq!(f.create_address.bytes, [0u8; 20]);
+            assert_eq!(f.create_address.bytes, [0u8; 24]);
             if f.release.is_some() {
                 f.release.unwrap()(&f);
             }
