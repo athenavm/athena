@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+athcon-sys = { path = "../athcon-sys" }
+athcon-vm = { path = "../athcon-vm" }
+enum_primitive = "0.1.1"
+num = "0.3"
