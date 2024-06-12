@@ -11,7 +11,14 @@ members = [
   "vm/entrypoint",
   "vm/precompiles",
 ]
-exclude = ["examples/target"]
 resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Lane Rettig <lane@spacemesh.io>"]
+repository = "https://github.com/athenavm/athena"
+homepage = "https://www.athenavm.org/"
+license = "MIT OR Apache-2.0"
+edition = "2021"
 
 [workspace.dependencies]
