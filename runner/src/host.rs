@@ -1,9 +1,17 @@
-use std::collections::BTreeMap;
 use athcon_sys as ffi;
 use athcon_host::host::HostContext as HostFfiInterface;
 
-type Bytes32 = [u8; 32];
 type Address = [u8; 24];
+type Bytes32 = [u8; 32];
+struct Bytes32AsBalance(Bytes32);
+
+impl From<Bytes32AsBalance> for u64 {
+  fn from(bytes: Bytes32AsBalance) -> Self {
+    // take most significant 8 bytes, assume little-endian
+    let slice = &bytes.0[..8];
+    u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
+  }
+}
 
 trait HostInterface {
   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32>;
@@ -25,73 +33,47 @@ enum StorageStatus {
   StorageModifiedRestored = 8,
 }
 
-// struct FfiHost {
-//   get_storage_callback: athcon_get_storage_fn,
-//   set_storage_callback: athcon_set_storage_fn,
-//   get_balance_callback: athcon_get_balance_fn,
-// }
+impl From<ffi::athcon_storage_status> for StorageStatus {
+  fn from(status: ffi::athcon_storage_status) -> Self {
+    match status {
+      ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED => StorageStatus::StorageAssigned,
+      ffi::athcon_storage_status::ATHCON_STORAGE_ADDED => StorageStatus::StorageAdded,
+      ffi::athcon_storage_status::ATHCON_STORAGE_DELETED => StorageStatus::StorageDeleted,
+      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED => StorageStatus::StorageModified,
+      ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_ADDED => StorageStatus::StorageDeletedAdded,
+      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_DELETED => StorageStatus::StorageModifiedDeleted,
+      ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_RESTORED => StorageStatus::StorageDeletedRestored,
+      ffi::athcon_storage_status::ATHCON_STORAGE_ADDED_DELETED => StorageStatus::StorageAddedDeleted,
+      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_RESTORED => StorageStatus::StorageModifiedRestored,
+    }
+  }
+}
 
-// impl FfiHost {
-//   pub fn new(
-//     get_storage_callback: athcon_get_storage_fn,
-//     set_storage_callback: athcon_set_storage_fn,
-//     get_balance_callback: athcon_get_balance_fn) -> Self {
-//     FfiHost {
-//       get_storage_callback,
-//       set_storage_callback,
-//       get_balance_callback,
-//     }
-//   }
-// }
+struct FfiHost<T: HostFfiInterface> {
+  host: T,
+}
 
-// impl AthconHost for FfiHost {
-//   fn get_storage(&self, address: &[u8; 24], key: &[u8; 32]) -> Option<[u8; 32]> {
-//     unsafe {
-//       let mut value = [0u8; 32];
-//       if let Some(get_storage_fn) = self.get_storage_callback {
-//         let status = get_storage_fn(
-//           address as *const _ as *const athcon_address,
-//           key as *const _ as *const athcon_bytes32,
-//         );
-//         if status == athcon_storage_status::SUCCESS {
-//           return Some(value);
-//         } else {
-//           None
-//         }
-//       } else {
-//         None
-//       }
-//     }
-//   }
+impl<T: HostFfiInterface> HostInterface for FfiHost<T> {
+  fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
+    let storage = self.host.get_storage(address, key);
+    return Some(storage);
+  }
 
-//   fn set_storage(&self, key: &[u8; 32], value: &[u8; 32]) -> bool {
-//     unsafe {
-//       let status = athcon_set_storage_fn(
-//         context,
-//         key as *const _ as *const athcon_bytes32,
-//         value as *const _ as *const athcon_bytes32
-//       );
-//       status == athcon_storage_status::SUCCESS
-//     }
-//   assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned)}
+  fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+    let ffi_status = self.host.set_storage(address, key, value);
+    return ffi_status.into();
+  }
 
-//   fn get_balance(&self, address: &[u8; 20]) -> u128 {
-//     unsafe {
-//       let balance = athcon_get_balance_fn(
-//         context,
-//         address as *const _ as *const athcon_address
-//       );
-//       // Assuming `athcon_uint256be` can be converted to u128
-//       balance.to_u128()
-//     }
-//   }
-
-//   // Implement other methods as needed
-// }
+  fn get_balance(&self, address: &Address) -> u64 {
+    let ffi_balance = self.host.get_balance(address);
+    return Bytes32AsBalance(ffi_balance).into();
+  }
+}
 
 
 #[cfg(test)]
 mod tests {
+  use std::collections::BTreeMap;
   use super::*;
 
   struct MockHost {
@@ -124,10 +106,7 @@ mod tests {
     fn get_balance(&self, address: &Address) -> u64 {
       let balance = self.balance.get(address);
       if let Some(b) = balance {
-        // take most significant 8 bytes
-        return u64::from_le_bytes([
-          b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-        ]);
+        return Bytes32AsBalance(*b).into();
       } else {
         return 0;
       }

@@ -8,12 +8,12 @@
  }
 
  pub trait HostContext {
-     fn account_exists(&mut self, addr: &Address) -> bool;
-     fn get_storage(&mut self, addr: &Address, key: &Bytes32) -> Bytes32;
+     fn account_exists(&self, addr: &Address) -> bool;
+     fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
      fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-     fn get_balance(&mut self, addr: &Address) -> Bytes32;
-     fn get_tx_context(&mut self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
-     fn get_block_hash(&mut self, number: i64) -> Bytes32;
+     fn get_balance(&self, addr: &Address) -> Bytes32;
+     fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
+     fn get_block_hash(&self, number: i64) -> Bytes32;
      fn call(
          &mut self,
          kind: MessageKind,
