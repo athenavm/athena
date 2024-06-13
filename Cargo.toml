@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "athcon/bindings/rust/athcon-host",
+  "athcon/bindings/rust/athcon-client",
   "athcon/bindings/rust/athcon-sys",
   "athcon/bindings/rust/athcon-vm",
   "cli",

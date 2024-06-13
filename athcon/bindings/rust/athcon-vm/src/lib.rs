@@ -16,6 +16,7 @@ pub trait AthconVm {
     fn set_option(&mut self, _: &str, _: &str) -> Result<(), SetOptionError> {
         Ok(())
     }
+
     /// This is called for every incoming message.
     fn execute<'a>(
         &self,

@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+athcon-client = { path = "../athcon/bindings/rust/athcon-client" }
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
-athcon-host = { path = "../athcon/bindings/rust/athcon-host" }

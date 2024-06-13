@@ -1,5 +1,5 @@
 use athcon_sys as ffi;
-use athcon_host::host::HostContext as HostFfiInterface;
+use athcon_client::host::HostContext as HostFfiInterface;
 
 type Address = [u8; 24];
 type Bytes32 = [u8; 32];

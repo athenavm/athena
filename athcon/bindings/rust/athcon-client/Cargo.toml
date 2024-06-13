@@ -1,5 +1,5 @@
 [package]
-name = "athcon-host"
+name = "athcon-client"
 version = "0.1.0"
 edition = "2021"
 
