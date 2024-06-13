@@ -8,8 +8,20 @@ extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
     return;
   } // Safety check to ensure the pointer is not null
   unsafe {
-    // Convert the raw pointer back to a Box, allowing Rust to reclaim the memory
-    drop(Box::from_raw(vm));
+    let wrapper = &mut *(vm as *mut AthenaVmWrapper);
+    drop(Box::from_raw(wrapper.vm));
+    drop(Box::from_raw(wrapper));
+  }
+}
+
+fn error_result() -> ffi::athcon_result {
+  ffi::athcon_result {
+    output_data: std::ptr::null_mut(),
+    output_size: 0,
+    gas_left: 0,
+    create_address: ffi::athcon_address::default(),
+    status_code: athcon_vm::StatusCode::ATHCON_FAILURE,
+    release: None,
   }
 }
 
@@ -22,50 +34,39 @@ extern "C" fn execute_code(
   code: *const u8,
   code_size: usize,
 ) -> ffi::athcon_result {
-  // Implementation for executing code in the VM instance
-
-  // Instantiate a Rust-native VM instance
-  let vm = AthenaVm::new();
-
-  // convert the message
-
   // First, check for null pointers
-  if msg.is_null() || host.is_null() {
-    // Handle the null pointer case appropriately
-    return ffi::athcon_result {
-      output_data: std::ptr::null_mut(),
-      output_size: 0,
-      gas_left: 0,
-      create_address: ffi::athcon_address::default(),
-      status_code: athcon_vm::StatusCode::ATHCON_FAILURE,
-      release: None,
-    };
-  } else {
-    // SAFETY: We've checked that the pointers aren't null, so it's safe to dereference
-    unsafe {
-      let ec_raw: &ffi::athcon_host_interface = &*host;
-      let ec = ExecutionContext::new(ec_raw, context);
+  // For now we require them all to be non-null
+  if msg.is_null() || host.is_null() || vm.is_null() {
+    return error_result();
+  }
 
-      let hc_raw: &ffi::athcon_host_context = &*context;
+  // SAFETY: We've checked that the pointers aren't null, so it's safe to dereference
+  unsafe {
+    // Unpack the VM
+    let wrapper = &mut *(vm as *mut AthenaVmWrapper);
+    let athena_vm = &mut *(wrapper.vm);
 
-      // Convert the raw pointer to a reference
-      let msg_ref: &ffi::athcon_message = &*msg;
+    // Unpack the context
+    let ec_raw: &ffi::athcon_host_interface = &*host;
+    let ec = ExecutionContext::new(ec_raw, context);
 
-      // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
-      let athena_msg: AthenaMessage = (*msg_ref).into();
+    // Convert the raw pointer to a reference
+    let msg_ref: &ffi::athcon_message = &*msg;
 
-      // Execute the code and proxy the result back to the caller
-      let execution_result = vm.execute(
-        ec,
-        context,
-        rev as u32,
-        athena_msg,
-        code,
-        code_size,
-      );
-      let athcon_result: *const ffi::athcon_result = execution_result.into();
-      *athcon_result
-    }
+    // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
+    let athena_msg: AthenaMessage = (*msg_ref).into();
+
+    // Execute the code and proxy the result back to the caller
+    let execution_result = athena_vm.execute(
+      ec,
+      context,
+      rev as u32,
+      athena_msg,
+      code,
+      code_size,
+    );
+    let athcon_result: *const ffi::athcon_result = execution_result.into();
+    *athcon_result
   }
 }
 
@@ -74,7 +75,9 @@ extern "C" fn get_capabilities(_vm: *mut ffi::athcon_vm) -> ffi::athcon_capabili
   0
 }
 
-extern "C" fn result_dispose(result: *const ffi::athcon_result) {
+// Make this pub because it's not referenced inside the athcon_vm struct below,
+// i.e., must be called separately
+pub extern "C" fn result_dispose(result: *const ffi::athcon_result) {
   unsafe {
     if !result.is_null() {
       let owned = *result;
@@ -96,16 +99,25 @@ extern "C" fn set_option(
   return ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS;
 }
 
+struct AthenaVmWrapper {
+  base: ffi::athcon_vm,
+  vm: *mut AthenaVm,
+}
+
 #[no_mangle]
 pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
-  // Implementation for creating an instance of AthconVm
-  Box::into_raw(Box::new(ffi::athcon_vm {
-    abi_version: 0,
-    name: "Example VM\0".as_ptr() as *const ::std::os::raw::c_char,
-    version: "0.1.0\0".as_ptr() as *const ::std::os::raw::c_char,
-    destroy: Some(destroy_vm),
-    execute: Some(execute_code),
-    get_capabilities: Some(get_capabilities),
-    set_option: Some(set_option),
-  }))
+  let athena_vm = Box::new(AthenaVm::new());
+  let wrapper = Box::new(AthenaVmWrapper {
+    base: ffi::athcon_vm {
+      abi_version: 0,
+      name: "Athena VM\0".as_ptr() as *const ::std::os::raw::c_char,
+      version: "0.1.0\0".as_ptr() as *const ::std::os::raw::c_char,
+      destroy: Some(destroy_vm),
+      execute: Some(execute_code),
+      get_capabilities: Some(get_capabilities),
+      set_option: Some(set_option),
+    },
+    vm: Box::into_raw(athena_vm),
+  });
+  Box::into_raw(wrapper) as *mut ffi::athcon_vm
 }
