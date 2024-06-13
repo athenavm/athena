@@ -1,8 +1,10 @@
 use athcon_sys as ffi;
 use athcon_client::host::HostContext as HostFfiInterface;
+use std::fmt;
 
 type Address = [u8; 24];
 type Bytes32 = [u8; 32];
+type Bytes = [u8];
 struct Bytes32AsBalance(Bytes32);
 
 impl From<Bytes32AsBalance> for u64 {
@@ -13,24 +15,135 @@ impl From<Bytes32AsBalance> for u64 {
   }
 }
 
-trait HostInterface {
+#[derive(Debug)]
+pub struct ExecutionResult {
+    status_code: StatusCode,
+    gas_left: i64,
+    output: Option<Vec<u8>>,
+    create_address: Option<Address>,
+}
+
+impl ExecutionResult {
+  pub fn new(status_code: StatusCode, gas_left: i64, output: Option<Vec<u8>>, create_address: Option<Address>) -> Self {
+    ExecutionResult {
+      status_code,
+      gas_left,
+      output,
+      create_address,
+    }
+  }
+}
+
+pub trait HostInterface {
   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32>;
   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, address: &Address) -> u64;
   // Define other methods as needed
 }
 
+ pub trait HostContext {
+  fn account_exists(&self, addr: &Address) -> bool;
+  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
+  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
+  fn get_balance(&self, addr: &Address) -> Bytes32;
+  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
+  fn get_block_hash(&self, number: i64) -> Bytes32;
+  fn call(
+    &mut self,
+    kind: MessageKind,
+    recipient: &Address,
+    sender: &Address,
+    value: &Bytes32,
+    input: &Bytes,
+    gas: i64,
+    depth: i32,
+  ) -> (Vec<u8>, i64, Address, StatusCode);
+ }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MessageKind {
+  Call,
+}
+
+impl From<ffi::athcon_call_kind> for MessageKind {
+  fn from(kind: ffi::athcon_call_kind) -> Self {
+    match kind {
+      ffi::athcon_call_kind::ATHCON_CALL => MessageKind::Call,
+    }
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StatusCode {
+  Success,
+  Failure,
+  Revert,
+  OutOfGas,
+  UndefinedInstruction,
+  InvalidMemoryAccess,
+  CallDepthExceeded,
+  PrecompileFailure,
+  ContractValidationFailure,
+  ArgumentOutOfRange,
+  InsufficientBalance,
+  InternalError,
+  Rejected,
+  OutOfMemory,
+}
+
+impl fmt::Display for StatusCode {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      StatusCode::Success => write!(f, "Execution finished with success."),
+      StatusCode::Failure => write!(f, "Generic execution failure."),
+      StatusCode::Revert => write!(f, "Execution terminated with REVERT opcode."),
+      StatusCode::OutOfGas => write!(f, "The execution has run out of gas."),
+      StatusCode::UndefinedInstruction => write!(f, "An undefined instruction has been encountered."),
+      StatusCode::InvalidMemoryAccess => write!(f, "Tried to read outside memory bounds."),
+      StatusCode::CallDepthExceeded => write!(f, "Call depth has exceeded the limit."),
+      StatusCode::PrecompileFailure => write!(f, "A call to a precompiled or system contract has ended with a failure."),
+      StatusCode::ContractValidationFailure => write!(f, "Contract validation has failed."),
+      StatusCode::ArgumentOutOfRange => write!(f, "An argument to a state accessing method has a value outside of the accepted range."),
+      StatusCode::InsufficientBalance => write!(f, "The caller does not have enough funds for value transfer."),
+      StatusCode::InternalError => write!(f, "Athena implementation generic internal error."),
+      StatusCode::Rejected => write!(f, "The execution of the given code and/or message has been rejected by the Athena implementation."),
+      StatusCode::OutOfMemory => write!(f, "The VM failed to allocate the amount of memory needed for execution."),
+    }
+  }
+}
+
+impl From<ffi::athcon_status_code> for StatusCode {
+  fn from(status: ffi::athcon_status_code) -> Self {
+    match status {
+      ffi::athcon_status_code::ATHCON_SUCCESS => StatusCode::Success,
+      ffi::athcon_status_code::ATHCON_FAILURE => StatusCode::Failure,
+      ffi::athcon_status_code::ATHCON_REVERT => StatusCode::Revert,
+      ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCode::OutOfGas,
+      ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
+      ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
+      ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
+      ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
+      ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => StatusCode::ContractValidationFailure,
+      ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
+      ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
+      ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => StatusCode::InternalError,
+      ffi::athcon_status_code::ATHCON_REJECTED => StatusCode::Rejected,
+      ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCode::OutOfMemory,
+    }
+  }
+}
+
 #[derive(Debug, PartialEq)]
-enum StorageStatus {
-  StorageAssigned = 0,
-  StorageAdded = 1,
-  StorageDeleted = 2,
-  StorageModified = 3,
-  StorageDeletedAdded = 4,
-  StorageModifiedDeleted = 5,
-  StorageDeletedRestored = 6,
-  StorageAddedDeleted = 7,
-  StorageModifiedRestored = 8,
+pub enum StorageStatus {
+  StorageAssigned,
+  StorageAdded,
+  StorageDeleted,
+  StorageModified,
+  StorageDeletedAdded,
+  StorageModifiedDeleted,
+  StorageDeletedRestored,
+  StorageAddedDeleted,
+  StorageModifiedRestored,
 }
 
 impl From<ffi::athcon_storage_status> for StorageStatus {
@@ -45,6 +158,22 @@ impl From<ffi::athcon_storage_status> for StorageStatus {
       ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_RESTORED => StorageStatus::StorageDeletedRestored,
       ffi::athcon_storage_status::ATHCON_STORAGE_ADDED_DELETED => StorageStatus::StorageAddedDeleted,
       ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_RESTORED => StorageStatus::StorageModifiedRestored,
+    }
+  }
+}
+
+impl fmt::Display for StorageStatus {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      StorageStatus::StorageAssigned => write!(f, "The storage item is assigned without affecting the cost structure."),
+      StorageStatus::StorageAdded => write!(f, "A new storage item is added by changing the current clean zero to a nonzero value."),
+      StorageStatus::StorageDeleted => write!(f, "A storage item is deleted by changing the current clean nonzero to the zero value."),
+      StorageStatus::StorageModified => write!(f, "A storage item is modified by changing the current clean nonzero to another nonzero value."),
+      StorageStatus::StorageDeletedAdded => write!(f, "A storage item is added by changing the current dirty zero to a nonzero value other than the original."),
+      StorageStatus::StorageModifiedDeleted => write!(f, "A storage item is deleted by changing the current dirty nonzero to the zero value and the original value is not zero."),
+      StorageStatus::StorageDeletedRestored => write!(f, "A storage item is added by changing the current dirty zero to the original value."),
+      StorageStatus::StorageAddedDeleted => write!(f, "A storage item is deleted by changing the current dirty nonzero to the original zero value."),
+      StorageStatus::StorageModifiedRestored => write!(f, "A storage item is modified by changing the current dirty nonzero to the original nonzero value other than the current."),
     }
   }
 }
@@ -69,7 +198,6 @@ impl<T: HostFfiInterface> HostInterface for FfiHost<T> {
     return Bytes32AsBalance(ffi_balance).into();
   }
 }
-
 
 #[cfg(test)]
 mod tests {

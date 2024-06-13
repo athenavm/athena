@@ -1,70 +1,59 @@
-use athcon_sys;
-use athcon_vm::AthconVm;
+use crate::host::{ExecutionResult, HostContext, HostInterface, MessageKind, StatusCode};
+pub use athcon_vm::SetOptionError;
 
-struct FfiVm {
-  instance: athcon_sys::athcon_vm,
+// currently unused
+#[derive(Debug, Clone, Copy)]
+pub enum Capability {}
+
+// currently unused
+#[derive(Debug, Clone)]
+pub enum Option {}
+
+pub trait VmInterface {
+  fn get_capabilities(&self) -> Vec<Capability>;
+  fn set_option(&self, option: Option, value: &str) -> Result<(), SetOptionError>;
+  fn execute(
+    &self,
+    host: *const dyn HostInterface,
+    context: *mut dyn HostContext,
+    rev: u32,
+    msg: *const MessageKind,
+    code: *const u8,
+    code_size: usize,
+  ) -> ExecutionResult;
 }
 
-impl AthconVm for FfiVm {
-  fn init() -> Self {
-    let instance = athcon_sys::athcon_vm {
-      name: "FfiVm".as_ptr(),
-      version: "0.1.0".as_ptr(),
-      abi_version: 0,
-      destroy: None,
-      execute: None,
-      get_capabilities: None,
-      set_option: None,
-    };
-  }
+pub struct AthenaVm {}
 
-  fn set_option(&mut self, _: &str, _: &str) -> Result<(), athcon_vm::SetOptionError> {
-    unimplemented!()
-  }
-
-  fn execute<'a>(
-          &self,
-          revision: athcon_vm::Revision,
-          code: &'a [u8],
-          message: &'a athcon_vm::ExecutionMessage,
-          context: Option<&'a mut athcon_vm::ExecutionContext<'a>>,
-      ) -> athcon_vm::ExecutionResult {
-    unimplemented!()
-  }
-}
-
-struct MockVm {
-    name: String,
-    version: String,
-    abi_version: i32,
-}
-
-impl MockVm {
-  pub fn new(name: &str) -> Self {
-    MockVm {
-      name: name.to_string(),
-      version: "0.1.0".to_string(),
-      abi_version: 0,
-    }
+impl AthenaVm {
+  pub fn new() -> Self {
+    AthenaVm {}
   }
 }
 
-impl AthconVm for MockVm {
-  fn init() -> Self {
-    MockVm::new("MockVm")
+impl VmInterface for AthenaVm {
+  fn get_capabilities(&self) -> Vec<Capability> {
+    vec![]
   }
 
-  fn set_option(&mut self, _: &str, _: &str) -> Result<(), athcon_vm::SetOptionError> {
-    unimplemented!()
+  fn set_option(&self, _option: Option, _value: &str) -> Result<(), SetOptionError> {
+    Err(SetOptionError::InvalidKey)
   }
 
   fn execute(
     &self,
-    _revision: athcon_sys::athcon_revision,
-    _code: &[u8],
-    _message: &athcon_vm::ExecutionMessage,
-    _context: Option<&mut athcon_vm::ExecutionContext>,
-  ) -> athcon_vm::ExecutionResult {
-    athcon_vm::ExecutionResult::failure()
+    _host: *const dyn HostInterface,
+    _context: *mut dyn HostContext,
+    _rev: u32,
+    _msg: *const MessageKind,
+    _code: *const u8,
+    _code_size: usize,
+  ) -> ExecutionResult {
+    ExecutionResult::new(
+      StatusCode::Success,
+      1337,
+      None,
+      None,
+    )
   }
 }
