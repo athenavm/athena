@@ -1,5 +1,6 @@
-use crate::host::{ExecutionResult, HostContext, HostInterface, MessageKind, StatusCode};
-pub use athcon_vm::SetOptionError;
+use crate::host::{AthenaMessage, HostContext, MessageKind};
+use athcon_sys as ffi;
+pub use athcon_vm::{ExecutionContext, ExecutionResult, SetOptionError, StatusCode};
 
 // currently unused
 #[derive(Debug, Clone, Copy)]
@@ -14,10 +15,10 @@ pub trait VmInterface {
   fn set_option(&self, option: Option, value: &str) -> Result<(), SetOptionError>;
   fn execute(
     &self,
-    host: *const dyn HostInterface,
-    context: *mut dyn HostContext,
+    host: ExecutionContext,
+    context: *mut ffi::athcon_host_context,
     rev: u32,
-    msg: *const MessageKind,
+    msg: AthenaMessage,
     code: *const u8,
     code_size: usize,
   ) -> ExecutionResult;
@@ -42,17 +43,16 @@ impl VmInterface for AthenaVm {
 
   fn execute(
     &self,
-    _host: *const dyn HostInterface,
-    _context: *mut dyn HostContext,
+    _host: ExecutionContext,
+    _context: *mut ffi::athcon_host_context,
     _rev: u32,
-    _msg: *const MessageKind,
+    _msg: AthenaMessage,
     _code: *const u8,
     _code_size: usize,
   ) -> ExecutionResult {
     ExecutionResult::new(
-      StatusCode::Success,
+      StatusCode::ATHCON_SUCCESS,
       1337,
-      None,
       None,
     )
   }

@@ -3,6 +3,14 @@ use athcon_client::host::HostContext as HostFfiInterface;
 use std::fmt;
 
 type Address = [u8; 24];
+struct AddressWrapper(ffi::athcon_address);
+
+impl From<AddressWrapper> for Address {
+  fn from(address: AddressWrapper) -> Self {
+    address.0.bytes
+  }
+}
+
 type Bytes32 = [u8; 32];
 type Bytes = [u8];
 struct Bytes32AsBalance(Bytes32);
@@ -12,6 +20,14 @@ impl From<Bytes32AsBalance> for u64 {
     // take most significant 8 bytes, assume little-endian
     let slice = &bytes.0[..8];
     u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
+  }
+}
+
+struct Bytes32Wrapper(ffi::athcon_bytes32);
+
+impl From<Bytes32Wrapper> for Bytes32 {
+  fn from(bytes: Bytes32Wrapper) -> Self {
+    bytes.0.bytes
   }
 }
 
@@ -34,12 +50,51 @@ impl ExecutionResult {
   }
 }
 
-pub trait HostInterface {
-  fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32>;
-  fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-  fn get_balance(&self, address: &Address) -> u64;
-  // Define other methods as needed
-}
+// pub trait HostInterface {
+//   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32>;
+//   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
+//   fn get_balance(&self, address: &Address) -> u64;
+//   // Define other methods as needed
+// }
+
+// struct HostInterfaceWrapper {
+//   host: ffi::athcon_host_interface,
+// }
+
+// impl From<ffi::athcon_host_interface> for HostInterfaceWrapper {
+//   fn from(host: ffi::athcon_host_interface) -> Self {
+//     HostInterfaceWrapper { host }
+//   }
+// }
+
+// impl HostInterface for HostInterfaceWrapper {
+//   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
+//     let get_storage = self.host.get_storage.unwrap();
+//     let result = get_storage(
+//       std::ptr::null_mut(),
+//       &ffi::athcon_address { bytes: *address },
+//       &ffi::athcon_bytes32 { bytes: *key },
+//     );
+//     Some(result.bytes)
+//   }
+
+//   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+//     let set_storage = self.host.set_storage.unwrap();
+//     let result = set_storage(
+//       std::ptr::null_mut(),
+//       &ffi::athcon_address { bytes: *address },
+//       &ffi::athcon_bytes32 { bytes: *key },
+//       &ffi::athcon_bytes32 { bytes: *value },
+//     );
+//     result.into()
+//   }
+
+//   fn get_balance(&self, address: &Address) -> u64 {
+//     let get_balance = self.host.get_balance.unwrap();
+//     let result = get_balance(std::ptr::null_mut(), &ffi::athcon_address { bytes: *address });
+//     Bytes32AsBalance(result.bytes).into()
+//   }
+// }
 
  pub trait HostContext {
   fn account_exists(&self, addr: &Address) -> bool;
@@ -69,6 +124,47 @@ impl From<ffi::athcon_call_kind> for MessageKind {
   fn from(kind: ffi::athcon_call_kind) -> Self {
     match kind {
       ffi::athcon_call_kind::ATHCON_CALL => MessageKind::Call,
+    }
+  }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AthenaMessage {
+  pub kind: MessageKind,
+  pub depth: i32,
+  pub gas: i64,
+  pub recipient: Address,
+  pub sender: Address,
+  pub input_data: Vec<u8>,
+  pub value: Bytes32,
+  pub code: Vec<u8>,
+}
+
+impl From<ffi::athcon_message> for AthenaMessage {
+  fn from(item: ffi::athcon_message) -> Self {
+    // Convert input_data pointer and size to Vec<u8>
+    let input_data = if !item.input_data.is_null() && item.input_size > 0 {
+      unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec()
+    } else {
+      Vec::new()
+    };
+
+    // Convert code pointer and size to Vec<u8>
+    let code = if !item.code.is_null() && item.code_size > 0 {
+      unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
+    } else {
+      Vec::new()
+    };
+
+    AthenaMessage {
+      kind: item.kind.into(),
+      depth: item.depth,
+      gas: item.gas,
+      recipient: AddressWrapper(item.recipient).into(),
+      sender: AddressWrapper(item.sender).into(),
+      input_data,
+      value: Bytes32Wrapper(item.value).into(),
+      code,
     }
   }
 }
@@ -178,26 +274,26 @@ impl fmt::Display for StorageStatus {
   }
 }
 
-struct FfiHost<T: HostFfiInterface> {
-  host: T,
-}
+// struct FfiHost<T: HostFfiInterface> {
+//   host: T,
+// }
 
-impl<T: HostFfiInterface> HostInterface for FfiHost<T> {
-  fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
-    let storage = self.host.get_storage(address, key);
-    return Some(storage);
-  }
+// impl<T: HostFfiInterface> HostInterface for FfiHost<T> {
+//   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
+//     let storage = self.host.get_storage(address, key);
+//     return Some(storage);
+//   }
 
-  fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-    let ffi_status = self.host.set_storage(address, key, value);
-    return ffi_status.into();
-  }
+//   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+//     let ffi_status = self.host.set_storage(address, key, value);
+//     return ffi_status.into();
+//   }
 
-  fn get_balance(&self, address: &Address) -> u64 {
-    let ffi_balance = self.host.get_balance(address);
-    return Bytes32AsBalance(ffi_balance).into();
-  }
-}
+//   fn get_balance(&self, address: &Address) -> u64 {
+//     let ffi_balance = self.host.get_balance(address);
+//     return Bytes32AsBalance(ffi_balance).into();
+//   }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -221,45 +317,45 @@ mod tests {
     }
   }
 
-  impl HostInterface for MockHost {
-    fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
-      return self.storage.get(&(*address, *key)).cloned();
-    }
+  // impl HostInterface for MockHost {
+  //   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
+  //     return self.storage.get(&(*address, *key)).cloned();
+  //   }
 
-    fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-      self.storage.insert((*address, *key), *value);
-      return StorageStatus::StorageAssigned;
-    }
+  //   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+  //     self.storage.insert((*address, *key), *value);
+  //     return StorageStatus::StorageAssigned;
+  //   }
 
-    fn get_balance(&self, address: &Address) -> u64 {
-      let balance = self.balance.get(address);
-      if let Some(b) = balance {
-        return Bytes32AsBalance(*b).into();
-      } else {
-        return 0;
-      }
-    }
-  }
+  //   fn get_balance(&self, address: &Address) -> u64 {
+  //     let balance = self.balance.get(address);
+  //     if let Some(b) = balance {
+  //       return Bytes32AsBalance(*b).into();
+  //     } else {
+  //       return 0;
+  //     }
+  //   }
+  // }
 
-  #[test]
-  fn test_get_storage() {
-    let mut host = MockHost::new();
-    let address = [8; 24];
-    let key = [1; 32];
-    let value = [2; 32];
-    assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned);
-    let retrieved_value = host.get_storage(&address, &key);
-    match retrieved_value {
-      Some(v) => assert_eq!(v, value),
-      None => panic!("Value not found"),
-    }
-  }
+  // #[test]
+  // fn test_get_storage() {
+  //   let mut host = MockHost::new();
+  //   let address = [8; 24];
+  //   let key = [1; 32];
+  //   let value = [2; 32];
+  //   assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned);
+  //   let retrieved_value = host.get_storage(&address, &key);
+  //   match retrieved_value {
+  //     Some(v) => assert_eq!(v, value),
+  //     None => panic!("Value not found"),
+  //   }
+  // }
 
-  #[test]
-  fn test_get_balance() {
-    let host = MockHost::new();
-    let address = [8; 24];
-    let balance = host.get_balance(&address);
-    assert_eq!(balance, 0);
-  }
+  // #[test]
+  // fn test_get_balance() {
+  //   let host = MockHost::new();
+  //   let address = [8; 24];
+  //   let balance = host.get_balance(&address);
+  //   assert_eq!(balance, 0);
+  // }
 }

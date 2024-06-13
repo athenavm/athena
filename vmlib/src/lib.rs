@@ -1,4 +1,6 @@
+use athena_runner::{host::HostContext, vm::ExecutionContext, AthenaMessage, AthenaVm, VmInterface};
 use athcon_sys as ffi;
+use athcon_vm;
 
 extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
   // Implementation for destroying the VM instance
@@ -23,19 +25,48 @@ extern "C" fn execute_code(
   // Implementation for executing code in the VM instance
 
   // Instantiate a Rust-native VM instance
+  let vm = AthenaVm::new();
 
-  // Execute the code
+  // convert the message
 
-  // Proxy the result back
+  // First, check for null pointers
+  if msg.is_null() || host.is_null() {
+    // Handle the null pointer case appropriately
+    return ffi::athcon_result {
+      output_data: std::ptr::null_mut(),
+      output_size: 0,
+      gas_left: 0,
+      create_address: ffi::athcon_address::default(),
+      status_code: athcon_vm::StatusCode::ATHCON_FAILURE,
+      release: None,
+    };
+  } else {
+    // SAFETY: We've checked that the pointers aren't null, so it's safe to dereference
+    unsafe {
+      let ec_raw: &ffi::athcon_host_interface = &*host;
+      let ec = ExecutionContext::new(ec_raw, context);
 
-  // return ffi::athcon_result {
-  //     status_code: ffi::athcon_status_code::ATHCON_SUCCESS,
-  //     gas_left: 1337,
-  //     output_data: Box::into_raw(Box::new([0xde, 0xad, 0xbe, 0xef])) as *const u8,
-  //     output_size: 4,
-  //     release: Some(result_dispose),
-  //     create_address: ffi::athcon_address { bytes: [0u8; 24] },
-  // };
+      let hc_raw: &ffi::athcon_host_context = &*context;
+
+      // Convert the raw pointer to a reference
+      let msg_ref: &ffi::athcon_message = &*msg;
+
+      // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
+      let athena_msg: AthenaMessage = (*msg_ref).into();
+
+      // Execute the code and proxy the result back to the caller
+      let execution_result = vm.execute(
+        ec,
+        context,
+        rev as u32,
+        athena_msg,
+        code,
+        code_size,
+      );
+      let athcon_result: *const ffi::athcon_result = execution_result.into();
+      *athcon_result
+    }
+  }
 }
 
 extern "C" fn get_capabilities(_vm: *mut ffi::athcon_vm) -> ffi::athcon_capabilities_flagset {
