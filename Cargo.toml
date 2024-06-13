@@ -9,7 +9,7 @@ members = [
   "runner",
   "sdk",
   "vm/entrypoint",
-  "vm/precompiles",
+  "vm/precompiles", "vmlib",
 ]
 resolver = "2"
 
