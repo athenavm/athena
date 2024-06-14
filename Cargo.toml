@@ -1,16 +1,17 @@
 [workspace]
 members = [
-  "athcon/bindings/rust/athcon-client",
-  "athcon/bindings/rust/athcon-sys",
-  "athcon/bindings/rust/athcon-vm",
   "cli",
   "core",
+  "ffi/athcon/bindings/rust/athcon-client",
+  "ffi/athcon/bindings/rust/athcon-sys",
+  "ffi/athcon/bindings/rust/athcon-vm",
+  "ffi/ffitest",
+  "ffi/vmlib",
   "helper",
   "runner",
   "sdk",
   "vm/entrypoint",
   "vm/precompiles",
-  "vmlib",
 ]
 resolver = "2"
 

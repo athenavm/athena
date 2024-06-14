@@ -8,6 +8,6 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-athcon-client = { path = "../athcon/bindings/rust/athcon-client" }
-athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
-athcon-vm = { path = "../athcon/bindings/rust/athcon-vm" }
+athcon-client = { path = "../ffi/athcon/bindings/rust/athcon-client" }
+athcon-sys = { path = "../ffi/athcon/bindings/rust/athcon-sys" }
+athcon-vm = { path = "../ffi/athcon/bindings/rust/athcon-vm" }
