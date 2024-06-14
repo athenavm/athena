@@ -57,7 +57,7 @@ main() {
     need_cmd cargo
 
     # Ignore branches/versions as we do not want to modify local git state
-    if [ -n "$ATHUP_REPO" ] || [ -n "$ATHUP_BRANCH" ] || [ -n "$_VERSION" ]; then
+    if [ -n "$ATHUP_REPO" ] || [ -n "$ATHUP_BRANCH" ] || [ -n "$ATHUP_VERSION" ]; then
       warn "--branch, --version, and --repo arguments are ignored during local install"
     fi
 
@@ -81,16 +81,16 @@ main() {
 
   # Install by downloading binaries
   if [[ "$ATHUP_REPO" == "athenavm/athena" && -z "$ATHUP_BRANCH" && -z "$ATHUP_COMMIT" ]]; then
-    _VERSION=${_VERSION:-latest}
-    ATHUP_TAG=$_VERSION
+    ATHUP_VERSION=${ATHUP_VERSION:-latest}
+    ATHUP_TAG=$ATHUP_VERSION
 
-    if [[ "$_VERSION" == [[:digit:]]* ]]; then
+    if [[ "$ATHUP_VERSION" == [[:digit:]]* ]]; then
       # Add v prefix
-      _VERSION="v${_VERSION}"
-      ATHUP_TAG="${_VERSION}"
+      ATHUP_VERSION="v${ATHUP_VERSION}"
+      ATHUP_TAG="${ATHUP_VERSION}"
     fi
 
-    say "installing athena (version ${_VERSION}, tag ${ATHUP_TAG})"
+    say "installing athena (version ${ATHUP_VERSION}, tag ${ATHUP_TAG})"
 
     uname_s=$(uname -s)
     PLATFORM=$(tolower "${ATHUP_PLATFORM:-$uname_s}")
@@ -126,7 +126,7 @@ main() {
 
     # Compute the URL of the release tarball in the repository.
     RELEASE_URL="https://github.com/${ATHUP_REPO}/releases/download/${ATHUP_TAG}/"
-    BIN_ARCHIVE_URL="${RELEASE_URL}cargo_athena_${_VERSION}_${PLATFORM}_${ARCHITECTURE}.$EXT"
+    BIN_ARCHIVE_URL="${RELEASE_URL}cargo_athena_${ATHUP_VERSION}_${PLATFORM}_${ARCHITECTURE}.$EXT"
 
     # Download and extract the binaries archive
     say "downloading latest cargo-athena"
