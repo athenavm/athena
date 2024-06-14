@@ -2,17 +2,9 @@ use athcon_sys as ffi;
 use athcon_client::host::HostContext as HostFfiInterface;
 use std::fmt;
 
-type Address = [u8; 24];
-struct AddressWrapper(ffi::athcon_address);
-
-impl From<AddressWrapper> for Address {
-  fn from(address: AddressWrapper) -> Self {
-    address.0.bytes
-  }
-}
-
-type Bytes32 = [u8; 32];
-type Bytes = [u8];
+pub type Address = [u8; 24];
+pub type Bytes32 = [u8; 32];
+pub type Bytes = [u8];
 struct Bytes32AsBalance(Bytes32);
 
 impl From<Bytes32AsBalance> for u64 {
@@ -20,14 +12,6 @@ impl From<Bytes32AsBalance> for u64 {
     // take most significant 8 bytes, assume little-endian
     let slice = &bytes.0[..8];
     u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
-  }
-}
-
-struct Bytes32Wrapper(ffi::athcon_bytes32);
-
-impl From<Bytes32Wrapper> for Bytes32 {
-  fn from(bytes: Bytes32Wrapper) -> Self {
-    bytes.0.bytes
   }
 }
 
@@ -138,35 +122,6 @@ pub struct AthenaMessage {
   pub input_data: Vec<u8>,
   pub value: Bytes32,
   pub code: Vec<u8>,
-}
-
-impl From<ffi::athcon_message> for AthenaMessage {
-  fn from(item: ffi::athcon_message) -> Self {
-    // Convert input_data pointer and size to Vec<u8>
-    let input_data = if !item.input_data.is_null() && item.input_size > 0 {
-      unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec()
-    } else {
-      Vec::new()
-    };
-
-    // Convert code pointer and size to Vec<u8>
-    let code = if !item.code.is_null() && item.code_size > 0 {
-      unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
-    } else {
-      Vec::new()
-    };
-
-    AthenaMessage {
-      kind: item.kind.into(),
-      depth: item.depth,
-      gas: item.gas,
-      recipient: AddressWrapper(item.recipient).into(),
-      sender: AddressWrapper(item.sender).into(),
-      input_data,
-      value: Bytes32Wrapper(item.value).into(),
-      code,
-    }
-  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

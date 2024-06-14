@@ -1,4 +1,4 @@
-use athena_runner::{vm::ExecutionContext, AthenaMessage, AthenaVm, VmInterface};
+use athena_runner::{vm::ExecutionContext, Address, AthenaMessage, AthenaVm, Bytes32, VmInterface};
 use athcon_sys as ffi;
 use athcon_vm;
 
@@ -26,6 +26,51 @@ fn error_result() -> ffi::athcon_result {
   }
 }
 
+struct AddressWrapper(ffi::athcon_address);
+impl From<AddressWrapper> for Address {
+  fn from(address: AddressWrapper) -> Self {
+    address.0.bytes
+  }
+}
+
+struct Bytes32Wrapper(ffi::athcon_bytes32);
+
+impl From<Bytes32Wrapper> for Bytes32 {
+  fn from(bytes: Bytes32Wrapper) -> Self {
+    bytes.0.bytes
+  }
+}
+
+struct AthenaMessageWrapper(AthenaMessage);
+impl From<ffi::athcon_message> for AthenaMessageWrapper {
+  fn from(item: ffi::athcon_message) -> Self {
+    // Convert input_data pointer and size to Vec<u8>
+    let input_data = if !item.input_data.is_null() && item.input_size > 0 {
+      unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec()
+    } else {
+      Vec::new()
+    };
+
+    // Convert code pointer and size to Vec<u8>
+    let code = if !item.code.is_null() && item.code_size > 0 {
+      unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
+    } else {
+      Vec::new()
+    };
+
+    AthenaMessageWrapper(AthenaMessage{
+      kind: item.kind.into(),
+      depth: item.depth,
+      gas: item.gas,
+      recipient: AddressWrapper(item.recipient).into(),
+      sender: AddressWrapper(item.sender).into(),
+      input_data,
+      value: Bytes32Wrapper(item.value).into(),
+      code,
+    })
+  }
+}
+
 extern "C" fn execute_code(
   vm: *mut ffi::athcon_vm,
   host: *const ffi::athcon_host_interface,
@@ -36,7 +81,8 @@ extern "C" fn execute_code(
   code_size: usize,
 ) -> ffi::athcon_result {
   // First, check for null pointers
-  // For now we require them all to be non-null
+  // According to the spec these are optional but
+  // we require all of msg, host, and vm
   if msg.is_null() || host.is_null() || vm.is_null() {
     return error_result();
   }
@@ -55,14 +101,14 @@ extern "C" fn execute_code(
     let msg_ref: &ffi::athcon_message = &*msg;
 
     // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
-    let athena_msg: AthenaMessage = (*msg_ref).into();
+    let athena_msg: AthenaMessageWrapper = (*msg_ref).into();
 
     // Execute the code and proxy the result back to the caller
     let execution_result = athena_vm.execute(
       ec,
       context,
       rev as u32,
-      athena_msg,
+      athena_msg.0,
       code,
       code_size,
     );
@@ -72,8 +118,8 @@ extern "C" fn execute_code(
 }
 
 extern "C" fn get_capabilities(_vm: *mut ffi::athcon_vm) -> ffi::athcon_capabilities_flagset {
-  // Implementation for getting capabilities of the VM instance
-  0
+  // we only support one capability for now
+  ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
 }
 
 // Make this pub because it's not referenced inside the athcon_vm struct below,
@@ -97,7 +143,8 @@ extern "C" fn set_option(
   _name: *const ::std::os::raw::c_char,
   _value: *const ::std::os::raw::c_char,
 ) -> ffi::athcon_set_option_result {
-  return ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS;
+  // not currently supported
+  return ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME;
 }
 
 struct AthenaVmWrapper {
@@ -124,6 +171,61 @@ pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
   Box::into_raw(wrapper) as *mut ffi::athcon_vm
 }
 
+
+
+unsafe extern "C" fn execute_call(
+    _context: *mut ffi::athcon_host_context,
+    _msg: *const ffi::athcon_message,
+) -> ffi::athcon_result {
+    // Some dumb validation for testing.
+    let msg = *_msg;
+    let success = if msg.input_size != 0 && msg.input_data.is_null() {
+        false
+    } else {
+        msg.input_size != 0 || msg.input_data.is_null()
+    };
+
+    ffi::athcon_result {
+        status_code: if success {
+            athcon_vm::StatusCode::ATHCON_SUCCESS
+        } else {
+            athcon_vm::StatusCode::ATHCON_INTERNAL_ERROR
+        },
+        gas_left: 2,
+        // NOTE: we are passing the input pointer here, but for testing the lifetime is ok
+        output_data: msg.input_data,
+        output_size: msg.input_size,
+        release: None,
+        create_address: athcon_vm::Address::default(),
+    }
+}
+
+unsafe extern "C" fn get_dummy_tx_context(
+    _context: *mut ffi::athcon_host_context,
+) -> ffi::athcon_tx_context {
+    ffi::athcon_tx_context {
+        tx_gas_price: athcon_vm::Uint256 { bytes: [0u8; 32] },
+        tx_origin: athcon_vm::Address { bytes: [0u8; 24] },
+        block_height: 42,
+        block_timestamp: 235117,
+        block_gas_limit: 105023,
+        chain_id: athcon_vm::Uint256::default(),
+    }
+}
+
+// Update these when needed for tests
+fn get_dummy_host_interface() -> ffi::athcon_host_interface {
+    ffi::athcon_host_interface {
+        account_exists: None,
+        get_storage: None,
+        set_storage: None,
+        get_balance: None,
+        call: Some(execute_call),
+        get_tx_context: Some(get_dummy_tx_context),
+        get_block_hash: None,
+    }
+}
+
 // This code is shared with the external FFI tests
 pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
   unsafe {
@@ -131,7 +233,6 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
 
     // Perform additional checks on the returned VM instance
-    // For example, checking the abi_version or name if accessible
     let vm = &*vm_ptr;
     assert_eq!((*vm).abi_version, 0, "ABI version mismatch");
     assert_eq!(std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(), "Athena VM", "VM name mismatch");
@@ -142,23 +243,99 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     // Test the FFI functions
     assert_eq!(
       (*vm).set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
-      ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS
+      ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
-    assert_eq!((*vm).get_capabilities.unwrap()(vm_ptr), 0);
+    assert_eq!((*vm).get_capabilities.unwrap()(vm_ptr), ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32);
+
+    // Construct mock host, context, message, and code objects for test
+    let host_interface = get_dummy_host_interface();
+    // let host_context = std::ptr::null_mut();
+    // let mut context = ExecutionContext::new(&host_interface, host_context);
+    let code = [0u8; 0];
+    let message = ::athcon_sys::athcon_message {
+        kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
+        depth: 0,
+        gas: 0,
+        recipient: ::athcon_sys::athcon_address::default(),
+        sender: ::athcon_sys::athcon_address::default(),
+        input_data: std::ptr::null(),
+        input_size: 0,
+        value: ::athcon_sys::athcon_uint256be::default(),
+        code: std::ptr::null(),
+        code_size: 0,
+    };
+
+    // fail due to null vm pointer
     assert_eq!(
-      (*vm).execute.unwrap()(vm_ptr, std::ptr::null(), std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, std::ptr::null(), std::ptr::null(), 0).status_code,
+      (*vm).execute.unwrap()(
+        std::ptr::null_mut(),
+        &host_interface,
+        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
+        ffi::athcon_revision::ATHCON_FRONTIER,
+        &message,
+        code.as_ptr(),
+        0,
+      ).status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
+    );
+
+    // fail due to null host pointer
+    assert_eq!(
+      (*vm).execute.unwrap()(
+        vm_ptr,
+        std::ptr::null(),
+        // host_context is unused and opaque
+        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
+        ffi::athcon_revision::ATHCON_FRONTIER,
+        &message,
+        code.as_ptr(),
+        0,
+      ).status_code,
+      // failure expected due to input null pointers
+      ffi::athcon_status_code::ATHCON_FAILURE
+    );
+
+    // fail due to null msg
+    assert_eq!(
+      (*vm).execute.unwrap()(
+        vm_ptr,
+        &host_interface,
+        // host_context is unused and opaque
+        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
+        ffi::athcon_revision::ATHCON_FRONTIER,
+        std::ptr::null(),
+        code.as_ptr(),
+        0,
+      ).status_code,
+      // failure expected due to input null pointers
+      ffi::athcon_status_code::ATHCON_FAILURE
+    );
+
+    // this one should succeed
+    assert_eq!(
+      (*vm).execute.unwrap()(
+        vm_ptr,
+        &host_interface,
+        // host_context is unused and opaque
+        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
+        ffi::athcon_revision::ATHCON_FRONTIER,
+        &message,
+        code.as_ptr(),
+        0,
+      ).status_code,
+      // failure expected due to input null pointers
+      ffi::athcon_status_code::ATHCON_SUCCESS
     );
 
     // Call them a second way
     assert_eq!(
       wrapper.base.set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
-      ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS
+      ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
     assert_eq!(
       wrapper.base.get_capabilities.unwrap()(vm_ptr),
-      0
+      ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
     );
     assert_eq!(
       wrapper.base.execute.unwrap()(vm_ptr, std::ptr::null(), std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, std::ptr::null(), std::ptr::null(), 0).status_code,
@@ -177,7 +354,6 @@ mod tests {
 
   #[test]
   fn test_athcon_create() {
-    // Call the function to create a new VM instance
     vm_tests(athcon_create());
   }
 }
