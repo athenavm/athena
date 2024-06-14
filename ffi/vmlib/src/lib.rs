@@ -2,11 +2,12 @@ use athena_runner::{vm::ExecutionContext, AthenaMessage, AthenaVm, VmInterface};
 use athcon_sys as ffi;
 use athcon_vm;
 
+// Implementation for destroying the VM instance
 extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
-  // Implementation for destroying the VM instance
+  // Safety check to ensure the pointer is not null
   if vm.is_null() {
     return;
-  } // Safety check to ensure the pointer is not null
+  }
   unsafe {
     let wrapper = &mut *(vm as *mut AthenaVmWrapper);
     drop(Box::from_raw(wrapper.vm));
@@ -90,12 +91,12 @@ pub extern "C" fn result_dispose(result: *const ffi::athcon_result) {
   }
 }
 
+// Implementation for setting options of the VM instance
 extern "C" fn set_option(
   _vm: *mut ffi::athcon_vm,
   _name: *const ::std::os::raw::c_char,
   _value: *const ::std::os::raw::c_char,
 ) -> ffi::athcon_set_option_result {
-  // Implementation for setting options of the VM instance
   return ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS;
 }
 
@@ -104,6 +105,7 @@ struct AthenaVmWrapper {
   vm: *mut AthenaVm,
 }
 
+// Main FFI "endpoint" called to create a new VM instance
 #[no_mangle]
 pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
   let athena_vm = Box::new(AthenaVm::new());
@@ -122,64 +124,60 @@ pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
   Box::into_raw(wrapper) as *mut ffi::athcon_vm
 }
 
+// This code is shared with the external FFI tests
+pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
+  unsafe {
+    // Ensure the returned pointer is not null
+    assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
+
+    // Perform additional checks on the returned VM instance
+    // For example, checking the abi_version or name if accessible
+    let vm = &*vm_ptr;
+    assert_eq!((*vm).abi_version, 0, "ABI version mismatch");
+    assert_eq!(std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(), "Athena VM", "VM name mismatch");
+    assert_eq!(std::ffi::CStr::from_ptr((*vm).version).to_str().unwrap(), "0.1.0", "Version mismatch");
+
+    let wrapper = &mut *(vm_ptr as *mut AthenaVmWrapper);
+
+    // Test the FFI functions
+    assert_eq!(
+      (*vm).set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
+      ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS
+    );
+    assert_eq!((*vm).get_capabilities.unwrap()(vm_ptr), 0);
+    assert_eq!(
+      (*vm).execute.unwrap()(vm_ptr, std::ptr::null(), std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, std::ptr::null(), std::ptr::null(), 0).status_code,
+      // failure expected due to input null pointers
+      ffi::athcon_status_code::ATHCON_FAILURE
+    );
+
+    // Call them a second way
+    assert_eq!(
+      wrapper.base.set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
+      ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS
+    );
+    assert_eq!(
+      wrapper.base.get_capabilities.unwrap()(vm_ptr),
+      0
+    );
+    assert_eq!(
+      wrapper.base.execute.unwrap()(vm_ptr, std::ptr::null(), std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, std::ptr::null(), std::ptr::null(), 0).status_code,
+      // failure expected due to input null pointers
+      ffi::athcon_status_code::ATHCON_FAILURE
+    );
+
+    // Cleanup: Destroy the VM instance to prevent memory leaks
+    (*vm).destroy.unwrap()(vm_ptr);
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::ptr;
 
   #[test]
   fn test_athcon_create() {
-    unsafe {
-      // Call the function to create a new VM instance
-      let vm_ptr = athcon_create();
-
-      // Ensure the returned pointer is not null
-      assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
-
-      // Perform additional checks on the returned VM instance
-      // For example, checking the abi_version or name if accessible
-      let vm = &*vm_ptr;
-      assert_eq!((*vm).abi_version, 0, "ABI version mismatch");
-      assert_eq!(std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(), "Athena VM", "VM name mismatch");
-      assert_eq!(std::ffi::CStr::from_ptr((*vm).version).to_str().unwrap(), "0.1.0", "Version mismatch");
-
-      let wrapper = &mut *(vm_ptr as *mut AthenaVmWrapper);
-      // let athena_vm = &mut *(wrapper.vm);
-
-      // Test the FFI functions
-      let set_option = (*vm).set_option.unwrap();
-      assert_eq!(
-        set_option(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
-        ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS
-      );
-      let get_capabilities = (*vm).get_capabilities.unwrap();
-      assert_eq!(get_capabilities(vm_ptr), 0);
-      let execute = (*vm).execute.unwrap();
-      let result = execute(vm_ptr, ptr::null(), ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, ptr::null(), ptr::null(), 0);
-      assert_eq!(
-        result.status_code,
-        // failure expected due to input null pointers
-        ffi::athcon_status_code::ATHCON_FAILURE
-      );
-
-      // Call them a second way
-      assert_eq!(
-        wrapper.base.set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
-        ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS
-      );
-      assert_eq!(
-        wrapper.base.get_capabilities.unwrap()(vm_ptr),
-        0
-      );
-      assert_eq!(
-        wrapper.base.execute.unwrap()(vm_ptr, ptr::null(), ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, ptr::null(), ptr::null(), 0).status_code,
-        // failure expected due to input null pointers
-        ffi::athcon_status_code::ATHCON_FAILURE
-      );
-
-      // Cleanup: Destroy the VM instance to prevent memory leaks
-      let destroy = (*vm).destroy.unwrap();
-      destroy(vm_ptr);
-    }
+    // Call the function to create a new VM instance
+    vm_tests(athcon_create());
   }
 }

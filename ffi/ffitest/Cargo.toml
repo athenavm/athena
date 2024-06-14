@@ -9,3 +9,4 @@ edition.workspace = true
 
 [dependencies]
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
+athena-vmlib = { path = "../vmlib" }
