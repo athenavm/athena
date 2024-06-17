@@ -1,10 +1,10 @@
+use athena_sdk::{AthenaStdin, ExecutionClient};
 use crate::host::{
   AthenaCapability,
   AthenaMessage,
   AthenaOption,
   ExecutionContext,
   ExecutionResult,
-  HostInterface,
   SetOptionError,
   StatusCode,
 };
@@ -18,15 +18,19 @@ pub trait VmInterface {
     // context: dyn HostInterface,
     rev: u32,
     msg: AthenaMessage,
-    code: Vec<u8>,
+    code: &[u8],
   ) -> ExecutionResult;
 }
 
-pub struct AthenaVm {}
+pub struct AthenaVm {
+  client: ExecutionClient,
+}
 
 impl AthenaVm {
   pub fn new() -> Self {
-    AthenaVm {}
+    AthenaVm {
+      client: ExecutionClient::default(),
+    }
   }
 }
 
@@ -46,14 +50,17 @@ impl VmInterface for AthenaVm {
     // _context: *mut ffi::athcon_host_context,
     _rev: u32,
     _msg: AthenaMessage,
-    _code: Vec<u8>,
+    // note: ignore _msg.code, should only be used on deploy
+    code: &[u8],
   ) -> ExecutionResult {
-
-
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(_msg.input_data);
+    // TODO: pass execution context/callbacks into VM
+    let output = self.client.execute(&code, stdin).unwrap();
     ExecutionResult::new(
       StatusCode::Success,
       1337,
-      None,
+      Some(output.to_vec()),
       None,
     )
   }

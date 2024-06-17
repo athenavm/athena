@@ -4,13 +4,12 @@ use athena_runner::{
   AthenaVm,
   Balance,
   Bytes32,
-  ExecutionContext,
+  ExecutionContext as AthenaExecutionContext,
   HostInterface as AthenaHostInterface,
   TransactionContext,
-  VmInterface,
 };
 use athcon_sys as ffi;
-use athcon_vm;
+use athcon_vm::{self, ExecutionContext};
 
 // Implementation for destroying the VM instance
 extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
@@ -105,7 +104,7 @@ extern "C" fn execute_code(
 
     // Unpack the context
     let ec_raw: &ffi::athcon_host_interface = &*host;
-    let ec = ExecutionContext::new(ec_raw, context);
+    let ec = AthenaExecutionContext::new(ec_raw, context);
 
     // Convert the raw pointer to a reference
     let msg_ref: &ffi::athcon_message = &*msg;
@@ -209,48 +208,39 @@ unsafe extern "C" fn execute_call(
 }
 
 struct WrappedHostInterface {
-  interface: ffi::athcon_host_interface,
+  context: ExecutionContext,
 }
 
 impl WrappedHostInterface {
-  fn new(interface: &ffi::athcon_host_interface) -> Self {
+  fn new(context: ExecutionContext) -> Self {
     WrappedHostInterface {
-      interface: *interface,
+      context: *context,
     }
   }
 }
 
 impl AthenaHostInterface for WrappedHostInterface {
   fn account_exists(&self, addr: &Address) -> bool {
-    self.interface.account_exists.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr })
+    self.context.account_exists(address)
   }
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
-    let result = self.interface.get_storage.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr }, &ffi::athcon_bytes32 { bytes: *key });
-    result.bytes
+    self.context.get_storage(address, key)
   }
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-    let result = self.interface.set_storage.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr }, &ffi::athcon_bytes32 { bytes: *key }, &ffi::athcon_bytes32 { bytes: *value });
-    result.into()
+    self.context.set_storage(address, key, value)
   }
   fn get_balance(&self, addr: &Address) -> Balance {
-    let result = self.interface.get_balance.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr });
-    result.bytes
+    self.context.get_balance(address)
 }
   fn get_tx_context(&self) -> TransactionContext {
-    let result = self.interface.get_tx_context.unwrap()(&self.interface);
-    (result.0.bytes, result.1.bytes, result.2, result.3, result.4, result.5.bytes)
+    self.context.get_tx_context()
   }
-  fn get_block_hash(&self, number: i64) -> Bytes32;
-  fn call(
-    &mut self,
-    kind: MessageKind,
-    recipient: &Address,
-    sender: &Address,
-    value: &Bytes32,
-    input: &Bytes,
-    gas: i64,
-    depth: i32,
-  ) -> (Vec<u8>, i64, Address, StatusCode);
+  fn get_block_hash(&self, number: i64) -> Bytes32 {
+    self.context.get_block_hash(number)
+  }
+  fn call(&mut self, msg: AthenaMessage) -> (Vec<u8>, i64, Address, StatusCode) {
+    self.context.call(msg)
+  }
 }
 
 impl From<ffi::athcon_host_interface> for WrappedHostInterface {

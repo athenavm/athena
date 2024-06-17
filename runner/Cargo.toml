@@ -11,3 +11,4 @@ edition.workspace = true
 athcon-client = { path = "../ffi/athcon/bindings/rust/athcon-client" }
 athcon-sys = { path = "../ffi/athcon/bindings/rust/athcon-sys" }
 athcon-vm = { path = "../ffi/athcon/bindings/rust/athcon-vm" }
+athena-sdk = { path = "../sdk" }

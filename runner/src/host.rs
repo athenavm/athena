@@ -96,16 +96,7 @@ impl ExecutionResult {
   fn get_balance(&self, addr: &Address) -> Balance;
   fn get_tx_context(&self) -> TransactionContext;
   fn get_block_hash(&self, number: i64) -> Bytes32;
-  fn call(
-    &mut self,
-    kind: MessageKind,
-    recipient: &Address,
-    sender: &Address,
-    value: &Bytes32,
-    input: &Bytes,
-    gas: i64,
-    depth: i32,
-  ) -> (Vec<u8>, i64, Address, StatusCode);
+  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
  }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
