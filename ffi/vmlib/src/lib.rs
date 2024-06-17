@@ -1,4 +1,14 @@
-use athena_runner::{vm::ExecutionContext, Address, AthenaMessage, AthenaVm, Bytes32, VmInterface};
+use athena_runner::{
+  Address,
+  AthenaMessage,
+  AthenaVm,
+  Balance,
+  Bytes32,
+  ExecutionContext,
+  HostInterface as AthenaHostInterface,
+  TransactionContext,
+  VmInterface,
+};
 use athcon_sys as ffi;
 use athcon_vm;
 
@@ -106,7 +116,7 @@ extern "C" fn execute_code(
     // Execute the code and proxy the result back to the caller
     let execution_result = athena_vm.execute(
       ec,
-      context,
+      // context,
       rev as u32,
       athena_msg.0,
       code,
@@ -171,8 +181,6 @@ pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
   Box::into_raw(wrapper) as *mut ffi::athcon_vm
 }
 
-
-
 unsafe extern "C" fn execute_call(
     _context: *mut ffi::athcon_host_context,
     _msg: *const ffi::athcon_message,
@@ -199,6 +207,60 @@ unsafe extern "C" fn execute_call(
         create_address: athcon_vm::Address::default(),
     }
 }
+
+struct WrappedHostInterface {
+  interface: ffi::athcon_host_interface,
+}
+
+impl WrappedHostInterface {
+  fn new(interface: &ffi::athcon_host_interface) -> Self {
+    WrappedHostInterface {
+      interface: *interface,
+    }
+  }
+}
+
+impl AthenaHostInterface for WrappedHostInterface {
+  fn account_exists(&self, addr: &Address) -> bool {
+    self.interface.account_exists.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr })
+  }
+  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
+    let result = self.interface.get_storage.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr }, &ffi::athcon_bytes32 { bytes: *key });
+    result.bytes
+  }
+  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+    let result = self.interface.set_storage.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr }, &ffi::athcon_bytes32 { bytes: *key }, &ffi::athcon_bytes32 { bytes: *value });
+    result.into()
+  }
+  fn get_balance(&self, addr: &Address) -> Balance {
+    let result = self.interface.get_balance.unwrap()(&self.interface, &ffi::athcon_address { bytes: *addr });
+    result.bytes
+}
+  fn get_tx_context(&self) -> TransactionContext {
+    let result = self.interface.get_tx_context.unwrap()(&self.interface);
+    (result.0.bytes, result.1.bytes, result.2, result.3, result.4, result.5.bytes)
+  }
+  fn get_block_hash(&self, number: i64) -> Bytes32;
+  fn call(
+    &mut self,
+    kind: MessageKind,
+    recipient: &Address,
+    sender: &Address,
+    value: &Bytes32,
+    input: &Bytes,
+    gas: i64,
+    depth: i32,
+  ) -> (Vec<u8>, i64, Address, StatusCode);
+}
+
+impl From<ffi::athcon_host_interface> for WrappedHostInterface {
+  fn from(interface: ffi::athcon_host_interface) -> Self {
+    WrappedHostInterface::new(&interface)
+  }
+}
+
+// TEST CODE follows
+// should probably be moved into a separate module
 
 unsafe extern "C" fn get_dummy_tx_context(
     _context: *mut ffi::athcon_host_context,

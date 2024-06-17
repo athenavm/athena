@@ -1,8 +1,8 @@
 use athcon_sys as ffi;
-use athcon_client::host::HostContext as HostFfiInterface;
 use std::fmt;
 
 pub type Address = [u8; 24];
+pub type Balance = u64;
 pub type Bytes32 = [u8; 32];
 pub type Bytes = [u8];
 struct Bytes32AsBalance(Bytes32);
@@ -13,6 +13,15 @@ impl From<Bytes32AsBalance> for u64 {
     let slice = &bytes.0[..8];
     u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
   }
+}
+
+pub struct TransactionContext {
+  pub gas_price: u64,
+  pub origin: Address,
+  pub block_height: u64,
+  pub block_timestamp: u64,
+  pub block_gas_limit: u64,
+  pub chain_id: Bytes32,
 }
 
 #[derive(Debug)]
@@ -80,12 +89,12 @@ impl ExecutionResult {
 //   }
 // }
 
- pub trait HostContext {
+ pub trait HostInterface {
   fn account_exists(&self, addr: &Address) -> bool;
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-  fn get_balance(&self, addr: &Address) -> Bytes32;
-  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
+  fn get_balance(&self, addr: &Address) -> Balance;
+  fn get_tx_context(&self) -> TransactionContext;
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(
     &mut self,
@@ -120,8 +129,29 @@ pub struct AthenaMessage {
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Vec<u8>,
-  pub value: Bytes32,
+  pub value: Balance,
   pub code: Vec<u8>,
+}
+
+// currently unused
+#[derive(Debug, Clone, Copy)]
+pub enum AthenaCapability {}
+
+// currently unused
+#[derive(Debug, Clone)]
+pub enum AthenaOption {}
+
+#[derive(Debug)]
+pub enum SetOptionError {
+    InvalidKey,
+    InvalidValue,
+}
+
+pub struct ExecutionContext {
+    host: dyn HostInterface,
+    tx_context: TransactionContext,
+    // unused
+    // context: *mut ffi::athcon_host_context,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -228,27 +258,6 @@ impl fmt::Display for StorageStatus {
     }
   }
 }
-
-// struct FfiHost<T: HostFfiInterface> {
-//   host: T,
-// }
-
-// impl<T: HostFfiInterface> HostInterface for FfiHost<T> {
-//   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
-//     let storage = self.host.get_storage(address, key);
-//     return Some(storage);
-//   }
-
-//   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-//     let ffi_status = self.host.set_storage(address, key, value);
-//     return ffi_status.into();
-//   }
-
-//   fn get_balance(&self, address: &Address) -> u64 {
-//     let ffi_balance = self.host.get_balance(address);
-//     return Bytes32AsBalance(ffi_balance).into();
-//   }
-// }
 
 #[cfg(test)]
 mod tests {
