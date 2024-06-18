@@ -4,8 +4,11 @@ use athena_runner::{
   AthenaVm,
   Balance,
   Bytes32,
+  Bytes32AsBalance,
   ExecutionContext as AthenaExecutionContext,
   HostInterface as AthenaHostInterface,
+  MessageKind,
+  StorageStatus,
   TransactionContext,
 };
 use athcon_sys as ffi;
@@ -42,11 +45,40 @@ impl From<AddressWrapper> for Address {
   }
 }
 
+struct ReverseAddressWrapper(Address);
+impl From<ReverseAddressWrapper> for ffi::athcon_address {
+  fn from(address: ReverseAddressWrapper) -> Self {
+    ffi::athcon_address {
+      bytes: address.0,
+    }
+  }
+}
+
 struct Bytes32Wrapper(ffi::athcon_bytes32);
 
 impl From<Bytes32Wrapper> for Bytes32 {
   fn from(bytes: Bytes32Wrapper) -> Self {
     bytes.0.bytes
+  }
+}
+
+struct ReverseBytes32Wrapper(Bytes32);
+
+impl From<ReverseBytes32Wrapper> for ffi::athcon_bytes32 {
+  fn from(bytes: ReverseBytes32Wrapper) -> Self {
+    ffi::athcon_bytes32 {
+      bytes: bytes.0,
+    }
+  }
+}
+
+struct MessageKindWrapper(MessageKind);
+
+impl From<ffi::athcon_call_kind> for MessageKindWrapper {
+  fn from(kind: ffi::athcon_call_kind) -> Self {
+    match kind {
+      ffi::athcon_call_kind::ATHCON_CALL => MessageKindWrapper(MessageKind::Call),
+    }
   }
 }
 
@@ -67,14 +99,15 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       Vec::new()
     };
 
+    let kind: MessageKindWrapper = item.kind.into();
     AthenaMessageWrapper(AthenaMessage{
-      kind: item.kind.into(),
+      kind: kind.0,
       depth: item.depth,
       gas: item.gas,
       recipient: AddressWrapper(item.recipient).into(),
       sender: AddressWrapper(item.sender).into(),
       input_data,
-      value: Bytes32Wrapper(item.value).into(),
+      value: Bytes32AsBalance::new(Bytes32Wrapper(item.value).into()).into(),
       code,
     })
   }
@@ -103,8 +136,10 @@ extern "C" fn execute_code(
     let athena_vm = &mut *(wrapper.vm);
 
     // Unpack the context
-    let ec_raw: &ffi::athcon_host_interface = &*host;
-    let ec = AthenaExecutionContext::new(ec_raw, context);
+    let host_interface: &ffi::athcon_host_interface = &*host;
+    let execution_context_raw = ExecutionContext::new(host_interface, context);
+    let wrapped = WrappedHostInterface::from(execution_context_raw);
+    let ec = AthenaExecutionContext::new(wrapped);
 
     // Convert the raw pointer to a reference
     let msg_ref: &ffi::athcon_message = &*msg;
@@ -113,13 +148,13 @@ extern "C" fn execute_code(
     let athena_msg: AthenaMessageWrapper = (*msg_ref).into();
 
     // Execute the code and proxy the result back to the caller
+    let code_slice: &[u8] = std::slice::from_raw_parts(code, code_size);
     let execution_result = athena_vm.execute(
       ec,
       // context,
       rev as u32,
       athena_msg.0,
-      code,
-      code_size,
+      code_slice,
     );
     let athcon_result: *const ffi::athcon_result = execution_result.into();
     *athcon_result
@@ -207,31 +242,51 @@ unsafe extern "C" fn execute_call(
     }
 }
 
-struct WrappedHostInterface {
-  context: ExecutionContext,
+struct WrappedHostInterface<'a> {
+  context: ExecutionContext<'a>,
 }
 
-impl WrappedHostInterface {
-  fn new(context: ExecutionContext) -> Self {
+impl<'a> WrappedHostInterface<'a> {
+  fn new(context: ExecutionContext<'a>) -> Self {
     WrappedHostInterface {
-      context: *context,
+      context: context,
     }
   }
 }
 
-impl AthenaHostInterface for WrappedHostInterface {
+fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
+  match status {
+    ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED => StorageStatus::StorageAssigned,
+    ffi::athcon_storage_status::ATHCON_STORAGE_ADDED => StorageStatus::StorageAdded,
+    ffi::athcon_storage_status::ATHCON_STORAGE_DELETED => StorageStatus::StorageDeleted,
+    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED => StorageStatus::StorageModified,
+    ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_ADDED => StorageStatus::StorageDeletedAdded,
+    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_DELETED => StorageStatus::StorageModifiedDeleted,
+    ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_RESTORED => StorageStatus::StorageDeletedRestored,
+    ffi::athcon_storage_status::ATHCON_STORAGE_ADDED_DELETED => StorageStatus::StorageAddedDeleted,
+    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_RESTORED => StorageStatus::StorageModifiedRestored,
+  }
+}
+
+impl<'a> AthenaHostInterface for WrappedHostInterface<'a> {
   fn account_exists(&self, addr: &Address) -> bool {
-    self.context.account_exists(address)
+    self.context.account_exists(&ReverseAddressWrapper(*addr).into())
   }
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
-    self.context.get_storage(address, key)
+    Bytes32Wrapper(self.context.get_storage(&ReverseAddressWrapper(*addr).into(), &ReverseBytes32Wrapper(*key).into())).into()
   }
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-    self.context.set_storage(address, key, value)
+    convert_storage_status(
+      self.context.set_storage(
+        &ReverseAddressWrapper(*addr).into(),
+        &ReverseBytes32Wrapper(*key).into(),
+        &ReverseBytes32Wrapper(*value).into(),
+      ))
   }
   fn get_balance(&self, addr: &Address) -> Balance {
-    self.context.get_balance(address)
-}
+    let balance = self.context.get_balance(&ReverseAddressWrapper(*addr).into());
+    Bytes32AsBalance::new(Bytes32Wrapper(balance).into()).into()
+  }
   fn get_tx_context(&self) -> TransactionContext {
     self.context.get_tx_context()
   }

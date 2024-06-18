@@ -1,11 +1,16 @@
-use athcon_sys as ffi;
 use std::fmt;
 
 pub type Address = [u8; 24];
 pub type Balance = u64;
 pub type Bytes32 = [u8; 32];
 pub type Bytes = [u8];
-struct Bytes32AsBalance(Bytes32);
+pub struct Bytes32AsBalance(Bytes32);
+
+impl Bytes32AsBalance {
+  pub fn new(bytes: Bytes32) -> Self {
+    Bytes32AsBalance(bytes)
+  }
+}
 
 impl From<Bytes32AsBalance> for u64 {
   fn from(bytes: Bytes32AsBalance) -> Self {
@@ -43,52 +48,6 @@ impl ExecutionResult {
   }
 }
 
-// pub trait HostInterface {
-//   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32>;
-//   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-//   fn get_balance(&self, address: &Address) -> u64;
-//   // Define other methods as needed
-// }
-
-// struct HostInterfaceWrapper {
-//   host: ffi::athcon_host_interface,
-// }
-
-// impl From<ffi::athcon_host_interface> for HostInterfaceWrapper {
-//   fn from(host: ffi::athcon_host_interface) -> Self {
-//     HostInterfaceWrapper { host }
-//   }
-// }
-
-// impl HostInterface for HostInterfaceWrapper {
-//   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
-//     let get_storage = self.host.get_storage.unwrap();
-//     let result = get_storage(
-//       std::ptr::null_mut(),
-//       &ffi::athcon_address { bytes: *address },
-//       &ffi::athcon_bytes32 { bytes: *key },
-//     );
-//     Some(result.bytes)
-//   }
-
-//   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-//     let set_storage = self.host.set_storage.unwrap();
-//     let result = set_storage(
-//       std::ptr::null_mut(),
-//       &ffi::athcon_address { bytes: *address },
-//       &ffi::athcon_bytes32 { bytes: *key },
-//       &ffi::athcon_bytes32 { bytes: *value },
-//     );
-//     result.into()
-//   }
-
-//   fn get_balance(&self, address: &Address) -> u64 {
-//     let get_balance = self.host.get_balance.unwrap();
-//     let result = get_balance(std::ptr::null_mut(), &ffi::athcon_address { bytes: *address });
-//     Bytes32AsBalance(result.bytes).into()
-//   }
-// }
-
  pub trait HostInterface {
   fn account_exists(&self, addr: &Address) -> bool;
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
@@ -102,14 +61,6 @@ impl ExecutionResult {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MessageKind {
   Call,
-}
-
-impl From<ffi::athcon_call_kind> for MessageKind {
-  fn from(kind: ffi::athcon_call_kind) -> Self {
-    match kind {
-      ffi::athcon_call_kind::ATHCON_CALL => MessageKind::Call,
-    }
-  }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -134,15 +85,24 @@ pub enum AthenaOption {}
 
 #[derive(Debug)]
 pub enum SetOptionError {
-    InvalidKey,
-    InvalidValue,
+  InvalidKey,
+  InvalidValue,
 }
 
 pub struct ExecutionContext {
-    host: dyn HostInterface,
-    tx_context: TransactionContext,
-    // unused
-    // context: *mut ffi::athcon_host_context,
+  host: Box<dyn HostInterface>,
+  tx_context: TransactionContext,
+  // unused
+  // context: *mut ffi::athcon_host_context,
+}
+
+impl ExecutionContext {
+  pub fn new(host: Box<dyn HostInterface>) -> Self {
+    ExecutionContext {
+      tx_context: host.get_tx_context(),
+      host,
+    }
+  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -184,26 +144,26 @@ impl fmt::Display for StatusCode {
   }
 }
 
-impl From<ffi::athcon_status_code> for StatusCode {
-  fn from(status: ffi::athcon_status_code) -> Self {
-    match status {
-      ffi::athcon_status_code::ATHCON_SUCCESS => StatusCode::Success,
-      ffi::athcon_status_code::ATHCON_FAILURE => StatusCode::Failure,
-      ffi::athcon_status_code::ATHCON_REVERT => StatusCode::Revert,
-      ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCode::OutOfGas,
-      ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
-      ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
-      ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
-      ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
-      ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => StatusCode::ContractValidationFailure,
-      ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
-      ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
-      ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => StatusCode::InternalError,
-      ffi::athcon_status_code::ATHCON_REJECTED => StatusCode::Rejected,
-      ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCode::OutOfMemory,
-    }
-  }
-}
+// impl From<ffi::athcon_status_code> for StatusCode {
+//   fn from(status: ffi::athcon_status_code) -> Self {
+//     match status {
+//       ffi::athcon_status_code::ATHCON_SUCCESS => StatusCode::Success,
+//       ffi::athcon_status_code::ATHCON_FAILURE => StatusCode::Failure,
+//       ffi::athcon_status_code::ATHCON_REVERT => StatusCode::Revert,
+//       ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCode::OutOfGas,
+//       ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
+//       ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
+//       ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
+//       ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
+//       ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => StatusCode::ContractValidationFailure,
+//       ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
+//       ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
+//       ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => StatusCode::InternalError,
+//       ffi::athcon_status_code::ATHCON_REJECTED => StatusCode::Rejected,
+//       ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCode::OutOfMemory,
+//     }
+//   }
+// }
 
 #[derive(Debug, PartialEq)]
 pub enum StorageStatus {
@@ -216,22 +176,6 @@ pub enum StorageStatus {
   StorageDeletedRestored,
   StorageAddedDeleted,
   StorageModifiedRestored,
-}
-
-impl From<ffi::athcon_storage_status> for StorageStatus {
-  fn from(status: ffi::athcon_storage_status) -> Self {
-    match status {
-      ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED => StorageStatus::StorageAssigned,
-      ffi::athcon_storage_status::ATHCON_STORAGE_ADDED => StorageStatus::StorageAdded,
-      ffi::athcon_storage_status::ATHCON_STORAGE_DELETED => StorageStatus::StorageDeleted,
-      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED => StorageStatus::StorageModified,
-      ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_ADDED => StorageStatus::StorageDeletedAdded,
-      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_DELETED => StorageStatus::StorageModifiedDeleted,
-      ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_RESTORED => StorageStatus::StorageDeletedRestored,
-      ffi::athcon_storage_status::ATHCON_STORAGE_ADDED_DELETED => StorageStatus::StorageAddedDeleted,
-      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_RESTORED => StorageStatus::StorageModifiedRestored,
-    }
-  }
 }
 
 impl fmt::Display for StorageStatus {
