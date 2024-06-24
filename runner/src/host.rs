@@ -105,8 +105,8 @@ pub enum SetOptionError {
 }
 
 pub struct ExecutionContext {
-  host: Box<dyn HostInterface>,
-  tx_context: TransactionContext,
+  _host: Box<dyn HostInterface>,
+  _tx_context: TransactionContext,
   // unused
   // context: *mut ffi::athcon_host_context,
 }
@@ -114,8 +114,8 @@ pub struct ExecutionContext {
 impl ExecutionContext {
   pub fn new(host: Box<dyn HostInterface>) -> Self {
     ExecutionContext {
-      tx_context: host.get_tx_context(),
-      host,
+      _tx_context: host.get_tx_context(),
+      _host: host,
     }
   }
 }
@@ -158,27 +158,6 @@ impl fmt::Display for StatusCode {
     }
   }
 }
-
-// impl From<ffi::athcon_status_code> for StatusCode {
-//   fn from(status: ffi::athcon_status_code) -> Self {
-//     match status {
-//       ffi::athcon_status_code::ATHCON_SUCCESS => StatusCode::Success,
-//       ffi::athcon_status_code::ATHCON_FAILURE => StatusCode::Failure,
-//       ffi::athcon_status_code::ATHCON_REVERT => StatusCode::Revert,
-//       ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCode::OutOfGas,
-//       ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
-//       ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
-//       ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
-//       ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
-//       ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => StatusCode::ContractValidationFailure,
-//       ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
-//       ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
-//       ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => StatusCode::InternalError,
-//       ffi::athcon_status_code::ATHCON_REJECTED => StatusCode::Rejected,
-//       ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCode::OutOfMemory,
-//     }
-//   }
-// }
 
 #[derive(Debug, PartialEq)]
 pub enum StorageStatus {

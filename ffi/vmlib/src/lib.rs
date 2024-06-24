@@ -5,7 +5,7 @@ use athena_runner::{
   Balance,
   Bytes32,
   Bytes32AsU64,
-  ExecutionContext as AthenaExecutionContext,
+  ExecutionContext,
   ExecutionResult,
   HostInterface as AthenaHostInterface,
   MessageKind,
@@ -245,7 +245,10 @@ impl From<ExecutionResultWrapper> for ffi::athcon_result {
     let output_size = output.len();
     let output_data = output.as_ptr();
     let gas_left = value.0.gas_left;
-    let create_address = AddressWrapper(value.0.create_address.unwrap()).into();
+    let create_address = value.0.create_address.map_or_else(
+      || ffi::athcon_address::default(),
+      |address| AddressWrapper(address).into(),
+    );
     let status_code = StatusCodeWrapper(value.0.status_code).into();
     let release = None;
     ffi::athcon_result {
@@ -285,7 +288,7 @@ extern "C" fn execute_code(
     let host_interface: &ffi::athcon_host_interface = &*host;
     let execution_context_raw = AthconExecutionContext::new(host_interface, context);
     let wrapped = WrappedHostInterface::new(execution_context_raw);
-    let ec = AthenaExecutionContext::new(wrapped);
+    let ec = ExecutionContext::new(Box::new(wrapped));
 
     // Convert the raw pointer to a reference
     let msg_ref: &ffi::athcon_message = &*msg;
@@ -302,8 +305,7 @@ extern "C" fn execute_code(
       athena_msg.0,
       code_slice,
     );
-    let athcon_result: *const ffi::athcon_result = execution_result.into();
-    *athcon_result
+    ExecutionResultWrapper(execution_result).into()
   }
 }
 
@@ -460,13 +462,6 @@ impl<'a> AthenaHostInterface for WrappedHostInterface<'a> {
   }
 }
 
-// impl<'a> From<&'a ffi::athcon_host_interface> for WrappedHostInterface {
-//   fn from(interface: &'a ffi::athcon_host_interface) -> Self {
-//     let execution_context_raw = AthconExecutionContext::new(interface, context);
-//     WrappedHostInterface::new(execution_context_raw)
-//   }
-// }
-
 // TEST CODE follows
 // should probably be moved into a separate module
 
@@ -519,9 +514,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
 
     // Construct mock host, context, message, and code objects for test
     let host_interface = get_dummy_host_interface();
-    // let host_context = std::ptr::null_mut();
-    // let mut context = ExecutionContext::new(&host_interface, host_context);
-    let code = [0u8; 0];
+    let code = include_bytes!("../../../examples/hello_world/program/elf/hello-world-program");
     let message = ::athcon_sys::athcon_message {
         kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
         depth: 0,
@@ -532,7 +525,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         input_size: 0,
         value: ::athcon_sys::athcon_uint256be::default(),
         code: std::ptr::null(),
-        code_size: 0,
+        code_size: code.len(),
     };
 
     // fail due to null vm pointer
@@ -544,7 +537,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         ffi::athcon_revision::ATHCON_FRONTIER,
         &message,
         code.as_ptr(),
-        0,
+        code.len(),
       ).status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
@@ -560,7 +553,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         ffi::athcon_revision::ATHCON_FRONTIER,
         &message,
         code.as_ptr(),
-        0,
+        code.len(),
       ).status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
@@ -576,7 +569,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         ffi::athcon_revision::ATHCON_FRONTIER,
         std::ptr::null(),
         code.as_ptr(),
-        0,
+        code.len(),
       ).status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
@@ -592,7 +585,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         ffi::athcon_revision::ATHCON_FRONTIER,
         &message,
         code.as_ptr(),
-        0,
+        code.len(),
       ).status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_SUCCESS
