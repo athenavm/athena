@@ -4,15 +4,22 @@ use athena_runner::{
   AthenaVm,
   Balance,
   Bytes32,
-  Bytes32AsBalance,
+  Bytes32AsU64,
   ExecutionContext as AthenaExecutionContext,
+  ExecutionResult,
   HostInterface as AthenaHostInterface,
   MessageKind,
+  StatusCode,
   StorageStatus,
   TransactionContext,
+  VmInterface,
 };
 use athcon_sys as ffi;
-use athcon_vm::{self, ExecutionContext};
+use athcon_vm::{
+  ExecutionContext as AthconExecutionContext,
+  ExecutionMessage as AthconExecutionMessage,
+  ExecutionResult as AthconExecutionResult,
+};
 
 // Implementation for destroying the VM instance
 extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
@@ -33,42 +40,58 @@ fn error_result() -> ffi::athcon_result {
     output_size: 0,
     gas_left: 0,
     create_address: ffi::athcon_address::default(),
-    status_code: athcon_vm::StatusCode::ATHCON_FAILURE,
+    status_code: ffi::athcon_status_code::ATHCON_FAILURE,
     release: None,
   }
 }
 
-struct AddressWrapper(ffi::athcon_address);
-impl From<AddressWrapper> for Address {
-  fn from(address: AddressWrapper) -> Self {
-    address.0.bytes
+struct AddressWrapper(Address);
+
+impl From<ffi::athcon_address> for AddressWrapper {
+  fn from(address: ffi::athcon_address) -> Self {
+    AddressWrapper(address.bytes)
   }
 }
 
-struct ReverseAddressWrapper(Address);
-impl From<ReverseAddressWrapper> for ffi::athcon_address {
-  fn from(address: ReverseAddressWrapper) -> Self {
+impl From<AddressWrapper> for Address {
+  fn from(address: AddressWrapper) -> Self {
+    address.0
+  }
+}
+
+impl From<AddressWrapper> for ffi::athcon_address {
+  fn from(address: AddressWrapper) -> Self {
     ffi::athcon_address {
       bytes: address.0,
     }
   }
 }
 
-struct Bytes32Wrapper(ffi::athcon_bytes32);
+struct Bytes32Wrapper(Bytes32);
 
-impl From<Bytes32Wrapper> for Bytes32 {
+impl From<Bytes32Wrapper> for ffi::athcon_bytes32 {
   fn from(bytes: Bytes32Wrapper) -> Self {
-    bytes.0.bytes
-  }
-}
-
-struct ReverseBytes32Wrapper(Bytes32);
-
-impl From<ReverseBytes32Wrapper> for ffi::athcon_bytes32 {
-  fn from(bytes: ReverseBytes32Wrapper) -> Self {
     ffi::athcon_bytes32 {
       bytes: bytes.0,
     }
+  }
+}
+
+impl From<Bytes32Wrapper> for Bytes32 {
+  fn from(bytes: Bytes32Wrapper) -> Self {
+    bytes.0
+  }
+}
+
+impl From<Bytes32Wrapper> for u64 {
+  fn from(bytes: Bytes32Wrapper) -> Self {
+    Bytes32AsU64::new(bytes.0).into()
+  }
+}
+
+impl From<ffi::athcon_bytes32> for Bytes32Wrapper {
+  fn from(bytes: ffi::athcon_bytes32) -> Self {
+    Bytes32Wrapper(bytes.bytes)
   }
 }
 
@@ -83,6 +106,7 @@ impl From<ffi::athcon_call_kind> for MessageKindWrapper {
 }
 
 struct AthenaMessageWrapper(AthenaMessage);
+
 impl From<ffi::athcon_message> for AthenaMessageWrapper {
   fn from(item: ffi::athcon_message) -> Self {
     // Convert input_data pointer and size to Vec<u8>
@@ -100,16 +124,138 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     };
 
     let kind: MessageKindWrapper = item.kind.into();
+    let byteswrapper: Bytes32Wrapper = item.value.into();
     AthenaMessageWrapper(AthenaMessage{
       kind: kind.0,
       depth: item.depth,
       gas: item.gas,
-      recipient: AddressWrapper(item.recipient).into(),
-      sender: AddressWrapper(item.sender).into(),
+      recipient: AddressWrapper::from(item.recipient).into(),
+      sender: AddressWrapper::from(item.sender).into(),
       input_data,
-      value: Bytes32AsBalance::new(Bytes32Wrapper(item.value).into()).into(),
+      value: Bytes32AsU64::new(byteswrapper.0).into(),
       code,
     })
+  }
+}
+
+impl From<AthenaMessageWrapper> for ffi::athcon_message {
+  fn from(item: AthenaMessageWrapper) -> Self {
+    let input_data = item.0.input_data.as_ptr();
+    let input_size = item.0.input_data.len();
+    let code = item.0.code.as_ptr();
+    let code_size = item.0.code.len();
+    let kind = match item.0.kind {
+      MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
+    };
+    let value: Bytes32AsU64 = item.0.value.into();
+    ffi::athcon_message {
+      kind,
+      depth: item.0.depth,
+      gas: item.0.gas,
+      recipient: AddressWrapper(item.0.recipient).into(),
+      sender: AddressWrapper(item.0.sender).into(),
+      input_data,
+      input_size,
+      value: Bytes32Wrapper(value.into()).into(),
+      code,
+      code_size,
+    }
+  }
+}
+
+impl From<AthenaMessageWrapper> for AthconExecutionMessage {
+  fn from(item: AthenaMessageWrapper) -> Self {
+    // conversion is already implemented on the other side; utilize this
+    AthconExecutionMessage::from(&ffi::athcon_message::from(item))
+  }
+}
+
+struct StatusCodeWrapper(StatusCode);
+
+impl From<StatusCodeWrapper> for StatusCode {
+  fn from(status_code: StatusCodeWrapper) -> Self {
+    status_code.0
+  }
+}
+
+impl From<ffi::athcon_status_code> for StatusCodeWrapper {
+  fn from(status_code: ffi::athcon_status_code) -> Self {
+    match status_code {
+      ffi::athcon_status_code::ATHCON_SUCCESS => StatusCodeWrapper(StatusCode::Success),
+      ffi::athcon_status_code::ATHCON_FAILURE => StatusCodeWrapper(StatusCode::Failure),
+      ffi::athcon_status_code::ATHCON_REVERT => StatusCodeWrapper(StatusCode::Revert),
+      ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCodeWrapper(StatusCode::OutOfGas),
+      ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => StatusCodeWrapper(StatusCode::UndefinedInstruction),
+      ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => StatusCodeWrapper(StatusCode::InvalidMemoryAccess),
+      ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => StatusCodeWrapper(StatusCode::CallDepthExceeded),
+      ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => StatusCodeWrapper(StatusCode::PrecompileFailure),
+      ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => StatusCodeWrapper(StatusCode::ContractValidationFailure),
+      ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => StatusCodeWrapper(StatusCode::ArgumentOutOfRange),
+      ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => StatusCodeWrapper(StatusCode::InsufficientBalance),
+      ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => StatusCodeWrapper(StatusCode::InternalError),
+      ffi::athcon_status_code::ATHCON_REJECTED => StatusCodeWrapper(StatusCode::Rejected),
+      ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCodeWrapper(StatusCode::OutOfMemory),
+    }
+  }
+}
+
+impl From<StatusCodeWrapper> for ffi::athcon_status_code {
+  fn from(status_code: StatusCodeWrapper) -> Self {
+    match status_code.0 {
+      StatusCode::Success => ffi::athcon_status_code::ATHCON_SUCCESS,
+      StatusCode::Failure => ffi::athcon_status_code::ATHCON_FAILURE,
+      StatusCode::Revert => ffi::athcon_status_code::ATHCON_REVERT,
+      StatusCode::OutOfGas => ffi::athcon_status_code::ATHCON_OUT_OF_GAS,
+      StatusCode::UndefinedInstruction => ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION,
+      StatusCode::InvalidMemoryAccess => ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS,
+      StatusCode::CallDepthExceeded => ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED,
+      StatusCode::PrecompileFailure => ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE,
+      StatusCode::ContractValidationFailure => ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE,
+      StatusCode::ArgumentOutOfRange => ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE,
+      StatusCode::InsufficientBalance => ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE,
+      StatusCode::InternalError => ffi::athcon_status_code::ATHCON_INTERNAL_ERROR,
+      StatusCode::Rejected => ffi::athcon_status_code::ATHCON_REJECTED,
+      StatusCode::OutOfMemory => ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY,
+    }
+  }
+}
+
+struct ExecutionResultWrapper(ExecutionResult);
+
+impl From<ExecutionResultWrapper> for ExecutionResult {
+  fn from(wrapper: ExecutionResultWrapper) -> Self {
+    wrapper.0
+  }
+}
+
+impl From<AthconExecutionResult> for ExecutionResultWrapper {
+  fn from(result: AthconExecutionResult) -> Self {
+    ExecutionResultWrapper(ExecutionResult::new(
+      StatusCodeWrapper::from(result.status_code()).into(),
+      result.gas_left(),
+      result.output().cloned(),
+      result.create_address().map(|address| AddressWrapper::from(*address).into()),
+    ))
+  }
+}
+
+impl From<ExecutionResultWrapper> for ffi::athcon_result {
+  fn from(value: ExecutionResultWrapper) -> Self {
+    let output = value.0.output.unwrap();
+    let output_size = output.len();
+    let output_data = output.as_ptr();
+    let gas_left = value.0.gas_left;
+    let create_address = AddressWrapper(value.0.create_address.unwrap()).into();
+    let status_code = StatusCodeWrapper(value.0.status_code).into();
+    let release = None;
+    ffi::athcon_result {
+      output_data,
+      output_size,
+      gas_left,
+      create_address,
+      status_code,
+      release,
+    }
   }
 }
 
@@ -137,8 +283,8 @@ extern "C" fn execute_code(
 
     // Unpack the context
     let host_interface: &ffi::athcon_host_interface = &*host;
-    let execution_context_raw = ExecutionContext::new(host_interface, context);
-    let wrapped = WrappedHostInterface::from(execution_context_raw);
+    let execution_context_raw = AthconExecutionContext::new(host_interface, context);
+    let wrapped = WrappedHostInterface::new(execution_context_raw);
     let ec = AthenaExecutionContext::new(wrapped);
 
     // Convert the raw pointer to a reference
@@ -229,9 +375,9 @@ unsafe extern "C" fn execute_call(
 
     ffi::athcon_result {
         status_code: if success {
-            athcon_vm::StatusCode::ATHCON_SUCCESS
+            ffi::athcon_status_code::ATHCON_SUCCESS
         } else {
-            athcon_vm::StatusCode::ATHCON_INTERNAL_ERROR
+            ffi::athcon_status_code::ATHCON_FAILURE
         },
         gas_left: 2,
         // NOTE: we are passing the input pointer here, but for testing the lifetime is ok
@@ -243,11 +389,11 @@ unsafe extern "C" fn execute_call(
 }
 
 struct WrappedHostInterface<'a> {
-  context: ExecutionContext<'a>,
+  context: AthconExecutionContext<'a>,
 }
 
 impl<'a> WrappedHostInterface<'a> {
-  fn new(context: ExecutionContext<'a>) -> Self {
+  fn new(context: AthconExecutionContext<'a>) -> Self {
     WrappedHostInterface {
       context: context,
     }
@@ -268,41 +414,58 @@ fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
   }
 }
 
+struct TransactionContextWrapper(ffi::athcon_tx_context);
+impl From<TransactionContextWrapper> for TransactionContext {
+  fn from(context: TransactionContextWrapper) -> Self {
+    let tx_context = context.0;
+    TransactionContext {
+      gas_price: Bytes32Wrapper::from(tx_context.tx_gas_price).into(),
+      origin: AddressWrapper::from(tx_context.tx_origin).into(),
+      block_height: tx_context.block_height,
+      block_timestamp: tx_context.block_timestamp,
+      block_gas_limit: tx_context.block_gas_limit,
+      chain_id: Bytes32Wrapper::from(tx_context.chain_id).into(),
+    }
+  }
+}
+
 impl<'a> AthenaHostInterface for WrappedHostInterface<'a> {
   fn account_exists(&self, addr: &Address) -> bool {
-    self.context.account_exists(&ReverseAddressWrapper(*addr).into())
+    self.context.account_exists(&AddressWrapper(*addr).into())
   }
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
-    Bytes32Wrapper(self.context.get_storage(&ReverseAddressWrapper(*addr).into(), &ReverseBytes32Wrapper(*key).into())).into()
+    let value_wrapper: Bytes32Wrapper = self.context.get_storage(&AddressWrapper(*addr).into(), &Bytes32Wrapper(*key).into()).into();
+    value_wrapper.into()
   }
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     convert_storage_status(
       self.context.set_storage(
-        &ReverseAddressWrapper(*addr).into(),
-        &ReverseBytes32Wrapper(*key).into(),
-        &ReverseBytes32Wrapper(*value).into(),
+        &AddressWrapper(*addr).into(),
+        &Bytes32Wrapper(*key).into(),
+        &Bytes32Wrapper(*value).into(),
       ))
   }
   fn get_balance(&self, addr: &Address) -> Balance {
-    let balance = self.context.get_balance(&ReverseAddressWrapper(*addr).into());
-    Bytes32AsBalance::new(Bytes32Wrapper(balance).into()).into()
+    let balance = self.context.get_balance(&AddressWrapper(*addr).into());
+    Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
   }
   fn get_tx_context(&self) -> TransactionContext {
-    self.context.get_tx_context()
+    TransactionContextWrapper(*self.context.get_tx_context()).into()
   }
   fn get_block_hash(&self, number: i64) -> Bytes32 {
-    self.context.get_block_hash(number)
+    Bytes32Wrapper::from(self.context.get_block_hash(number)).into()
   }
-  fn call(&mut self, msg: AthenaMessage) -> (Vec<u8>, i64, Address, StatusCode) {
-    self.context.call(msg)
+  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+    ExecutionResultWrapper::from(self.context.call(&AthconExecutionMessage::from(AthenaMessageWrapper(msg)))).into()
   }
 }
 
-impl From<ffi::athcon_host_interface> for WrappedHostInterface {
-  fn from(interface: ffi::athcon_host_interface) -> Self {
-    WrappedHostInterface::new(&interface)
-  }
-}
+// impl<'a> From<&'a ffi::athcon_host_interface> for WrappedHostInterface {
+//   fn from(interface: &'a ffi::athcon_host_interface) -> Self {
+//     let execution_context_raw = AthconExecutionContext::new(interface, context);
+//     WrappedHostInterface::new(execution_context_raw)
+//   }
+// }
 
 // TEST CODE follows
 // should probably be moved into a separate module

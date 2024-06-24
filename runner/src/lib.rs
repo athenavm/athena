@@ -6,10 +6,12 @@ pub use host::{
   AthenaMessage,
   Balance,
   Bytes32,
-  Bytes32AsBalance,
+  Bytes32AsU64,
   ExecutionContext,
+  ExecutionResult,
   HostInterface,
   MessageKind,
+  StatusCode,
   StorageStatus,
   TransactionContext,
 };
