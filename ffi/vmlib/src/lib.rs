@@ -1,17 +1,19 @@
-use athena_runner::{
+use athena_interface::{
   Address,
   AthenaMessage,
-  AthenaVm,
   Balance,
   Bytes32,
-  Bytes32AsU64,
-  ExecutionContext,
   ExecutionResult,
   HostInterface,
   MessageKind,
   StatusCode,
   StorageStatus,
   TransactionContext,
+};
+use athena_runner::{
+  AthenaVm,
+  Bytes32AsU64,
+  ExecutionContext,
   VmInterface,
 };
 use athcon_sys as ffi;

@@ -8,6 +8,7 @@ members = [
   "ffi/ffitest",
   "ffi/vmlib",
   "helper",
+  "interface",
   "runner",
   "sdk",
   "vm/entrypoint",

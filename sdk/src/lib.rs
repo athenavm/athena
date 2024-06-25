@@ -13,6 +13,7 @@ use anyhow::{Ok, Result};
 use athena_core::runtime::{Program, Runtime};
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::utils::AthenaCoreOpts;
+use athena_interface::HostInterface;
 
 /// A client for interacting with Athena.
 pub struct ExecutionClient {}
@@ -53,7 +54,7 @@ impl ExecutionClient {
     /// // Execute the program on the inputs.
     /// let public_values = client.execute(elf, stdin).unwrap();
     /// ```
-    pub fn execute(&self, elf: &[u8], stdin: AthenaStdin) -> Result<AthenaPublicValues> {
+    pub fn execute(&self, elf: &[u8], stdin: AthenaStdin, _host: Option<&dyn HostInterface>) -> Result<AthenaPublicValues> {
       let program = Program::from(elf);
       let opts = AthenaCoreOpts::default();
       let mut runtime = Runtime::new(program, opts);

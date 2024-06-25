@@ -1,16 +1,14 @@
+use athena_interface::{
+  AthenaMessage,
+  ExecutionResult,
+  StatusCode,
+};
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use crate::host::{
-  Address,
   AthenaCapability,
-  AthenaMessage,
   AthenaOption,
-  Balance,
   ExecutionContext,
-  ExecutionResult,
-  MessageKind,
-  MockHost,
   SetOptionError,
-  StatusCode,
 };
 
 pub trait VmInterface {
@@ -48,7 +46,7 @@ impl VmInterface for AthenaVm {
 
   fn execute(
     &self,
-    _host: ExecutionContext,
+    host: ExecutionContext,
     _rev: u32,
     _msg: AthenaMessage,
     // note: ignore _msg.code, should only be used on deploy
@@ -57,7 +55,7 @@ impl VmInterface for AthenaVm {
     let mut stdin = AthenaStdin::new();
     stdin.write_vec(_msg.input_data);
     // TODO: pass execution context/callbacks into VM
-    let output = self.client.execute(&code, stdin).unwrap();
+    let output = self.client.execute(&code, stdin, Some(host.get_host())).unwrap();
     ExecutionResult::new(
       StatusCode::Success,
       1337,
@@ -67,7 +65,16 @@ impl VmInterface for AthenaVm {
   }
 }
 
+  #[cfg(test)]
 mod tests {
+  use athena_interface::{
+    Address,
+    AthenaMessage,
+    Balance,
+    MessageKind,
+    StatusCode,
+  };
+  use crate::host::MockHost;
   use crate::VmInterface;
   use super::*;
 

@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
-use std::fmt;
+use athena_interface::{
+  Bytes32,
+  HostInterface,
+  TransactionContext,
+};
 
-pub type Address = [u8; 24];
-pub type Balance = u64;
-pub type Bytes32 = [u8; 32];
-pub type Bytes = [u8];
 pub struct Bytes32AsU64(Bytes32);
 
 impl Bytes32AsU64 {
@@ -33,78 +32,6 @@ impl From<u64> for Bytes32AsU64 {
     let value_bytes = value.to_le_bytes();
     bytes[..8].copy_from_slice(&value_bytes);
     Bytes32AsU64(bytes)
-  }
-}
-
-#[derive(Copy, Clone)]
-pub struct TransactionContext {
-  pub gas_price: u64,
-  pub origin: Address,
-  pub block_height: i64,
-  pub block_timestamp: i64,
-  pub block_gas_limit: i64,
-  pub chain_id: Bytes32,
-}
-
-#[derive(Debug)]
-pub struct ExecutionResult {
-    pub status_code: StatusCode,
-    pub gas_left: i64,
-    pub output: Option<Vec<u8>>,
-    pub create_address: Option<Address>,
-}
-
-impl ExecutionResult {
-  pub fn new(status_code: StatusCode, gas_left: i64, output: Option<Vec<u8>>, create_address: Option<Address>) -> Self {
-    ExecutionResult {
-      status_code,
-      gas_left,
-      output,
-      create_address,
-    }
-  }
-}
-
- pub trait HostInterface {
-  fn account_exists(&self, addr: &Address) -> bool;
-  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
-  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-  fn get_balance(&self, addr: &Address) -> Balance;
-  // this should take an opaque context object (txid? something else?)
-  fn get_tx_context(&self) -> TransactionContext;
-  fn get_block_hash(&self, number: i64) -> Bytes32;
-  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
- }
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum MessageKind {
-  Call,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct AthenaMessage {
-  pub kind: MessageKind,
-  pub depth: i32,
-  pub gas: i64,
-  pub recipient: Address,
-  pub sender: Address,
-  pub input_data: Vec<u8>,
-  pub value: Balance,
-  pub code: Vec<u8>,
-}
-
-impl AthenaMessage {
-  pub fn new(kind: MessageKind, depth: i32, gas: i64, recipient: Address, sender: Address, input_data: Vec<u8>, value: Balance, code: Vec<u8>) -> Self {
-    AthenaMessage {
-      kind,
-      depth,
-      gas,
-      recipient,
-      sender,
-      input_data,
-      value,
-      code,
-    }
   }
 }
 
@@ -146,74 +73,18 @@ impl ExecutionContext {
   }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum StatusCode {
-  Success,
-  Failure,
-  Revert,
-  OutOfGas,
-  UndefinedInstruction,
-  InvalidMemoryAccess,
-  CallDepthExceeded,
-  PrecompileFailure,
-  ContractValidationFailure,
-  ArgumentOutOfRange,
-  InsufficientBalance,
-  InternalError,
-  Rejected,
-  OutOfMemory,
-}
+#[cfg(test)]
+use std::collections::BTreeMap;
 
-impl fmt::Display for StatusCode {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      StatusCode::Success => write!(f, "Execution finished with success."),
-      StatusCode::Failure => write!(f, "Generic execution failure."),
-      StatusCode::Revert => write!(f, "Execution terminated with REVERT opcode."),
-      StatusCode::OutOfGas => write!(f, "The execution has run out of gas."),
-      StatusCode::UndefinedInstruction => write!(f, "An undefined instruction has been encountered."),
-      StatusCode::InvalidMemoryAccess => write!(f, "Tried to read outside memory bounds."),
-      StatusCode::CallDepthExceeded => write!(f, "Call depth has exceeded the limit."),
-      StatusCode::PrecompileFailure => write!(f, "A call to a precompiled or system contract has ended with a failure."),
-      StatusCode::ContractValidationFailure => write!(f, "Contract validation has failed."),
-      StatusCode::ArgumentOutOfRange => write!(f, "An argument to a state accessing method has a value outside of the accepted range."),
-      StatusCode::InsufficientBalance => write!(f, "The caller does not have enough funds for value transfer."),
-      StatusCode::InternalError => write!(f, "Athena implementation generic internal error."),
-      StatusCode::Rejected => write!(f, "The execution of the given code and/or message has been rejected by the Athena implementation."),
-      StatusCode::OutOfMemory => write!(f, "The VM failed to allocate the amount of memory needed for execution."),
-    }
-  }
-}
+#[cfg(test)]
+use athena_interface::{
+  Address,
+  AthenaMessage,
+  ExecutionResult,
+  StorageStatus,
+};
 
-#[derive(Debug, PartialEq)]
-pub enum StorageStatus {
-  StorageAssigned,
-  StorageAdded,
-  StorageDeleted,
-  StorageModified,
-  StorageDeletedAdded,
-  StorageModifiedDeleted,
-  StorageDeletedRestored,
-  StorageAddedDeleted,
-  StorageModifiedRestored,
-}
-
-impl fmt::Display for StorageStatus {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      StorageStatus::StorageAssigned => write!(f, "The storage item is assigned without affecting the cost structure."),
-      StorageStatus::StorageAdded => write!(f, "A new storage item is added by changing the current clean zero to a nonzero value."),
-      StorageStatus::StorageDeleted => write!(f, "A storage item is deleted by changing the current clean nonzero to the zero value."),
-      StorageStatus::StorageModified => write!(f, "A storage item is modified by changing the current clean nonzero to another nonzero value."),
-      StorageStatus::StorageDeletedAdded => write!(f, "A storage item is added by changing the current dirty zero to a nonzero value other than the original."),
-      StorageStatus::StorageModifiedDeleted => write!(f, "A storage item is deleted by changing the current dirty nonzero to the zero value and the original value is not zero."),
-      StorageStatus::StorageDeletedRestored => write!(f, "A storage item is added by changing the current dirty zero to the original value."),
-      StorageStatus::StorageAddedDeleted => write!(f, "A storage item is deleted by changing the current dirty nonzero to the original zero value."),
-      StorageStatus::StorageModifiedRestored => write!(f, "A storage item is modified by changing the current dirty nonzero to the original nonzero value other than the current."),
-    }
-  }
-}
-
+#[cfg(test)]
 pub(crate) struct MockHost {
   context: Option<TransactionContext>,
 
@@ -224,6 +95,7 @@ pub(crate) struct MockHost {
   balance: BTreeMap<Address, Bytes32>,
 }
 
+#[cfg(test)]
 impl MockHost {
   pub fn new(context: Option<TransactionContext>) -> Self {
     MockHost {
@@ -234,6 +106,7 @@ impl MockHost {
   }
 }
 
+#[cfg(test)]
 impl HostInterface for MockHost {
   fn account_exists(&self, addr: &Address) -> bool {
     self.balance.contains_key(addr)
@@ -262,8 +135,8 @@ impl HostInterface for MockHost {
     Bytes32::default()
   }
 
-  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
-
+  fn call(&mut self, _msg: AthenaMessage) -> ExecutionResult {
+    ExecutionResult::new(athena_interface::StatusCode::Failure, 0, None, None)
   }
 }
 
@@ -273,21 +146,18 @@ mod tests {
 
   #[test]
   fn test_get_storage() {
-    let mut host = MockHost::new();
+    let mut host = MockHost::new(None);
     let address = [8; 24];
     let key = [1; 32];
     let value = [2; 32];
     assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned);
     let retrieved_value = host.get_storage(&address, &key);
-    match retrieved_value {
-      Some(v) => assert_eq!(v, value),
-      None => panic!("Value not found"),
-    }
+    assert_eq!(retrieved_value, value);
   }
 
   #[test]
   fn test_get_balance() {
-    let host = MockHost::new();
+    let host = MockHost::new(None);
     let address = [8; 24];
     let balance = host.get_balance(&address);
     assert_eq!(balance, 0);
