@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 pub type Address = [u8; 24];
@@ -35,6 +36,7 @@ impl From<u64> for Bytes32AsU64 {
   }
 }
 
+#[derive(Copy, Clone)]
 pub struct TransactionContext {
   pub gas_price: u64,
   pub origin: Address,
@@ -68,6 +70,7 @@ impl ExecutionResult {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
+  // this should take an opaque context object (txid? something else?)
   fn get_tx_context(&self) -> TransactionContext;
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
@@ -90,6 +93,21 @@ pub struct AthenaMessage {
   pub code: Vec<u8>,
 }
 
+impl AthenaMessage {
+  pub fn new(kind: MessageKind, depth: i32, gas: i64, recipient: Address, sender: Address, input_data: Vec<u8>, value: Balance, code: Vec<u8>) -> Self {
+    AthenaMessage {
+      kind,
+      depth,
+      gas,
+      recipient,
+      sender,
+      input_data,
+      value,
+      code,
+    }
+  }
+}
+
 // currently unused
 #[derive(Debug, Clone, Copy)]
 pub enum AthenaCapability {}
@@ -105,8 +123,8 @@ pub enum SetOptionError {
 }
 
 pub struct ExecutionContext {
-  _host: Box<dyn HostInterface>,
-  _tx_context: TransactionContext,
+  host: Box<dyn HostInterface>,
+  tx_context: TransactionContext,
   // unused
   // context: *mut ffi::athcon_host_context,
 }
@@ -114,9 +132,17 @@ pub struct ExecutionContext {
 impl ExecutionContext {
   pub fn new(host: Box<dyn HostInterface>) -> Self {
     ExecutionContext {
-      _tx_context: host.get_tx_context(),
-      _host: host,
+      tx_context: host.get_tx_context(),
+      host: host,
     }
+  }
+
+  pub fn get_host(&self) -> &dyn HostInterface {
+    &*self.host
+  }
+
+  pub fn get_tx_context(&self) -> &TransactionContext {
+    &self.tx_context
   }
 }
 
@@ -188,67 +214,82 @@ impl fmt::Display for StorageStatus {
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use std::collections::BTreeMap;
-  use super::*;
+pub(crate) struct MockHost {
+  context: Option<TransactionContext>,
 
-  struct MockHost {
-    // stores state keyed by address and key
-    storage: BTreeMap<(Address, Bytes32), Bytes32>,
+  // stores state keyed by address and key
+  storage: BTreeMap<(Address, Bytes32), Bytes32>,
 
-    // stores balance keyed by address
-    balance: BTreeMap<Address, Bytes32>,
+  // stores balance keyed by address
+  balance: BTreeMap<Address, Bytes32>,
+}
+
+impl MockHost {
+  pub fn new(context: Option<TransactionContext>) -> Self {
+    MockHost {
+      context: context,
+      storage: BTreeMap::new(),
+      balance: BTreeMap::new(),
+    }
+  }
+}
+
+impl HostInterface for MockHost {
+  fn account_exists(&self, addr: &Address) -> bool {
+    self.balance.contains_key(addr)
   }
 
-  impl MockHost {
-    pub fn new() -> Self {
-      MockHost {
-        storage: BTreeMap::new(),
-        balance: BTreeMap::new(),
-      }
+  // return null bytes if the account or key do not exist
+  fn get_storage(&self, address: &Address, key: &Bytes32) -> Bytes32 {
+    *self.storage.get(&(*address, *key)).unwrap_or(&Bytes32::default())
+  }
+
+  fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+    self.storage.insert((*address, *key), *value);
+    return StorageStatus::StorageAssigned;
+  }
+
+  // return 0 if the account does not exist
+  fn get_balance(&self, address: &Address) -> u64 {
+    self.balance.get(address).map_or_else(|| 0, |balance| Bytes32AsU64(*balance).into())
+  }
+
+  fn get_tx_context(&self) -> TransactionContext {
+    self.context.unwrap()
+  }
+
+  fn get_block_hash(&self, _number: i64) -> Bytes32 {
+    Bytes32::default()
+  }
+
+  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_get_storage() {
+    let mut host = MockHost::new();
+    let address = [8; 24];
+    let key = [1; 32];
+    let value = [2; 32];
+    assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned);
+    let retrieved_value = host.get_storage(&address, &key);
+    match retrieved_value {
+      Some(v) => assert_eq!(v, value),
+      None => panic!("Value not found"),
     }
   }
 
-  // impl HostInterface for MockHost {
-  //   fn get_storage(&self, address: &Address, key: &Bytes32) -> Option<Bytes32> {
-  //     return self.storage.get(&(*address, *key)).cloned();
-  //   }
-
-  //   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-  //     self.storage.insert((*address, *key), *value);
-  //     return StorageStatus::StorageAssigned;
-  //   }
-
-  //   fn get_balance(&self, address: &Address) -> u64 {
-  //     let balance = self.balance.get(address);
-  //     if let Some(b) = balance {
-  //       return Bytes32AsBalance(*b).into();
-  //     } else {
-  //       return 0;
-  //     }
-  //   }
-  // }
-
-  // #[test]
-  // fn test_get_storage() {
-  //   let mut host = MockHost::new();
-  //   let address = [8; 24];
-  //   let key = [1; 32];
-  //   let value = [2; 32];
-  //   assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned);
-  //   let retrieved_value = host.get_storage(&address, &key);
-  //   match retrieved_value {
-  //     Some(v) => assert_eq!(v, value),
-  //     None => panic!("Value not found"),
-  //   }
-  // }
-
-  // #[test]
-  // fn test_get_balance() {
-  //   let host = MockHost::new();
-  //   let address = [8; 24];
-  //   let balance = host.get_balance(&address);
-  //   assert_eq!(balance, 0);
-  // }
+  #[test]
+  fn test_get_balance() {
+    let host = MockHost::new();
+    let address = [8; 24];
+    let balance = host.get_balance(&address);
+    assert_eq!(balance, 0);
+  }
 }

@@ -7,7 +7,7 @@ use athena_runner::{
   Bytes32AsU64,
   ExecutionContext,
   ExecutionResult,
-  HostInterface as AthenaHostInterface,
+  HostInterface,
   MessageKind,
   StatusCode,
   StorageStatus,
@@ -431,7 +431,7 @@ impl From<TransactionContextWrapper> for TransactionContext {
   }
 }
 
-impl<'a> AthenaHostInterface for WrappedHostInterface<'a> {
+impl<'a> HostInterface for WrappedHostInterface<'a> {
   fn account_exists(&self, addr: &Address) -> bool {
     self.context.account_exists(&AddressWrapper(*addr).into())
   }

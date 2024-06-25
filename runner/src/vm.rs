@@ -1,10 +1,14 @@
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use crate::host::{
+  Address,
   AthenaCapability,
   AthenaMessage,
   AthenaOption,
+  Balance,
   ExecutionContext,
   ExecutionResult,
+  MessageKind,
+  MockHost,
   SetOptionError,
   StatusCode,
 };
@@ -15,7 +19,6 @@ pub trait VmInterface {
   fn execute(
     &self,
     host: ExecutionContext,
-    // context: dyn HostInterface,
     rev: u32,
     msg: AthenaMessage,
     code: &[u8],
@@ -46,8 +49,6 @@ impl VmInterface for AthenaVm {
   fn execute(
     &self,
     _host: ExecutionContext,
-    // unused
-    // _context: *mut ffi::athcon_host_context,
     _rev: u32,
     _msg: AthenaMessage,
     // note: ignore _msg.code, should only be used on deploy
@@ -63,5 +64,75 @@ impl VmInterface for AthenaVm {
       Some(output.to_vec()),
       None,
     )
+  }
+}
+
+mod tests {
+  use crate::VmInterface;
+  use super::*;
+
+  struct MockVm {}
+
+  impl MockVm {
+    fn new() -> Self {
+      MockVm {}
+    }
+  }
+
+  impl VmInterface for MockVm {
+    fn get_capabilities(&self) -> Vec<AthenaCapability> {
+      vec![]
+    }
+
+    fn set_option(&self, _option: AthenaOption, _value: &str) -> Result<(), SetOptionError> {
+      Err(SetOptionError::InvalidKey)
+    }
+
+    fn execute(
+      &self,
+      host: ExecutionContext,
+      _rev: u32,
+      msg: AthenaMessage,
+      _code: &[u8],
+    ) -> ExecutionResult {
+      // process a few basic messages
+      let host_interface = host.get_host();
+
+      // save context and perform a call
+
+
+      // restore context
+
+      // get block hash
+      let output = host_interface.get_block_hash(0);
+
+      ExecutionResult::new(StatusCode::Success, msg.gas-1, Some(output.to_vec()), None)
+    }
+  }
+
+  #[test]
+  fn test_vm() {
+    // construct a mock host
+    let host = MockHost::new(None);
+
+    // construct a mock vm
+    let vm = MockVm::new();
+
+    // test execution
+    vm.execute(
+      ExecutionContext::new(Box::new(host)),
+      0,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000,
+        Address::default(),
+        Address::default(),
+        vec![],
+        Balance::default(),
+        vec![],
+      ),
+      &[],
+    );
   }
 }
