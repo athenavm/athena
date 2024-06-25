@@ -1,15 +1,6 @@
-use athena_interface::{
-  AthenaMessage,
-  ExecutionResult,
-  StatusCode,
-};
+use crate::host::{AthenaCapability, AthenaOption, ExecutionContext, SetOptionError};
+use athena_interface::{AthenaMessage, ExecutionResult, StatusCode};
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use crate::host::{
-  AthenaCapability,
-  AthenaOption,
-  ExecutionContext,
-  SetOptionError,
-};
 
 pub trait VmInterface {
   fn get_capabilities(&self) -> Vec<AthenaCapability>;
@@ -55,28 +46,20 @@ impl VmInterface for AthenaVm {
     let mut stdin = AthenaStdin::new();
     stdin.write_vec(_msg.input_data);
     // TODO: pass execution context/callbacks into VM
-    let output = self.client.execute(&code, stdin, Some(host.get_host())).unwrap();
-    ExecutionResult::new(
-      StatusCode::Success,
-      1337,
-      Some(output.to_vec()),
-      None,
-    )
+    let output = self
+      .client
+      .execute(&code, stdin, Some(host.get_host()))
+      .unwrap();
+    ExecutionResult::new(StatusCode::Success, 1337, Some(output.to_vec()), None)
   }
 }
 
-  #[cfg(test)]
+#[cfg(test)]
 mod tests {
-  use athena_interface::{
-    Address,
-    AthenaMessage,
-    Balance,
-    MessageKind,
-    StatusCode,
-  };
+  use super::*;
   use crate::host::MockHost;
   use crate::VmInterface;
-  use super::*;
+  use athena_interface::{Address, AthenaMessage, Balance, MessageKind, StatusCode};
 
   struct MockVm {}
 
@@ -107,13 +90,17 @@ mod tests {
 
       // save context and perform a call
 
-
       // restore context
 
       // get block hash
       let output = host_interface.get_block_hash(0);
 
-      ExecutionResult::new(StatusCode::Success, msg.gas-1, Some(output.to_vec()), None)
+      ExecutionResult::new(
+        StatusCode::Success,
+        msg.gas - 1,
+        Some(output.to_vec()),
+        None,
+      )
     }
   }
 
@@ -127,7 +114,7 @@ mod tests {
 
     // test execution
     vm.execute(
-      ExecutionContext::new(Box::new(host)),
+      ExecutionContext::new(Arc::new(host)),
       0,
       AthenaMessage::new(
         MessageKind::Call,

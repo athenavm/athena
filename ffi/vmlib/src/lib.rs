@@ -1,27 +1,13 @@
-use athena_interface::{
-  Address,
-  AthenaMessage,
-  Balance,
-  Bytes32,
-  ExecutionResult,
-  HostInterface,
-  MessageKind,
-  StatusCode,
-  StorageStatus,
-  TransactionContext,
-};
-use athena_runner::{
-  AthenaVm,
-  Bytes32AsU64,
-  ExecutionContext,
-  VmInterface,
-};
 use athcon_sys as ffi;
 use athcon_vm::{
-  ExecutionContext as AthconExecutionContext,
-  ExecutionMessage as AthconExecutionMessage,
+  ExecutionContext as AthconExecutionContext, ExecutionMessage as AthconExecutionMessage,
   ExecutionResult as AthconExecutionResult,
 };
+use athena_interface::{
+  Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, MessageKind,
+  StatusCode, StorageStatus, TransactionContext,
+};
+use athena_runner::{AthenaVm, Bytes32AsU64, ExecutionContext, VmInterface};
 
 // Implementation for destroying the VM instance
 extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
@@ -63,9 +49,7 @@ impl From<AddressWrapper> for Address {
 
 impl From<AddressWrapper> for ffi::athcon_address {
   fn from(address: AddressWrapper) -> Self {
-    ffi::athcon_address {
-      bytes: address.0,
-    }
+    ffi::athcon_address { bytes: address.0 }
   }
 }
 
@@ -73,9 +57,7 @@ struct Bytes32Wrapper(Bytes32);
 
 impl From<Bytes32Wrapper> for ffi::athcon_bytes32 {
   fn from(bytes: Bytes32Wrapper) -> Self {
-    ffi::athcon_bytes32 {
-      bytes: bytes.0,
-    }
+    ffi::athcon_bytes32 { bytes: bytes.0 }
   }
 }
 
@@ -127,7 +109,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
 
     let kind: MessageKindWrapper = item.kind.into();
     let byteswrapper: Bytes32Wrapper = item.value.into();
-    AthenaMessageWrapper(AthenaMessage{
+    AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: item.depth,
       gas: item.gas,
@@ -187,14 +169,30 @@ impl From<ffi::athcon_status_code> for StatusCodeWrapper {
       ffi::athcon_status_code::ATHCON_FAILURE => StatusCodeWrapper(StatusCode::Failure),
       ffi::athcon_status_code::ATHCON_REVERT => StatusCodeWrapper(StatusCode::Revert),
       ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCodeWrapper(StatusCode::OutOfGas),
-      ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => StatusCodeWrapper(StatusCode::UndefinedInstruction),
-      ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => StatusCodeWrapper(StatusCode::InvalidMemoryAccess),
-      ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => StatusCodeWrapper(StatusCode::CallDepthExceeded),
-      ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => StatusCodeWrapper(StatusCode::PrecompileFailure),
-      ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => StatusCodeWrapper(StatusCode::ContractValidationFailure),
-      ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => StatusCodeWrapper(StatusCode::ArgumentOutOfRange),
-      ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => StatusCodeWrapper(StatusCode::InsufficientBalance),
-      ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => StatusCodeWrapper(StatusCode::InternalError),
+      ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => {
+        StatusCodeWrapper(StatusCode::UndefinedInstruction)
+      }
+      ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => {
+        StatusCodeWrapper(StatusCode::InvalidMemoryAccess)
+      }
+      ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => {
+        StatusCodeWrapper(StatusCode::CallDepthExceeded)
+      }
+      ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => {
+        StatusCodeWrapper(StatusCode::PrecompileFailure)
+      }
+      ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE => {
+        StatusCodeWrapper(StatusCode::ContractValidationFailure)
+      }
+      ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => {
+        StatusCodeWrapper(StatusCode::ArgumentOutOfRange)
+      }
+      ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => {
+        StatusCodeWrapper(StatusCode::InsufficientBalance)
+      }
+      ffi::athcon_status_code::ATHCON_INTERNAL_ERROR => {
+        StatusCodeWrapper(StatusCode::InternalError)
+      }
       ffi::athcon_status_code::ATHCON_REJECTED => StatusCodeWrapper(StatusCode::Rejected),
       ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCodeWrapper(StatusCode::OutOfMemory),
     }
@@ -212,7 +210,9 @@ impl From<StatusCodeWrapper> for ffi::athcon_status_code {
       StatusCode::InvalidMemoryAccess => ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS,
       StatusCode::CallDepthExceeded => ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED,
       StatusCode::PrecompileFailure => ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE,
-      StatusCode::ContractValidationFailure => ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE,
+      StatusCode::ContractValidationFailure => {
+        ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE
+      }
       StatusCode::ArgumentOutOfRange => ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE,
       StatusCode::InsufficientBalance => ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE,
       StatusCode::InternalError => ffi::athcon_status_code::ATHCON_INTERNAL_ERROR,
@@ -236,7 +236,9 @@ impl From<AthconExecutionResult> for ExecutionResultWrapper {
       StatusCodeWrapper::from(result.status_code()).into(),
       result.gas_left(),
       result.output().cloned(),
-      result.create_address().map(|address| AddressWrapper::from(*address).into()),
+      result
+        .create_address()
+        .map(|address| AddressWrapper::from(*address).into()),
     ))
   }
 }
@@ -290,7 +292,7 @@ extern "C" fn execute_code(
     let host_interface: &ffi::athcon_host_interface = &*host;
     let execution_context_raw = AthconExecutionContext::new(host_interface, context);
     let wrapped = WrappedHostInterface::new(execution_context_raw);
-    let ec = ExecutionContext::new(Box::new(wrapped));
+    let ec = ExecutionContext::new(Arc::new(wrapped));
 
     // Convert the raw pointer to a reference
     let msg_ref: &ffi::athcon_message = &*msg;
@@ -366,30 +368,30 @@ pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
 }
 
 unsafe extern "C" fn execute_call(
-    _context: *mut ffi::athcon_host_context,
-    _msg: *const ffi::athcon_message,
+  _context: *mut ffi::athcon_host_context,
+  _msg: *const ffi::athcon_message,
 ) -> ffi::athcon_result {
-    // Some dumb validation for testing.
-    let msg = *_msg;
-    let success = if msg.input_size != 0 && msg.input_data.is_null() {
-        false
-    } else {
-        msg.input_size != 0 || msg.input_data.is_null()
-    };
+  // Some dumb validation for testing.
+  let msg = *_msg;
+  let success = if msg.input_size != 0 && msg.input_data.is_null() {
+    false
+  } else {
+    msg.input_size != 0 || msg.input_data.is_null()
+  };
 
-    ffi::athcon_result {
-        status_code: if success {
-            ffi::athcon_status_code::ATHCON_SUCCESS
-        } else {
-            ffi::athcon_status_code::ATHCON_FAILURE
-        },
-        gas_left: 2,
-        // NOTE: we are passing the input pointer here, but for testing the lifetime is ok
-        output_data: msg.input_data,
-        output_size: msg.input_size,
-        release: None,
-        create_address: athcon_vm::Address::default(),
-    }
+  ffi::athcon_result {
+    status_code: if success {
+      ffi::athcon_status_code::ATHCON_SUCCESS
+    } else {
+      ffi::athcon_status_code::ATHCON_FAILURE
+    },
+    gas_left: 2,
+    // NOTE: we are passing the input pointer here, but for testing the lifetime is ok
+    output_data: msg.input_data,
+    output_size: msg.input_size,
+    release: None,
+    create_address: athcon_vm::Address::default(),
+  }
 }
 
 struct WrappedHostInterface<'a> {
@@ -398,9 +400,7 @@ struct WrappedHostInterface<'a> {
 
 impl<'a> WrappedHostInterface<'a> {
   fn new(context: AthconExecutionContext<'a>) -> Self {
-    WrappedHostInterface {
-      context: context,
-    }
+    WrappedHostInterface { context: context }
   }
 }
 
@@ -411,10 +411,16 @@ fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
     ffi::athcon_storage_status::ATHCON_STORAGE_DELETED => StorageStatus::StorageDeleted,
     ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED => StorageStatus::StorageModified,
     ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_ADDED => StorageStatus::StorageDeletedAdded,
-    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_DELETED => StorageStatus::StorageModifiedDeleted,
-    ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_RESTORED => StorageStatus::StorageDeletedRestored,
+    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_DELETED => {
+      StorageStatus::StorageModifiedDeleted
+    }
+    ffi::athcon_storage_status::ATHCON_STORAGE_DELETED_RESTORED => {
+      StorageStatus::StorageDeletedRestored
+    }
     ffi::athcon_storage_status::ATHCON_STORAGE_ADDED_DELETED => StorageStatus::StorageAddedDeleted,
-    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_RESTORED => StorageStatus::StorageModifiedRestored,
+    ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED_RESTORED => {
+      StorageStatus::StorageModifiedRestored
+    }
   }
 }
 
@@ -438,16 +444,18 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
     self.context.account_exists(&AddressWrapper(*addr).into())
   }
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
-    let value_wrapper: Bytes32Wrapper = self.context.get_storage(&AddressWrapper(*addr).into(), &Bytes32Wrapper(*key).into()).into();
+    let value_wrapper: Bytes32Wrapper = self
+      .context
+      .get_storage(&AddressWrapper(*addr).into(), &Bytes32Wrapper(*key).into())
+      .into();
     value_wrapper.into()
   }
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
-    convert_storage_status(
-      self.context.set_storage(
-        &AddressWrapper(*addr).into(),
-        &Bytes32Wrapper(*key).into(),
-        &Bytes32Wrapper(*value).into(),
-      ))
+    convert_storage_status(self.context.set_storage(
+      &AddressWrapper(*addr).into(),
+      &Bytes32Wrapper(*key).into(),
+      &Bytes32Wrapper(*value).into(),
+    ))
   }
   fn get_balance(&self, addr: &Address) -> Balance {
     let balance = self.context.get_balance(&AddressWrapper(*addr).into());
@@ -460,7 +468,12 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
     Bytes32Wrapper::from(self.context.get_block_hash(number)).into()
   }
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
-    ExecutionResultWrapper::from(self.context.call(&AthconExecutionMessage::from(AthenaMessageWrapper(msg)))).into()
+    ExecutionResultWrapper::from(
+      self
+        .context
+        .call(&AthconExecutionMessage::from(AthenaMessageWrapper(msg))),
+    )
+    .into()
   }
 }
 
@@ -468,29 +481,29 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
 // should probably be moved into a separate module
 
 unsafe extern "C" fn get_dummy_tx_context(
-    _context: *mut ffi::athcon_host_context,
+  _context: *mut ffi::athcon_host_context,
 ) -> ffi::athcon_tx_context {
-    ffi::athcon_tx_context {
-        tx_gas_price: athcon_vm::Uint256 { bytes: [0u8; 32] },
-        tx_origin: athcon_vm::Address { bytes: [0u8; 24] },
-        block_height: 42,
-        block_timestamp: 235117,
-        block_gas_limit: 105023,
-        chain_id: athcon_vm::Uint256::default(),
-    }
+  ffi::athcon_tx_context {
+    tx_gas_price: athcon_vm::Uint256 { bytes: [0u8; 32] },
+    tx_origin: athcon_vm::Address { bytes: [0u8; 24] },
+    block_height: 42,
+    block_timestamp: 235117,
+    block_gas_limit: 105023,
+    chain_id: athcon_vm::Uint256::default(),
+  }
 }
 
 // Update these when needed for tests
 fn get_dummy_host_interface() -> ffi::athcon_host_interface {
-    ffi::athcon_host_interface {
-        account_exists: None,
-        get_storage: None,
-        set_storage: None,
-        get_balance: None,
-        call: Some(execute_call),
-        get_tx_context: Some(get_dummy_tx_context),
-        get_block_hash: None,
-    }
+  ffi::athcon_host_interface {
+    account_exists: None,
+    get_storage: None,
+    set_storage: None,
+    get_balance: None,
+    call: Some(execute_call),
+    get_tx_context: Some(get_dummy_tx_context),
+    get_block_hash: None,
+  }
 }
 
 // This code is shared with the external FFI tests
@@ -502,32 +515,47 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     // Perform additional checks on the returned VM instance
     let vm = &*vm_ptr;
     assert_eq!((*vm).abi_version, 0, "ABI version mismatch");
-    assert_eq!(std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(), "Athena VM", "VM name mismatch");
-    assert_eq!(std::ffi::CStr::from_ptr((*vm).version).to_str().unwrap(), "0.1.0", "Version mismatch");
+    assert_eq!(
+      std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(),
+      "Athena VM",
+      "VM name mismatch"
+    );
+    assert_eq!(
+      std::ffi::CStr::from_ptr((*vm).version).to_str().unwrap(),
+      "0.1.0",
+      "Version mismatch"
+    );
 
     let wrapper = &mut *(vm_ptr as *mut AthenaVmWrapper);
 
     // Test the FFI functions
     assert_eq!(
-      (*vm).set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
+      (*vm).set_option.unwrap()(
+        vm_ptr,
+        "foo\0".as_ptr() as *const i8,
+        "bar\0".as_ptr() as *const i8
+      ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
-    assert_eq!((*vm).get_capabilities.unwrap()(vm_ptr), ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32);
+    assert_eq!(
+      (*vm).get_capabilities.unwrap()(vm_ptr),
+      ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
+    );
 
     // Construct mock host, context, message, and code objects for test
     let host_interface = get_dummy_host_interface();
     let code = include_bytes!("../../../examples/hello_world/program/elf/hello-world-program");
     let message = ::athcon_sys::athcon_message {
-        kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
-        depth: 0,
-        gas: 0,
-        recipient: ::athcon_sys::athcon_address::default(),
-        sender: ::athcon_sys::athcon_address::default(),
-        input_data: std::ptr::null(),
-        input_size: 0,
-        value: ::athcon_sys::athcon_uint256be::default(),
-        code: std::ptr::null(),
-        code_size: code.len(),
+      kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
+      depth: 0,
+      gas: 0,
+      recipient: ::athcon_sys::athcon_address::default(),
+      sender: ::athcon_sys::athcon_address::default(),
+      input_data: std::ptr::null(),
+      input_size: 0,
+      value: ::athcon_sys::athcon_uint256be::default(),
+      code: std::ptr::null(),
+      code_size: code.len(),
     };
 
     // fail due to null vm pointer
@@ -540,7 +568,8 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         &message,
         code.as_ptr(),
         code.len(),
-      ).status_code,
+      )
+      .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
     );
@@ -556,7 +585,8 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         &message,
         code.as_ptr(),
         code.len(),
-      ).status_code,
+      )
+      .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
     );
@@ -572,7 +602,8 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         std::ptr::null(),
         code.as_ptr(),
         code.len(),
-      ).status_code,
+      )
+      .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
     );
@@ -588,14 +619,19 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
         &message,
         code.as_ptr(),
         code.len(),
-      ).status_code,
+      )
+      .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_SUCCESS
     );
 
     // Call them a second way
     assert_eq!(
-      wrapper.base.set_option.unwrap()(vm_ptr, "foo\0".as_ptr() as *const i8, "bar\0".as_ptr() as *const i8),
+      wrapper.base.set_option.unwrap()(
+        vm_ptr,
+        "foo\0".as_ptr() as *const i8,
+        "bar\0".as_ptr() as *const i8
+      ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
     assert_eq!(
@@ -603,7 +639,16 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
       ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
     );
     assert_eq!(
-      wrapper.base.execute.unwrap()(vm_ptr, std::ptr::null(), std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void, ffi::athcon_revision::ATHCON_FRONTIER, std::ptr::null(), std::ptr::null(), 0).status_code,
+      wrapper.base.execute.unwrap()(
+        vm_ptr,
+        std::ptr::null(),
+        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
+        ffi::athcon_revision::ATHCON_FRONTIER,
+        std::ptr::null(),
+        std::ptr::null(),
+        0
+      )
+      .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
     );

@@ -1,8 +1,4 @@
-use athena_interface::{
-  Bytes32,
-  HostInterface,
-  TransactionContext,
-};
+use athena_interface::{Bytes32, HostInterface, TransactionContext};
 
 pub struct Bytes32AsU64(Bytes32);
 
@@ -50,14 +46,16 @@ pub enum SetOptionError {
 }
 
 pub struct ExecutionContext {
-  host: Box<dyn HostInterface>,
+  // Not 100% sure that we need `Arc` here, i.e., not sure we need thread-safety, but
+  // this is how the Runtime is implemented so let's go with this for now.
+  host: Arc<dyn HostInterface>,
   tx_context: TransactionContext,
   // unused
   // context: *mut ffi::athcon_host_context,
 }
 
 impl ExecutionContext {
-  pub fn new(host: Box<dyn HostInterface>) -> Self {
+  pub fn new(host: Arc<dyn HostInterface>) -> Self {
     ExecutionContext {
       tx_context: host.get_tx_context(),
       host: host,
@@ -77,12 +75,7 @@ impl ExecutionContext {
 use std::collections::BTreeMap;
 
 #[cfg(test)]
-use athena_interface::{
-  Address,
-  AthenaMessage,
-  ExecutionResult,
-  StorageStatus,
-};
+use athena_interface::{Address, AthenaMessage, ExecutionResult, StorageStatus};
 
 #[cfg(test)]
 pub(crate) struct MockHost {
@@ -114,7 +107,10 @@ impl HostInterface for MockHost {
 
   // return null bytes if the account or key do not exist
   fn get_storage(&self, address: &Address, key: &Bytes32) -> Bytes32 {
-    *self.storage.get(&(*address, *key)).unwrap_or(&Bytes32::default())
+    *self
+      .storage
+      .get(&(*address, *key))
+      .unwrap_or(&Bytes32::default())
   }
 
   fn set_storage(&mut self, address: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
@@ -124,7 +120,10 @@ impl HostInterface for MockHost {
 
   // return 0 if the account does not exist
   fn get_balance(&self, address: &Address) -> u64 {
-    self.balance.get(address).map_or_else(|| 0, |balance| Bytes32AsU64(*balance).into())
+    self
+      .balance
+      .get(address)
+      .map_or_else(|| 0, |balance| Bytes32AsU64(*balance).into())
   }
 
   fn get_tx_context(&self) -> TransactionContext {
@@ -150,7 +149,10 @@ mod tests {
     let address = [8; 24];
     let key = [1; 32];
     let value = [2; 32];
-    assert_eq!(host.set_storage(&address, &key, &value), StorageStatus::StorageAssigned);
+    assert_eq!(
+      host.set_storage(&address, &key, &value),
+      StorageStatus::StorageAssigned
+    );
     let retrieved_value = host.get_storage(&address, &key);
     assert_eq!(retrieved_value, value);
   }

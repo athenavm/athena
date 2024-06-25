@@ -4,12 +4,93 @@
 
 use std::fmt;
 
-pub type Address = [u8; 24];
+pub const ADDRESS_LENGTH: usize = 24;
+pub const BYTES32_LENGTH: usize = 32;
+pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
-pub type Bytes32 = [u8; 32];
+pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 
+pub struct AddressWrapper(Address);
+
+impl From<Vec<u32>> for AddressWrapper {
+  fn from(value: Vec<u32>) -> Self {
+    assert!(value.len() == ADDRESS_LENGTH / 4, "Invalid address length");
+    let mut bytes = [0u8; ADDRESS_LENGTH];
+    // let mut value_bytes = [0u8; 4];
+    for (i, word) in value.iter().enumerate() {
+      let value_bytes = word.to_le_bytes();
+      bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
+    }
+    AddressWrapper(bytes)
+  }
+}
+
+// impl From<u32> for AddressWrapper {
+//   fn from(value: u32) -> Self {
+//     let mut bytes = [0u8; 24];
+//     let value_bytes = value.to_le_bytes();
+//     bytes[..4].copy_from_slice(&value_bytes);
+//     AddressWrapper(bytes)
+//   }
+// }
+
+impl From<AddressWrapper> for Address {
+  fn from(value: AddressWrapper) -> Address {
+    value.0
+  }
+}
+
+pub struct Bytes32Wrapper(Bytes32);
+
+impl Bytes32Wrapper {
+  pub fn new(bytes: Bytes32) -> Self {
+    Bytes32Wrapper(bytes)
+  }
+}
+
+// impl From<u32> for Bytes32Wrapper {
+//   fn from(value: u32) -> Self {
+//     let mut bytes = [0u8; 32];
+//     let value_bytes = value.to_le_bytes();
+//     bytes[..4].copy_from_slice(&value_bytes);
+//     Bytes32Wrapper(bytes)
+//   }
+// }
+
+impl From<Vec<u32>> for Bytes32Wrapper {
+  fn from(value: Vec<u32>) -> Self {
+    assert!(value.len() == 8, "Invalid address length");
+    let mut bytes = [0u8; 32];
+    for (i, word) in value.iter().enumerate() {
+      let value_bytes = word.to_le_bytes();
+      bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
+    }
+    Bytes32Wrapper(bytes)
+  }
+}
+
+impl From<Bytes32Wrapper> for Vec<u32> {
+  fn from(value: Bytes32Wrapper) -> Vec<u32> {
+    value
+      .0
+      .chunks(4) // Process 4 bytes at a time
+      .map(|chunk| {
+        // Convert each 4-byte chunk into a u32
+        u32::from_le_bytes(chunk.try_into().unwrap())
+      })
+      .collect()
+  }
+}
+
+impl From<Bytes32Wrapper> for Bytes32 {
+  fn from(value: Bytes32Wrapper) -> Bytes32 {
+    value.0
+  }
+}
+
 #[derive(Debug, PartialEq)]
+#[repr(u32)]
 pub enum StorageStatus {
   StorageAssigned,
   StorageAdded,
@@ -66,7 +147,16 @@ pub struct AthenaMessage {
 }
 
 impl AthenaMessage {
-  pub fn new(kind: MessageKind, depth: i32, gas: i64, recipient: Address, sender: Address, input_data: Vec<u8>, value: Balance, code: Vec<u8>) -> Self {
+  pub fn new(
+    kind: MessageKind,
+    depth: i32,
+    gas: i64,
+    recipient: Address,
+    sender: Address,
+    input_data: Vec<u8>,
+    value: Balance,
+    code: Vec<u8>,
+  ) -> Self {
     AthenaMessage {
       kind,
       depth,
@@ -121,14 +211,19 @@ impl fmt::Display for StatusCode {
 
 #[derive(Debug)]
 pub struct ExecutionResult {
-    pub status_code: StatusCode,
-    pub gas_left: i64,
-    pub output: Option<Vec<u8>>,
-    pub create_address: Option<Address>,
+  pub status_code: StatusCode,
+  pub gas_left: i64,
+  pub output: Option<Vec<u8>>,
+  pub create_address: Option<Address>,
 }
 
 impl ExecutionResult {
-  pub fn new(status_code: StatusCode, gas_left: i64, output: Option<Vec<u8>>, create_address: Option<Address>) -> Self {
+  pub fn new(
+    status_code: StatusCode,
+    gas_left: i64,
+    output: Option<Vec<u8>>,
+    create_address: Option<Address>,
+  ) -> Self {
     ExecutionResult {
       status_code,
       gas_left,

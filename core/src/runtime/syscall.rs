@@ -5,12 +5,17 @@ use strum_macros::EnumIter;
 
 use crate::runtime::{Register, Runtime};
 use crate::syscall::{
-    SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallWrite,
+    SyscallHalt,
+    SyscallHintLen,
+    SyscallHintRead,
+    SyscallHostRead,
+    SyscallHostWrite,
+    SyscallWrite,
 };
 use crate::{runtime::MemoryReadRecord, runtime::MemoryWriteRecord};
 
 /// A system call is invoked by the the `ecall` instruction with a specific value in register t0.
-/// The syscall number is a 32-bit integer, with the following layout (in litte-endian format)
+/// The syscall number is a 32-bit integer, with the following layout (in little-endian format)
 /// - The first byte is the syscall id.
 /// - The second byte is 0/1 depending on whether the syscall has a separate table. This is used
 /// in the CPU table to determine whether to lookup the syscall using the syscall interaction.
@@ -23,6 +28,10 @@ pub enum SyscallCode {
 
     /// Write to the output buffer.
     WRITE = 0x00_00_00_02,
+
+    /// Host functions
+    HOST_READ = 0x00_00_00_A0,
+    HOST_WRITE = 0x00_00_00_A1,
 
     /// Executes the `HINT_LEN` precompile.
     HINT_LEN = 0x00_00_00_F0,
@@ -37,6 +46,8 @@ impl SyscallCode {
         match value {
             0x00_00_00_00 => SyscallCode::HALT,
             0x00_00_00_02 => SyscallCode::WRITE,
+            0x00_00_00_A0 => SyscallCode::HOST_READ,
+            0x00_00_00_A1 => SyscallCode::HOST_WRITE,
             0x00_00_00_F0 => SyscallCode::HINT_LEN,
             0x00_00_00_F1 => SyscallCode::HINT_READ,
             _ => panic!("invalid syscall number: {}", value),
@@ -160,6 +171,8 @@ pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
     let mut syscall_map = HashMap::<SyscallCode, Arc<dyn Syscall>>::default();
     syscall_map.insert(SyscallCode::HALT, Arc::new(SyscallHalt {}));
     syscall_map.insert(SyscallCode::WRITE, Arc::new(SyscallWrite::new()));
+    syscall_map.insert(SyscallCode::HOST_READ, Arc::new(SyscallHostRead::new()));
+    syscall_map.insert(SyscallCode::HOST_WRITE, Arc::new(SyscallHostWrite::new()));
     syscall_map.insert(SyscallCode::HINT_LEN, Arc::new(SyscallHintLen::new()));
     syscall_map.insert(SyscallCode::HINT_READ, Arc::new(SyscallHintRead::new()));
 
@@ -201,6 +214,8 @@ mod tests {
             match code {
                 SyscallCode::HALT => assert_eq!(code as u32, athena_vm::syscalls::HALT),
                 SyscallCode::WRITE => assert_eq!(code as u32, athena_vm::syscalls::WRITE),
+                SyscallCode::HOST_READ => assert_eq!(code as u32, athena_vm::syscalls::HOST_READ),
+                SyscallCode::HOST_WRITE => assert_eq!(code as u32, athena_vm::syscalls::HOST_WRITE),
                 SyscallCode::HINT_LEN => assert_eq!(code as u32, athena_vm::syscalls::HINT_LEN),
                 SyscallCode::HINT_READ => assert_eq!(code as u32, athena_vm::syscalls::HINT_READ),
             }
