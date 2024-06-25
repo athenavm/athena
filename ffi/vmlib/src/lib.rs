@@ -292,7 +292,7 @@ extern "C" fn execute_code(
     let host_interface: &ffi::athcon_host_interface = &*host;
     let execution_context_raw = AthconExecutionContext::new(host_interface, context);
     let wrapped = WrappedHostInterface::new(execution_context_raw);
-    let ec = ExecutionContext::new(Arc::new(wrapped));
+    let ec = ExecutionContext::new(Box::new(wrapped));
 
     // Convert the raw pointer to a reference
     let msg_ref: &ffi::athcon_message = &*msg;

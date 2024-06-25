@@ -58,7 +58,7 @@ impl ExecutionClient {
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<Arc<dyn HostInterface>>,
+    host: Option<Box<dyn HostInterface>>,
   ) -> Result<AthenaPublicValues> {
     let program = Program::from(elf);
     let opts = AthenaCoreOpts::default();

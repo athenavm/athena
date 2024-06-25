@@ -46,16 +46,14 @@ pub enum SetOptionError {
 }
 
 pub struct ExecutionContext {
-  // Not 100% sure that we need `Arc` here, i.e., not sure we need thread-safety, but
-  // this is how the Runtime is implemented so let's go with this for now.
-  host: Arc<dyn HostInterface>,
+  host: Box<dyn HostInterface>,
   tx_context: TransactionContext,
   // unused
   // context: *mut ffi::athcon_host_context,
 }
 
 impl ExecutionContext {
-  pub fn new(host: Arc<dyn HostInterface>) -> Self {
+  pub fn new(host: Box<dyn HostInterface>) -> Self {
     ExecutionContext {
       tx_context: host.get_tx_context(),
       host: host,

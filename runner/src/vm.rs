@@ -114,7 +114,7 @@ mod tests {
 
     // test execution
     vm.execute(
-      ExecutionContext::new(Arc::new(host)),
+      ExecutionContext::new(Box::new(host)),
       0,
       AthenaMessage::new(
         MessageKind::Call,
