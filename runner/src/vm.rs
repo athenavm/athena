@@ -95,7 +95,7 @@ mod tests {
       // restore context
 
       // get block hash
-      let output = host_interface.get_block_hash(0);
+      let output = host_interface.borrow().get_block_hash(0);
 
       ExecutionResult::new(
         StatusCode::Success,
