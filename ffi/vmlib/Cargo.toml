@@ -11,6 +11,7 @@ edition.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+athcon-declare = { path = "../athcon/bindings/rust/athcon-declare" }
 athena-interface = { path = "../../interface" }
 athena-runner = { path = "../../runner" }
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }

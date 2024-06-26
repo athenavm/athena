@@ -32,7 +32,7 @@ use crate::utils::AthenaCoreOpts;
 
 use athena_interface::HostInterface;
 
-/// An implementation of a runtime for the Athena RISC-V zkVM.
+/// An implementation of a runtime for the Athena RISC-V VM.
 ///
 /// The runtime is responsible for executing a user program and tracing important events which occur
 /// during execution (i.e., memory reads, alu operations, etc).

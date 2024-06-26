@@ -1,28 +1,17 @@
 use std::{cell::RefCell, sync::Arc};
 
+use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
 use athcon_vm::{
-  ExecutionContext as AthconExecutionContext, ExecutionMessage as AthconExecutionMessage,
-  ExecutionResult as AthconExecutionResult,
+  AthconVm, ExecutionContext as AthconExecutionContext, ExecutionMessage as AthconExecutionMessage,
+  ExecutionResult as AthconExecutionResult, MessageKind as AthconMessageKind, Revision,
+  SetOptionError,
 };
 use athena_interface::{
   Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, MessageKind,
   StatusCode, StorageStatus, TransactionContext,
 };
 use athena_runner::{AthenaVm, Bytes32AsU64, ExecutionContext, VmInterface};
-
-// Implementation for destroying the VM instance
-extern "C" fn destroy_vm(vm: *mut ffi::athcon_vm) {
-  // Safety check to ensure the pointer is not null
-  if vm.is_null() {
-    return;
-  }
-  unsafe {
-    let wrapper = &mut *(vm as *mut AthenaVmWrapper);
-    drop(Box::from_raw(wrapper.vm));
-    drop(Box::from_raw(wrapper));
-  }
-}
 
 fn error_result() -> ffi::athcon_result {
   ffi::athcon_result {
@@ -32,6 +21,59 @@ fn error_result() -> ffi::athcon_result {
     create_address: ffi::athcon_address::default(),
     status_code: ffi::athcon_status_code::ATHCON_FAILURE,
     release: None,
+  }
+}
+
+#[athcon_declare_vm("Athena", "athena1", "v0.0.1")]
+pub struct AthenaVMWrapper {
+  // Internal, wrapped, Rust-native VM
+  athena_vm: AthenaVm,
+}
+
+impl AthconVm for AthenaVMWrapper {
+  fn init() -> Self {
+    Self {
+      athena_vm: AthenaVm::new(),
+    }
+  }
+
+  fn set_option(&mut self, _key: &str, _value: &str) -> Result<(), SetOptionError> {
+    // we don't currently support any options
+    Err(SetOptionError::InvalidKey)
+  }
+
+  fn execute(
+    &self,
+    rev: Revision,
+    code: &[u8],
+    message: &AthconExecutionMessage,
+    context: Option<&mut AthconExecutionContext>,
+  ) -> AthconExecutionResult {
+    if context.is_none() {
+      return AthconExecutionResult::failure();
+    }
+
+    if message.kind() != AthconMessageKind::ATHCON_CALL {
+      return AthconExecutionResult::failure();
+    }
+
+    if code.is_empty() {
+      return AthconExecutionResult::failure();
+    }
+
+    // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
+    let athena_msg = AthenaMessageWrapper::from(message);
+
+    // Execute the code and proxy the result back to the caller
+    // Encapsulate the host creation and context creation within a block
+    // to limit the lifetime of the mutable borrow of context.
+    let execution_result = {
+      let context = context.unwrap();
+      let host = Arc::new(RefCell::new(WrappedHostInterface::new(context)));
+      let ec = ExecutionContext::new(host);
+      self.athena_vm.execute(ec, rev as u32, athena_msg.0, code)
+    };
+    ExecutionResultWrapper(execution_result).into()
   }
 }
 
@@ -156,6 +198,23 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
   }
 }
 
+impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
+  fn from(item: &AthconExecutionMessage) -> Self {
+    let kind: MessageKindWrapper = item.kind().into();
+    let byteswrapper = Bytes32Wrapper::from(*item.value());
+    AthenaMessageWrapper(AthenaMessage {
+      kind: kind.0,
+      depth: item.depth(),
+      gas: item.gas(),
+      recipient: AddressWrapper::from(*item.recipient()).into(),
+      sender: AddressWrapper::from(*item.sender()).into(),
+      input_data: item.input().unwrap().clone(),
+      value: Bytes32AsU64::new(byteswrapper.0).into(),
+      code: item.code().unwrap().clone(),
+    })
+  }
+}
+
 struct StatusCodeWrapper(StatusCode);
 
 impl From<StatusCodeWrapper> for StatusCode {
@@ -245,6 +304,13 @@ impl From<AthconExecutionResult> for ExecutionResultWrapper {
   }
 }
 
+impl From<ExecutionResultWrapper> for AthconExecutionResult {
+  fn from(wrapper: ExecutionResultWrapper) -> Self {
+    // use conversion implemented on the other side
+    ffi::athcon_result::from(wrapper).into()
+  }
+}
+
 impl From<ExecutionResultWrapper> for ffi::athcon_result {
   fn from(value: ExecutionResultWrapper) -> Self {
     let output = value.0.output.unwrap();
@@ -268,140 +334,17 @@ impl From<ExecutionResultWrapper> for ffi::athcon_result {
   }
 }
 
-extern "C" fn execute_code(
-  vm: *mut ffi::athcon_vm,
-  host: *const ffi::athcon_host_interface,
-  context: *mut ffi::athcon_host_context,
-  rev: ffi::athcon_revision,
-  msg: *const ffi::athcon_message,
-  code: *const u8,
-  code_size: usize,
-) -> ffi::athcon_result {
-  // First, check for null pointers
-  // According to the spec these are optional but
-  // we require all of msg, host, and vm
-  if msg.is_null() || host.is_null() || vm.is_null() {
-    return error_result();
-  }
-
-  // SAFETY: We've checked that the pointers aren't null, so it's safe to dereference
-  unsafe {
-    // Unpack the VM
-    let wrapper = &mut *(vm as *mut AthenaVmWrapper);
-    let athena_vm = &mut *(wrapper.vm);
-
-    // Unpack the context
-    let host_interface: &ffi::athcon_host_interface = &*host;
-    let execution_context_raw = AthconExecutionContext::new(host_interface, context);
-    let wrapped = WrappedHostInterface::new(execution_context_raw);
-    let ec = ExecutionContext::new(Arc::new(RefCell::new(wrapped)));
-
-    // Convert the raw pointer to a reference
-    let msg_ref: &ffi::athcon_message = &*msg;
-
-    // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
-    let athena_msg: AthenaMessageWrapper = (*msg_ref).into();
-
-    // Execute the code and proxy the result back to the caller
-    let code_slice: &[u8] = std::slice::from_raw_parts(code, code_size);
-    let execution_result = athena_vm.execute(
-      ec,
-      // context,
-      rev as u32,
-      athena_msg.0,
-      code_slice,
-    );
-    ExecutionResultWrapper(execution_result).into()
-  }
-}
-
-extern "C" fn get_capabilities(_vm: *mut ffi::athcon_vm) -> ffi::athcon_capabilities_flagset {
-  // we only support one capability for now
-  ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
-}
-
-// Make this pub because it's not referenced inside the athcon_vm struct below,
-// i.e., must be called separately
-pub extern "C" fn result_dispose(result: *const ffi::athcon_result) {
-  unsafe {
-    if !result.is_null() {
-      let owned = *result;
-      Vec::from_raw_parts(
-        owned.output_data as *mut u8,
-        owned.output_size,
-        owned.output_size,
-      );
-    }
-  }
-}
-
-// Implementation for setting options of the VM instance
-extern "C" fn set_option(
-  _vm: *mut ffi::athcon_vm,
-  _name: *const ::std::os::raw::c_char,
-  _value: *const ::std::os::raw::c_char,
-) -> ffi::athcon_set_option_result {
-  // not currently supported
-  return ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME;
-}
-
 struct AthenaVmWrapper {
   base: ffi::athcon_vm,
   vm: *mut AthenaVm,
 }
 
-// Main FFI "endpoint" called to create a new VM instance
-#[no_mangle]
-pub extern "C" fn athcon_create() -> *mut ffi::athcon_vm {
-  let athena_vm = Box::new(AthenaVm::new());
-  let wrapper = Box::new(AthenaVmWrapper {
-    base: ffi::athcon_vm {
-      abi_version: 0,
-      name: "Athena VM\0".as_ptr() as *const ::std::os::raw::c_char,
-      version: "0.1.0\0".as_ptr() as *const ::std::os::raw::c_char,
-      destroy: Some(destroy_vm),
-      execute: Some(execute_code),
-      get_capabilities: Some(get_capabilities),
-      set_option: Some(set_option),
-    },
-    vm: Box::into_raw(athena_vm),
-  });
-  Box::into_raw(wrapper) as *mut ffi::athcon_vm
-}
-
-unsafe extern "C" fn execute_call(
-  _context: *mut ffi::athcon_host_context,
-  _msg: *const ffi::athcon_message,
-) -> ffi::athcon_result {
-  // Some dumb validation for testing.
-  let msg = *_msg;
-  let success = if msg.input_size != 0 && msg.input_data.is_null() {
-    false
-  } else {
-    msg.input_size != 0 || msg.input_data.is_null()
-  };
-
-  ffi::athcon_result {
-    status_code: if success {
-      ffi::athcon_status_code::ATHCON_SUCCESS
-    } else {
-      ffi::athcon_status_code::ATHCON_FAILURE
-    },
-    gas_left: 2,
-    // NOTE: we are passing the input pointer here, but for testing the lifetime is ok
-    output_data: msg.input_data,
-    output_size: msg.input_size,
-    release: None,
-    create_address: athcon_vm::Address::default(),
-  }
-}
-
 struct WrappedHostInterface<'a> {
-  context: AthconExecutionContext<'a>,
+  context: &'a mut AthconExecutionContext<'a>,
 }
 
 impl<'a> WrappedHostInterface<'a> {
-  fn new(context: AthconExecutionContext<'a>) -> Self {
+  fn new(context: &'a mut AthconExecutionContext<'a>) -> Self {
     WrappedHostInterface { context: context }
   }
 }
@@ -502,14 +445,14 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
     get_storage: None,
     set_storage: None,
     get_balance: None,
-    call: Some(execute_call),
+    call: Some(__athcon_execute),
     get_tx_context: Some(get_dummy_tx_context),
     get_block_hash: None,
   }
 }
 
 // This code is shared with the external FFI tests
-pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
+pub fn vm_tests(vm_ptr: *const ffi::athcon_vm) {
   unsafe {
     // Ensure the returned pointer is not null
     assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
@@ -666,6 +609,6 @@ mod tests {
 
   #[test]
   fn test_athcon_create() {
-    vm_tests(athcon_create());
+    vm_tests(athcon_create_athenavm());
   }
 }

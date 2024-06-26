@@ -1,4 +1,5 @@
 use athena_interface::{Bytes32, HostInterface, TransactionContext};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 pub struct Bytes32AsU64(Bytes32);
 
@@ -45,22 +46,20 @@ pub enum SetOptionError {
   InvalidValue,
 }
 
-pub struct ExecutionContext {
-  host: Arc<RefCell<dyn HostInterface>>,
+pub struct ExecutionContext<'a> {
+  host: Rc<RefCell<dyn HostInterface + 'a>>,
   tx_context: TransactionContext,
-  // unused
-  // context: *mut ffi::athcon_host_context,
 }
 
-impl ExecutionContext {
-  pub fn new(host: Arc<RefCell<dyn HostInterface>>) -> Self {
+impl<'a> ExecutionContext<'a> {
+  pub fn new(host: Rc<RefCell<dyn HostInterface + 'a>>) -> Self {
     ExecutionContext {
       tx_context: host.clone().borrow().get_tx_context(),
       host: host,
     }
   }
 
-  pub fn get_host(&self) -> Arc<RefCell<dyn HostInterface>> {
+  pub fn get_host(&self) -> Rc<RefCell<dyn HostInterface + 'a>> {
     self.host.clone()
   }
 
@@ -71,7 +70,6 @@ impl ExecutionContext {
 
 #[cfg(test)]
 use std::collections::BTreeMap;
-use std::{cell::RefCell, sync::Arc};
 
 #[cfg(test)]
 use athena_interface::{Address, AthenaMessage, ExecutionResult, StorageStatus};

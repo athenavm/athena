@@ -10,6 +10,7 @@ pub mod utils {
 }
 
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use anyhow::{Ok, Result};
@@ -57,11 +58,11 @@ impl ExecutionClient {
   /// // Execute the program on the inputs.
   /// let public_values = client.execute(elf, stdin).unwrap();
   /// ```
-  pub fn execute(
+  pub fn execute<'a>(
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<Arc<RefCell<dyn HostInterface>>>,
+    host: Option<Rc<RefCell<dyn HostInterface + 'a>>>,
   ) -> Result<AthenaPublicValues> {
     let program = Program::from(elf);
     let opts = AthenaCoreOpts::default();

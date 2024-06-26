@@ -18,7 +18,7 @@
 //!     }
 //!
 //!     fn execute(&self, revision: athcon_vm::ffi::athcon_revision, code: &[u8], message: &athcon_vm::ExecutionMessage, context: Option<&mut athcon_vm::ExecutionContext>) -> athcon_vm::ExecutionResult {
-//!             athcon_vm::ExecutionResult::success(1337, 0, None)
+//!             athcon_vm::ExecutionResult::success(1337, None)
 //!     }
 //! }
 //! ```
@@ -290,13 +290,13 @@ fn build_set_option_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
           assert!(!instance.is_null());
 
           if key.is_null() {
-              return ::athcon_vm::ffi::athcon_set_option_result::athcon_SET_OPTION_INVALID_NAME;
+              return ::athcon_vm::ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME;
           }
 
           let key = unsafe { CStr::from_ptr(key) };
           let key = match key.to_str() {
               Ok(k) => k,
-              Err(e) => return ::athcon_vm::ffi::athcon_set_option_result::athcon_SET_OPTION_INVALID_NAME,
+              Err(e) => return ::athcon_vm::ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME,
           };
 
           let value = if !value.is_null() {
@@ -307,7 +307,7 @@ fn build_set_option_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
 
           let value = match value.to_str() {
               Ok(k) => k,
-              Err(e) => return ::athcon_vm::ffi::athcon_set_option_result::athcon_SET_OPTION_INVALID_VALUE,
+              Err(e) => return ::athcon_vm::ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_VALUE,
           };
 
           let mut container = unsafe {
@@ -316,9 +316,9 @@ fn build_set_option_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
           };
 
           let result = match container.set_option(key, value) {
-              Ok(()) => ::athcon_vm::ffi::athcon_set_option_result::athcon_SET_OPTION_SUCCESS,
-              Err(SetOptionError::InvalidKey) => ::athcon_vm::ffi::athcon_set_option_result::athcon_SET_OPTION_INVALID_NAME,
-              Err(SetOptionError::InvalidValue) => ::athcon_vm::ffi::athcon_set_option_result::athcon_SET_OPTION_INVALID_VALUE,
+              Ok(()) => ::athcon_vm::ffi::athcon_set_option_result::ATHCON_SET_OPTION_SUCCESS,
+              Err(SetOptionError::InvalidKey) => ::athcon_vm::ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME,
+              Err(SetOptionError::InvalidValue) => ::athcon_vm::ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_VALUE,
           };
 
           unsafe {
@@ -344,7 +344,7 @@ fn build_create_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
       #[no_mangle]
       extern "C" fn #fn_ident() -> *const ::athcon_vm::ffi::athcon_vm {
           let new_instance = ::athcon_vm::ffi::athcon_vm {
-              abi_version: ::athcon_vm::ffi::athcon_ABI_VERSION as i32,
+              abi_version: ::athcon_vm::ffi::ATHCON_ABI_VERSION as i32,
               destroy: Some(__athcon_destroy),
               execute: Some(__athcon_execute),
               get_capabilities: Some(__athcon_get_capabilities),
@@ -442,7 +442,7 @@ fn build_execute_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
 
           let result = if result.is_err() {
               // Consider a panic an internal error.
-              ::athcon_vm::ExecutionResult::new(::athcon_vm::ffi::athcon_status_code::athcon_INTERNAL_ERROR, 0, 0, None)
+              ::athcon_vm::ExecutionResult::new(::athcon_vm::ffi::athcon_status_code::ATHCON_INTERNAL_ERROR, 0, None)
           } else {
               result.unwrap()
           };
