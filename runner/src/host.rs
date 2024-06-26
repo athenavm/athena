@@ -46,22 +46,22 @@ pub enum SetOptionError {
 }
 
 pub struct ExecutionContext {
-  host: Box<dyn HostInterface>,
+  host: Arc<RefCell<dyn HostInterface>>,
   tx_context: TransactionContext,
   // unused
   // context: *mut ffi::athcon_host_context,
 }
 
 impl ExecutionContext {
-  pub fn new(host: Box<dyn HostInterface>) -> Self {
+  pub fn new(host: Arc<RefCell<dyn HostInterface>>) -> Self {
     ExecutionContext {
-      tx_context: host.get_tx_context(),
+      tx_context: host.clone().borrow().get_tx_context(),
       host: host,
     }
   }
 
-  pub fn get_host(&self) -> &dyn HostInterface {
-    &*self.host
+  pub fn get_host(&self) -> Arc<RefCell<dyn HostInterface>> {
+    self.host.clone()
   }
 
   pub fn get_tx_context(&self) -> &TransactionContext {
@@ -71,6 +71,7 @@ impl ExecutionContext {
 
 #[cfg(test)]
 use std::collections::BTreeMap;
+use std::{cell::RefCell, sync::Arc};
 
 #[cfg(test)]
 use athena_interface::{Address, AthenaMessage, ExecutionResult, StorageStatus};

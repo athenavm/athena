@@ -56,6 +56,8 @@ impl VmInterface for AthenaVm {
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, sync::Arc};
+
   use super::*;
   use crate::host::MockHost;
   use crate::VmInterface;
@@ -111,10 +113,12 @@ mod tests {
 
     // construct a mock vm
     let vm = MockVm::new();
+    let host_interface: Arc<RefCell<dyn athena_interface::HostInterface>> =
+      Arc::new(RefCell::new(host));
 
     // test execution
     vm.execute(
-      ExecutionContext::new(Box::new(host)),
+      ExecutionContext::new(host_interface),
       0,
       AthenaMessage::new(
         MessageKind::Call,

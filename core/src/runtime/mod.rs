@@ -18,6 +18,7 @@ pub use state::*;
 pub use syscall::*;
 pub use utils::*;
 
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs::File;
@@ -46,7 +47,7 @@ pub struct Runtime {
   pub state: ExecutionState,
 
   /// The host interface for host calls.
-  pub host: Option<Box<dyn HostInterface>>,
+  pub host: Option<Arc<RefCell<dyn HostInterface>>>,
 
   /// A counter for the number of cycles that have been executed in certain functions.
   pub cycle_tracker: HashMap<String, (u64, u32)>,
@@ -90,7 +91,7 @@ impl Runtime {
   // Create a new runtime from a program and, optionally, a host.
   pub fn new(
     program: Program,
-    host: Option<Box<dyn HostInterface>>,
+    host: Option<Arc<RefCell<dyn HostInterface>>>,
     _opts: AthenaCoreOpts,
   ) -> Self {
     // Create a shared reference to the program and host.

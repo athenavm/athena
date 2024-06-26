@@ -1,3 +1,5 @@
+use std::{cell::RefCell, sync::Arc};
+
 use athcon_sys as ffi;
 use athcon_vm::{
   ExecutionContext as AthconExecutionContext, ExecutionMessage as AthconExecutionMessage,
@@ -292,7 +294,7 @@ extern "C" fn execute_code(
     let host_interface: &ffi::athcon_host_interface = &*host;
     let execution_context_raw = AthconExecutionContext::new(host_interface, context);
     let wrapped = WrappedHostInterface::new(execution_context_raw);
-    let ec = ExecutionContext::new(Box::new(wrapped));
+    let ec = ExecutionContext::new(Arc::new(RefCell::new(wrapped)));
 
     // Convert the raw pointer to a reference
     let msg_ref: &ffi::athcon_message = &*msg;

@@ -9,6 +9,9 @@ pub mod utils {
   pub use athena_core::utils::setup_logger;
 }
 
+use std::cell::RefCell;
+use std::sync::Arc;
+
 use anyhow::{Ok, Result};
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{Program, Runtime};
@@ -58,7 +61,7 @@ impl ExecutionClient {
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<Box<dyn HostInterface>>,
+    host: Option<Arc<RefCell<dyn HostInterface>>>,
   ) -> Result<AthenaPublicValues> {
     let program = Program::from(elf);
     let opts = AthenaCoreOpts::default();
