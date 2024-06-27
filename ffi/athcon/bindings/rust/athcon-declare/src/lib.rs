@@ -342,7 +342,7 @@ fn build_create_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
   // Note: we can get CStrs unchecked because we did the checks on instantiation of VMMetaData.
   quote! {
       #[no_mangle]
-      extern "C" fn #fn_ident() -> *const ::athcon_vm::ffi::athcon_vm {
+      extern "C" fn #fn_ident() -> *mut ::athcon_vm::ffi::athcon_vm {
           let new_instance = ::athcon_vm::ffi::athcon_vm {
               abi_version: ::athcon_vm::ffi::ATHCON_ABI_VERSION as i32,
               destroy: Some(__athcon_destroy),

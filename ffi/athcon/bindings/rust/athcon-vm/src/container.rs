@@ -66,7 +66,7 @@ where
 mod tests {
   use super::*;
   use crate::types::*;
-  use crate::{ExecutionContext, ExecutionMessage, ExecutionResult};
+  use crate::{ExecutionMessage, ExecutionResult};
 
   struct TestVm {}
 
@@ -79,7 +79,8 @@ mod tests {
       _revision: athcon_sys::athcon_revision,
       _code: &[u8],
       _message: &ExecutionMessage,
-      _context: Option<ExecutionContext>,
+      _host: *const athcon_sys::athcon_host_interface,
+      _context: *mut athcon_sys::athcon_host_context,
     ) -> ExecutionResult {
       ExecutionResult::failure()
     }
@@ -137,7 +138,6 @@ mod tests {
     };
     let host_context = std::ptr::null_mut();
 
-    let context = ExecutionContext::new(&host, host_context);
     let container = AthconContainer::<TestVm>::new(instance);
     assert_eq!(
       container
@@ -145,7 +145,8 @@ mod tests {
           athcon_sys::athcon_revision::ATHCON_FRONTIER,
           &code,
           &message,
-          Some(context)
+          &host,
+          host_context,
         )
         .status_code(),
       ::athcon_sys::athcon_status_code::ATHCON_FAILURE
@@ -153,7 +154,6 @@ mod tests {
 
     let ptr = unsafe { AthconContainer::into_ffi_pointer(container) };
 
-    let context = ExecutionContext::new(&host, host_context);
     let container = unsafe { AthconContainer::<TestVm>::from_ffi_pointer(ptr) };
     assert_eq!(
       container
@@ -161,7 +161,8 @@ mod tests {
           athcon_sys::athcon_revision::ATHCON_FRONTIER,
           &code,
           &message,
-          Some(context)
+          &host,
+          host_context,
         )
         .status_code(),
       ::athcon_sys::athcon_status_code::ATHCON_FAILURE

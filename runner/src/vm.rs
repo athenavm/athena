@@ -55,7 +55,7 @@ impl VmInterface for AthenaVm {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc, sync::Arc};
+  use std::{cell::RefCell, sync::Arc};
 
   use super::*;
   use crate::host::MockHost;

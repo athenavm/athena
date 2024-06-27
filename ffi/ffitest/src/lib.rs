@@ -8,13 +8,13 @@ mod ffi_tests {
 
   // Declare the external functions you want to test
   extern "C" {
-    fn athcon_create() -> *mut ffi::athcon_vm;
+    fn athcon_create_athenavmwrapper() -> *mut ffi::athcon_vm;
   }
 
   #[test]
   fn test_athcon_create() {
     unsafe {
-      athena_vmlib::vm_tests(athcon_create());
+      athena_vmlib::vm_tests(athcon_create_athenavmwrapper());
     }
   }
 }

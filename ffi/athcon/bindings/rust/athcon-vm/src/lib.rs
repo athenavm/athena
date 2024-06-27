@@ -737,12 +737,12 @@ mod tests {
     }
   }
 
-  unsafe extern "C" fn get_dummy_code_size(
-    _context: *mut ffi::athcon_host_context,
-    _addr: *const Address,
-  ) -> usize {
-    105023_usize
-  }
+  // unsafe extern "C" fn get_dummy_code_size(
+  //   _context: *mut ffi::athcon_host_context,
+  //   _addr: *const Address,
+  // ) -> usize {
+  //   105023_usize
+  // }
 
   unsafe extern "C" fn execute_call(
     _context: *mut ffi::athcon_host_context,

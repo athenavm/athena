@@ -13,7 +13,7 @@ use athena_interface::{
 };
 use athena_runner::{AthenaVm, Bytes32AsU64, VmInterface};
 
-#[athcon_declare_vm("Athena", "athena1", "v0.0.1")]
+#[athcon_declare_vm("Athena", "athena1", "0.1.0")]
 pub struct AthenaVMWrapper {
   // Internal, wrapped, Rust-native VM
   athena_vm: AthenaVm,
@@ -53,12 +53,9 @@ impl AthconVm for AthenaVMWrapper {
     // Unpack the context
     let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
     let execution_context = AthconExecutionContext::new(host_interface, context);
-    // let wrapped = WrappedHostInterface::new(execution_context_raw);
+    let host = Arc::new(RefCell::new(WrappedHostInterface::new(execution_context)));
 
     // Execute the code and proxy the result back to the caller
-    // Encapsulate the host creation and context creation within a block
-    // to limit the lifetime of the mutable borrow of context.
-    let host = Arc::new(RefCell::new(WrappedHostInterface::new(execution_context)));
     let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
   }
@@ -448,7 +445,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert_eq!((*vm).abi_version, 0, "ABI version mismatch");
     assert_eq!(
       std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(),
-      "Athena VM",
+      "Athena",
       "VM name mismatch"
     );
     assert_eq!(
@@ -595,6 +592,6 @@ mod tests {
 
   #[test]
   fn test_athcon_create() {
-    vm_tests(athcon_create_athenavm());
+    vm_tests(athcon_create_athenavmwrapper());
   }
 }
