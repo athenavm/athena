@@ -45,33 +45,13 @@ pub enum SetOptionError {
   InvalidValue,
 }
 
-// pub struct ExecutionContext {
-//   host: Arc<RefCell<dyn HostInterface>>,
-//   tx_context: TransactionContext,
-// }
-
-// impl<'a> ExecutionContext {
-//   pub fn new(host: Arc<RefCell<dyn HostInterface>>) -> Self {
-//     ExecutionContext {
-//       tx_context: host.clone().borrow().get_tx_context(),
-//       host: host,
-//     }
-//   }
-
-//   pub fn get_host(&self) -> Arc<RefCell<dyn HostInterface>> {
-//     self.host.clone()
-//   }
-
-//   pub fn get_tx_context(&self) -> &TransactionContext {
-//     &self.tx_context
-//   }
-// }
-
 #[cfg(test)]
 use std::collections::BTreeMap;
 
 #[cfg(test)]
-use athena_interface::{Address, AthenaMessage, ExecutionResult, StorageStatus};
+use athena_interface::{
+  Address, AthenaMessage, ExecutionResult, HostInterface, StorageStatus, TransactionContext,
+};
 
 #[cfg(test)]
 pub(crate) struct MockHost {

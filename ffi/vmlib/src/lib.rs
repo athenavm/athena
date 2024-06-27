@@ -31,12 +31,12 @@ impl AthconVm for AthenaVMWrapper {
     Err(SetOptionError::InvalidKey)
   }
 
-  fn execute(
+  fn execute<'a>(
     &self,
     rev: Revision,
     code: &[u8],
     message: &AthconExecutionMessage,
-    context: Option<AthconExecutionContext<'static>>,
+    context: Option<AthconExecutionContext<'a>>,
   ) -> AthconExecutionResult {
     if context.is_none() {
       return AthconExecutionResult::failure();

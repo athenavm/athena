@@ -61,7 +61,6 @@ pub type ExecutionTxContext = ffi::athcon_tx_context;
 
 /// ATHCON context structure. Exposes the ATHCON host functions, message data, and transaction context
 /// to the executing VM.
-#[derive(Clone)]
 pub struct ExecutionContext<'a> {
   host: &'a ffi::athcon_host_interface,
   context: *mut ffi::athcon_host_context,
