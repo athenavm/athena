@@ -427,17 +427,7 @@ fn build_execute_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
           };
 
           let result = ::std::panic::catch_unwind(|| {
-              if host.is_null() {
-                  container.execute(revision, code_ref, &execution_message, None)
-              } else {
-                  let execution_context = unsafe {
-                      ::athcon_vm::ExecutionContext::new(
-                          host.as_ref().expect("athcon host is null"),
-                          context,
-                      )
-                  };
-                  container.execute(revision, code_ref, &execution_message, Some(execution_context))
-              }
+              container.execute(revision, code_ref, &execution_message, host, context)
           });
 
           let result = if result.is_err() {

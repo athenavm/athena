@@ -36,27 +36,29 @@ impl AthconVm for AthenaVMWrapper {
     rev: Revision,
     code: &[u8],
     message: &AthconExecutionMessage,
-    context: Option<AthconExecutionContext<'a>>,
+    host: *const ffi::athcon_host_interface,
+    context: *mut ffi::athcon_host_context,
   ) -> AthconExecutionResult {
-    if context.is_none() {
-      return AthconExecutionResult::failure();
-    }
-
-    if message.kind() != AthconMessageKind::ATHCON_CALL {
-      return AthconExecutionResult::failure();
-    }
-
-    if code.is_empty() {
+    if host.is_null()
+      || context.is_null()
+      || message.kind() != AthconMessageKind::ATHCON_CALL
+      || code.is_empty()
+    {
       return AthconExecutionResult::failure();
     }
 
     // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
     let athena_msg = AthenaMessageWrapper::from(message);
 
+    // Unpack the context
+    let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
+    let execution_context = AthconExecutionContext::new(host_interface, context);
+    // let wrapped = WrappedHostInterface::new(execution_context_raw);
+
     // Execute the code and proxy the result back to the caller
     // Encapsulate the host creation and context creation within a block
     // to limit the lifetime of the mutable borrow of context.
-    let host = Arc::new(RefCell::new(WrappedHostInterface::new(context.unwrap())));
+    let host = Arc::new(RefCell::new(WrappedHostInterface::new(execution_context)));
     let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
   }

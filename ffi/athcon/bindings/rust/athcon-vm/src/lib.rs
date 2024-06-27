@@ -23,7 +23,8 @@ pub trait AthconVm {
     revision: Revision,
     code: &'a [u8],
     message: &'a ExecutionMessage,
-    context: Option<ExecutionContext<'static>>,
+    host: *const ffi::athcon_host_interface,
+    context: *mut ffi::athcon_host_context,
   ) -> ExecutionResult;
 }
 
