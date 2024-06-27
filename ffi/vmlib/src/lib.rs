@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
@@ -11,7 +11,7 @@ use athena_interface::{
   Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, MessageKind,
   StatusCode, StorageStatus, TransactionContext,
 };
-use athena_runner::{AthenaVm, Bytes32AsU64, ExecutionContext, VmInterface};
+use athena_runner::{AthenaVm, Bytes32AsU64, VmInterface};
 
 fn error_result() -> ffi::athcon_result {
   ffi::athcon_result {
@@ -30,6 +30,27 @@ pub struct AthenaVMWrapper {
   athena_vm: AthenaVm,
 }
 
+// struct OwnedContext {
+//   context: Box<AthconExecutionContext>,
+// }
+
+// impl OwnedContext {
+//   fn new(context: AthconExecutionContext) -> Self {
+//     Self {
+//       context: Box::new(context),
+//     }
+//   }
+// }
+
+// impl HostInterface for OwnedContext {
+//   // Implement the HostInterface methods here, delegating to self.context
+//   // For example:
+//   fn some_method(&self) -> SomeType {
+//     self.context.some_method()
+//   }
+//   // ... implement other methods ...
+// }
+
 impl AthconVm for AthenaVMWrapper {
   fn init() -> Self {
     Self {
@@ -47,7 +68,7 @@ impl AthconVm for AthenaVMWrapper {
     rev: Revision,
     code: &[u8],
     message: &AthconExecutionMessage,
-    context: Option<&mut AthconExecutionContext>,
+    context: Option<AthconExecutionContext<'static>>,
   ) -> AthconExecutionResult {
     if context.is_none() {
       return AthconExecutionResult::failure();
@@ -67,13 +88,14 @@ impl AthconVm for AthenaVMWrapper {
     // Execute the code and proxy the result back to the caller
     // Encapsulate the host creation and context creation within a block
     // to limit the lifetime of the mutable borrow of context.
-    let execution_result = {
-      let context = context.unwrap();
-      let host = Arc::new(RefCell::new(WrappedHostInterface::new(context)));
-      let ec = ExecutionContext::new(host);
-      self.athena_vm.execute(ec, rev as u32, athena_msg.0, code)
-    };
+    // let context = context.unwrap();
+    let host = Arc::new(RefCell::new(WrappedHostInterface::new(context.unwrap())));
+    // let ec = ExecutionContext::new(host);
+    // let wrapped = WrappedHostInterface::new(context);
+    // let ec = ExecutionContext::new(Arc::new(RefCell::new(wrapped)));
+    let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
+    // AthconExecutionResult::failure()
   }
 }
 
@@ -339,16 +361,6 @@ struct AthenaVmWrapper {
   vm: *mut AthenaVm,
 }
 
-struct WrappedHostInterface<'a> {
-  context: &'a mut AthconExecutionContext<'a>,
-}
-
-impl<'a> WrappedHostInterface<'a> {
-  fn new(context: &'a mut AthconExecutionContext<'a>) -> Self {
-    WrappedHostInterface { context: context }
-  }
-}
-
 fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
   match status {
     ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED => StorageStatus::StorageAssigned,
@@ -381,6 +393,21 @@ impl From<TransactionContextWrapper> for TransactionContext {
       block_gas_limit: tx_context.block_gas_limit,
       chain_id: Bytes32Wrapper::from(tx_context.chain_id).into(),
     }
+  }
+}
+
+struct WrappedHostInterface<'a> {
+  // context: *mut AthconExecutionContext<'static>,
+  context: AthconExecutionContext<'a>,
+}
+
+impl<'a> WrappedHostInterface<'a> {
+  fn new(context: AthconExecutionContext<'a>) -> Self {
+    // fn new(context: &'static mut AthconExecutionContext<'static>) -> Self {
+    // WrappedHostInterface {
+    //   context: context as *mut AthconExecutionContext,
+    // }
+    WrappedHostInterface { context }
   }
 }
 
@@ -445,14 +472,14 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
     get_storage: None,
     set_storage: None,
     get_balance: None,
-    call: Some(__athcon_execute),
+    call: None,
     get_tx_context: Some(get_dummy_tx_context),
     get_block_hash: None,
   }
 }
 
 // This code is shared with the external FFI tests
-pub fn vm_tests(vm_ptr: *const ffi::athcon_vm) {
+pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
   unsafe {
     // Ensure the returned pointer is not null
     assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");

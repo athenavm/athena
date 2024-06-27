@@ -430,13 +430,13 @@ fn build_execute_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
               if host.is_null() {
                   container.execute(revision, code_ref, &execution_message, None)
               } else {
-                  let mut execution_context = unsafe {
+                  let execution_context = unsafe {
                       ::athcon_vm::ExecutionContext::new(
                           host.as_ref().expect("athcon host is null"),
                           context,
                       )
                   };
-                  container.execute(revision, code_ref, &execution_message, Some(&mut execution_context))
+                  container.execute(revision, code_ref, &execution_message, Some(execution_context))
               }
           });
 
