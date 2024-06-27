@@ -1,5 +1,4 @@
-use athena_interface::{Bytes32, HostInterface, TransactionContext};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use athena_interface::Bytes32;
 
 pub struct Bytes32AsU64(Bytes32);
 

@@ -24,7 +24,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use thiserror::Error;

@@ -10,7 +10,6 @@ pub mod utils {
 }
 
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use anyhow::{Ok, Result};

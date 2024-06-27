@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, sync::Arc};
 
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
@@ -88,14 +88,9 @@ impl AthconVm for AthenaVMWrapper {
     // Execute the code and proxy the result back to the caller
     // Encapsulate the host creation and context creation within a block
     // to limit the lifetime of the mutable borrow of context.
-    // let context = context.unwrap();
     let host = Arc::new(RefCell::new(WrappedHostInterface::new(context.unwrap())));
-    // let ec = ExecutionContext::new(host);
-    // let wrapped = WrappedHostInterface::new(context);
-    // let ec = ExecutionContext::new(Arc::new(RefCell::new(wrapped)));
     let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
-    // AthconExecutionResult::failure()
   }
 }
 
@@ -358,7 +353,6 @@ impl From<ExecutionResultWrapper> for ffi::athcon_result {
 
 struct AthenaVmWrapper {
   base: ffi::athcon_vm,
-  vm: *mut AthenaVm,
 }
 
 fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
@@ -397,16 +391,11 @@ impl From<TransactionContextWrapper> for TransactionContext {
 }
 
 struct WrappedHostInterface<'a> {
-  // context: *mut AthconExecutionContext<'static>,
   context: AthconExecutionContext<'a>,
 }
 
 impl<'a> WrappedHostInterface<'a> {
   fn new(context: AthconExecutionContext<'a>) -> Self {
-    // fn new(context: &'static mut AthconExecutionContext<'static>) -> Self {
-    // WrappedHostInterface {
-    //   context: context as *mut AthconExecutionContext,
-    // }
     WrappedHostInterface { context }
   }
 }
