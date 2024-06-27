@@ -13,43 +13,11 @@ use athena_interface::{
 };
 use athena_runner::{AthenaVm, Bytes32AsU64, VmInterface};
 
-fn error_result() -> ffi::athcon_result {
-  ffi::athcon_result {
-    output_data: std::ptr::null_mut(),
-    output_size: 0,
-    gas_left: 0,
-    create_address: ffi::athcon_address::default(),
-    status_code: ffi::athcon_status_code::ATHCON_FAILURE,
-    release: None,
-  }
-}
-
 #[athcon_declare_vm("Athena", "athena1", "v0.0.1")]
 pub struct AthenaVMWrapper {
   // Internal, wrapped, Rust-native VM
   athena_vm: AthenaVm,
 }
-
-// struct OwnedContext {
-//   context: Box<AthconExecutionContext>,
-// }
-
-// impl OwnedContext {
-//   fn new(context: AthconExecutionContext) -> Self {
-//     Self {
-//       context: Box::new(context),
-//     }
-//   }
-// }
-
-// impl HostInterface for OwnedContext {
-//   // Implement the HostInterface methods here, delegating to self.context
-//   // For example:
-//   fn some_method(&self) -> SomeType {
-//     self.context.some_method()
-//   }
-//   // ... implement other methods ...
-// }
 
 impl AthconVm for AthenaVMWrapper {
   fn init() -> Self {

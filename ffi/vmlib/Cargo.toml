@@ -16,10 +16,3 @@ athena-interface = { path = "../../interface" }
 athena-runner = { path = "../../runner" }
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
 athcon-vm = { path = "../athcon/bindings/rust/athcon-vm" }
-anyhow = "1.0.83"
-thiserror = "1.0.60"
-serde = { version = "1.0", features = ["derive", "rc"] }
-
-[[bin]]
-name = "test"
-path = "src/test.rs"
