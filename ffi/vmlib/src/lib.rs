@@ -31,6 +31,10 @@ impl AthconVm for AthenaVMWrapper {
     Err(SetOptionError::InvalidKey)
   }
 
+  /// `execute` is the main entrypoint from FFI. It's called from the macro-generated `__athcon_execute` fn.
+  /// Note that we have to pass in raw `host` and `context` pointers here. If we wrap them into the
+  /// `AthenaExecutionContext` object inside the top-level FFI function and pass it in here, it causes
+  /// lifetime issues.
   fn execute<'a>(
     &self,
     rev: Revision,
