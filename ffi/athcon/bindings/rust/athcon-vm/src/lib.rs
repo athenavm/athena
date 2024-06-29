@@ -346,7 +346,9 @@ fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
 }
 
 unsafe fn deallocate_output_data(ptr: *const u8, size: usize) {
-  if !ptr.is_null() {
+  // be careful with dangling, aligned pointers here; they are not null but
+  // not valid and cannot be deallocated!
+  if !ptr.is_null() && size > 0 {
     let buf_layout = std::alloc::Layout::from_size_align(size, 1).expect("Bad layout");
     std::alloc::dealloc(ptr as *mut u8, buf_layout);
   }
@@ -520,7 +522,10 @@ mod tests {
     unsafe {
       assert_eq!((*f).status_code, StatusCode::ATHCON_FAILURE);
       assert_eq!((*f).gas_left, 420);
-      assert!((*f).output_data.is_null());
+      assert_eq!(
+        (*f).output_data,
+        core::ptr::NonNull::<u8>::dangling().as_ptr()
+      );
       assert_eq!((*f).output_size, 0);
       assert_eq!((*f).create_address.bytes, [0u8; 24]);
       if (*f).release.is_some() {
@@ -562,7 +567,7 @@ mod tests {
     unsafe {
       assert_eq!(f.status_code, StatusCode::ATHCON_FAILURE);
       assert_eq!(f.gas_left, 420);
-      assert!(f.output_data.is_null());
+      assert_eq!(f.output_data, core::ptr::NonNull::<u8>::dangling().as_ptr());
       assert_eq!(f.output_size, 0);
       assert_eq!(f.create_address.bytes, [0u8; 24]);
       if f.release.is_some() {
