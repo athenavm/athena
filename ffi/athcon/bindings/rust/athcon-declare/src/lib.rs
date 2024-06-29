@@ -14,11 +14,18 @@
 //!
 //! impl athcon_vm::AthconVm for ExampleVM {
 //!     fn init() -> Self {
-//!             ExampleVM {}
+//!       ExampleVM {}
 //!     }
 //!
-//!     fn execute(&self, revision: athcon_vm::ffi::athcon_revision, code: &[u8], message: &athcon_vm::ExecutionMessage, context: Option<&mut athcon_vm::ExecutionContext>) -> athcon_vm::ExecutionResult {
-//!             athcon_vm::ExecutionResult::success(1337, None)
+//!     fn execute(
+//!       &self,
+//!       revision: athcon_vm::ffi::athcon_revision,
+//!       code: &[u8],
+//!       message: &athcon_vm::ExecutionMessage,
+//!       host: *const athcon_vm::ffi::athcon_host_interface,
+//!       context: *mut athcon_vm::ffi::athcon_host_context,
+//!     ) -> athcon_vm::ExecutionResult {
+//!       athcon_vm::ExecutionResult::success(1337, None)
 //!     }
 //! }
 //! ```

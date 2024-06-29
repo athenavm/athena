@@ -55,7 +55,7 @@ impl ExecutionClient {
   /// stdin.write(&10usize);
   ///
   /// // Execute the program on the inputs.
-  /// let public_values = client.execute(elf, stdin).unwrap();
+  /// let public_values = client.execute(elf, stdin, None).unwrap();
   /// ```
   pub fn execute(
     &self,
