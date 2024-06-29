@@ -141,7 +141,7 @@ pub struct AthenaMessage {
   pub gas: i64,
   pub recipient: Address,
   pub sender: Address,
-  pub input_data: Vec<u8>,
+  pub input_data: Option<Vec<u8>>,
   pub value: Balance,
   pub code: Vec<u8>,
 }
@@ -153,7 +153,7 @@ impl AthenaMessage {
     gas: i64,
     recipient: Address,
     sender: Address,
-    input_data: Vec<u8>,
+    input_data: Option<Vec<u8>>,
     value: Balance,
     code: Vec<u8>,
   ) -> Self {

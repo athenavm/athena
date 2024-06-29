@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, panic, sync::Arc};
 
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
@@ -43,11 +43,9 @@ impl AthconVm for AthenaVMWrapper {
     host: *const ffi::athcon_host_interface,
     context: *mut ffi::athcon_host_context,
   ) -> AthconExecutionResult {
-    if host.is_null()
-      || context.is_null()
-      || message.kind() != AthconMessageKind::ATHCON_CALL
-      || code.is_empty()
-    {
+    // note that host context is allowed to be null. it's opaque and totally up to the host
+    // whether and how to use it. but we require the host interface to be non-null.
+    if host.is_null() || message.kind() != AthconMessageKind::ATHCON_CALL || code.is_empty() {
       return AthconExecutionResult::failure();
     }
 
@@ -127,9 +125,9 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
   fn from(item: ffi::athcon_message) -> Self {
     // Convert input_data pointer and size to Vec<u8>
     let input_data = if !item.input_data.is_null() && item.input_size > 0 {
-      unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec()
+      Some(unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec())
     } else {
-      Vec::new()
+      None
     };
 
     // Convert code pointer and size to Vec<u8>
@@ -156,8 +154,11 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
 
 impl From<AthenaMessageWrapper> for ffi::athcon_message {
   fn from(item: AthenaMessageWrapper) -> Self {
-    let input_data = item.0.input_data.as_ptr();
-    let input_size = item.0.input_data.len();
+    let (input_data, input_size) = if let Some(data) = item.0.input_data {
+      (data.as_ptr(), data.len())
+    } else {
+      (std::ptr::null(), 0)
+    };
     let code = item.0.code.as_ptr();
     let code_size = item.0.code.len();
     let kind = match item.0.kind {
@@ -196,7 +197,7 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       gas: item.gas(),
       recipient: AddressWrapper::from(*item.recipient()).into(),
       sender: AddressWrapper::from(*item.sender()).into(),
-      input_data: item.input().unwrap().clone(),
+      input_data: item.input().cloned(),
       value: Bytes32AsU64::new(byteswrapper.0).into(),
       code: item.code().unwrap().clone(),
     })
@@ -477,6 +478,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     // Construct mock host, context, message, and code objects for test
     let host_interface = get_dummy_host_interface();
     let code = include_bytes!("../../../examples/hello_world/program/elf/hello-world-program");
+    let empty_code = &[0u8; 0];
     let message = ::athcon_sys::athcon_message {
       kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
       depth: 0,
@@ -486,32 +488,35 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
       input_data: std::ptr::null(),
       input_size: 0,
       value: ::athcon_sys::athcon_uint256be::default(),
-      code: std::ptr::null(),
+      code: code.as_ptr(),
       code_size: code.len(),
     };
 
-    // fail due to null vm pointer
-    assert_eq!(
-      (*vm).execute.unwrap()(
-        std::ptr::null_mut(),
-        &host_interface,
-        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
-        ffi::athcon_revision::ATHCON_FRONTIER,
-        &message,
-        code.as_ptr(),
-        code.len(),
-      )
-      .status_code,
-      // failure expected due to input null pointers
-      ffi::athcon_status_code::ATHCON_FAILURE
-    );
+    // this message is invalid because code_size doesn't match code length
+    let bad_message = ::athcon_sys::athcon_message {
+      kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
+      depth: 0,
+      gas: 0,
+      recipient: ::athcon_sys::athcon_address::default(),
+      sender: ::athcon_sys::athcon_address::default(),
+      input_data: std::ptr::null(),
+      input_size: 0,
+      value: ::athcon_sys::athcon_uint256be::default(),
+      code: std::ptr::null(),
+      code_size: 1,
+    };
+
+    // note: we cannot check for a null instance or message pointer here, as the VM wrapper code
+    // calls `std::process::abort()`. this is a violation of the athcon spec.
+    // host pointer is allowed to be null.
 
     // fail due to null host pointer
     assert_eq!(
       (*vm).execute.unwrap()(
         vm_ptr,
+        // host can be null
         std::ptr::null(),
-        // host_context is unused and opaque
+        // host_context is an opaque pointer
         std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         ffi::athcon_revision::ATHCON_FRONTIER,
         &message,
@@ -523,24 +528,42 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
       ffi::athcon_status_code::ATHCON_FAILURE
     );
 
-    // fail due to null msg
+    // fail due to empty code
     assert_eq!(
       (*vm).execute.unwrap()(
         vm_ptr,
         &host_interface,
-        // host_context is unused and opaque
+        // host_context is an opaque pointer
         std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         ffi::athcon_revision::ATHCON_FRONTIER,
-        std::ptr::null(),
-        code.as_ptr(),
-        code.len(),
+        &message,
+        empty_code.as_ptr(),
+        empty_code.len(),
       )
       .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
     );
 
+    // fail due to bad message
+    // fails an assertion inside the VM macro code
+    let result = panic::catch_unwind(|| {
+      (*vm).execute.unwrap()(
+        vm_ptr,
+        &host_interface,
+        // host_context is an opaque pointer
+        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
+        ffi::athcon_revision::ATHCON_FRONTIER,
+        &bad_message,
+        code.as_ptr(),
+        code.len(),
+      )
+    });
+    assert!(result.is_err(), "Expected panic did not occur");
+
     // this one should succeed
+    // note that host needs to be non-null, but the host context can be null.
+    // the VM is unopinionated about it and doesn't rely on it directly.
     assert_eq!(
       (*vm).execute.unwrap()(
         vm_ptr,
@@ -573,12 +596,14 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert_eq!(
       wrapper.base.execute.unwrap()(
         vm_ptr,
+        // host can be null
         std::ptr::null(),
+        // host_context is an opaque pointer
         std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         ffi::athcon_revision::ATHCON_FRONTIER,
-        std::ptr::null(),
-        std::ptr::null(),
-        0
+        &message,
+        code.as_ptr(),
+        code.len(),
       )
       .status_code,
       // failure expected due to input null pointers

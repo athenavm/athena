@@ -41,13 +41,16 @@ impl VmInterface for AthenaVm {
     &self,
     host: Arc<RefCell<dyn HostInterface>>,
     _rev: u32,
-    _msg: AthenaMessage,
+    msg: AthenaMessage,
     // note: ignore _msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
     let mut stdin = AthenaStdin::new();
-    stdin.write_vec(_msg.input_data);
-    // TODO: pass execution context/callbacks into VM
+
+    // input data is optional
+    if let Some(input_data) = msg.input_data {
+      stdin.write_vec(input_data);
+    }
     let output = self.client.execute(&code, stdin, Some(host)).unwrap();
     ExecutionResult::new(StatusCode::Success, 1337, Some(output.to_vec()), None)
   }
