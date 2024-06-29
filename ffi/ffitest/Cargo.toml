@@ -8,5 +8,9 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+athcon-client = { path = "../athcon/bindings/rust/athcon-client" }
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
 athena-vmlib = { path = "../vmlib" }
+hex = "0.4"

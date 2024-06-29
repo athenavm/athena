@@ -6,7 +6,7 @@ use athcon_sys as ffi;
 use std::ffi::CStr;
 
 extern "C" {
-  fn athcon_create() -> *mut ffi::athcon_vm;
+  fn athcon_create_athenavmwrapper() -> *mut ffi::athcon_vm;
 }
 
 pub struct AthconVm {
@@ -93,7 +93,7 @@ impl AthconVm {
 pub fn create() -> AthconVm {
   unsafe {
     AthconVm {
-      handle: athcon_create(),
+      handle: athcon_create_athenavmwrapper(),
       host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
     }
   }

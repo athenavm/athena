@@ -302,9 +302,17 @@ impl From<ExecutionResultWrapper> for AthconExecutionResult {
 
 impl From<ExecutionResultWrapper> for ffi::athcon_result {
   fn from(value: ExecutionResultWrapper) -> Self {
-    let output = value.0.output.unwrap();
+    let output = value.0.output.unwrap_or_else(Vec::new);
     let output_size = output.len();
-    let output_data = output.as_ptr();
+
+    // in order to ensure that a slice can be reconstructed from empty output,
+    // we need some trickery here. see std::slice::from_raw_parts for more details.
+    let output_data = if output_size > 0 {
+      output.as_ptr()
+    } else {
+      core::ptr::NonNull::<u8>::dangling().as_ptr()
+    };
+
     let gas_left = value.0.gas_left;
     let create_address = value.0.create_address.map_or_else(
       || ffi::athcon_address::default(),
@@ -440,6 +448,7 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
 }
 
 // This code is shared with the external FFI tests
+// These are raw tests, where the host context is null.
 pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
   unsafe {
     // Ensure the returned pointer is not null

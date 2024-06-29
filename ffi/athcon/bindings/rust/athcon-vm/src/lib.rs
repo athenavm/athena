@@ -341,7 +341,7 @@ fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
 
     (new_buf as *const u8, buf_len)
   } else {
-    (std::ptr::null(), 0)
+    (core::ptr::NonNull::<u8>::dangling().as_ptr(), 0)
   }
 }
 

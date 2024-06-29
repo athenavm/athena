@@ -128,7 +128,7 @@ mod tests {
         1000,
         Address::default(),
         Address::default(),
-        vec![],
+        None,
         Balance::default(),
         vec![],
       ),
