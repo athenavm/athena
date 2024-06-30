@@ -8,41 +8,39 @@ cfg_if::cfg_if! {
 
 /// Read from host storage at the given address and key.
 ///
-/// The result is stored in the `address` pointer.
+/// The output is stored in the `key` pointer.
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern "C" fn host_read_storage(
-  // result: *mut Bytes32,
-  address: *mut u32,
-  key: *const u32,
-) -> *const u8 {
-  // let result_ptr = result as *mut u32;
+pub extern "C" fn host_read_storage(key: *mut u32, address: *const u32) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_READ,
-        in("a0") address,
-        in("a1") key,
-    );
+        in("a0") key,
+        in("a1") address,
+    )
   }
 
   #[cfg(not(target_os = "zkvm"))]
   unreachable!()
 }
 
+/// Write to host storage at the given address and key.
+///
+/// The result status code is stored in the `key` pointer.
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern "C" fn host_write_storage(address: *const u8, key: *const u8, value: *const u8) -> u32 {
+pub extern "C" fn host_write_storage(key: *mut u32, address: *const u32, value: *const u32) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_WRITE,
-        in("a0") address,
-        in("a1") key,
+        in("a0") key,
+        in("a1") address,
         in("a2") value,
-    );
+    )
   }
 
   #[cfg(not(target_os = "zkvm"))]

@@ -795,10 +795,14 @@ impl Runtime {
 #[cfg(test)]
 pub mod tests {
 
+  use std::{cell::RefCell, sync::Arc};
+
+  use athena_interface::{HostInterface, BYTES32_LENGTH};
+
   use crate::{
     runtime::Register,
     utils::{
-      tests::{TEST_FIBONACCI_ELF, TEST_PANIC_ELF},
+      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF},
       AthenaCoreOpts,
     },
   };
@@ -822,6 +826,51 @@ pub mod tests {
     Program::from(TEST_PANIC_ELF)
   }
 
+  pub fn host_program() -> Program {
+    Program::from(TEST_HOST)
+  }
+
+  struct MockHost;
+  impl HostInterface for MockHost {
+    fn account_exists(&self, _addr: &athena_interface::Address) -> bool {
+      true
+    }
+
+    fn get_storage(
+      &self,
+      _addr: &athena_interface::Address,
+      _key: &athena_interface::Bytes32,
+    ) -> athena_interface::Bytes32 {
+      // return all 1's
+      [1u8; BYTES32_LENGTH]
+    }
+
+    fn set_storage(
+      &mut self,
+      _addr: &athena_interface::Address,
+      _key: &athena_interface::Bytes32,
+      _value: &athena_interface::Bytes32,
+    ) -> athena_interface::StorageStatus {
+      athena_interface::StorageStatus::StorageAssigned
+    }
+
+    fn get_balance(&self, _addr: &athena_interface::Address) -> u64 {
+      0
+    }
+
+    fn get_tx_context(&self) -> athena_interface::TransactionContext {
+      unimplemented!()
+    }
+
+    fn get_block_hash(&self, _block_height: i64) -> athena_interface::Bytes32 {
+      unimplemented!()
+    }
+
+    fn call(&mut self, _msg: athena_interface::AthenaMessage) -> athena_interface::ExecutionResult {
+      unimplemented!()
+    }
+  }
+
   #[test]
   fn test_simple_program_run() {
     let program = simple_program();
@@ -835,6 +884,18 @@ pub mod tests {
   fn test_panic() {
     let program = panic_program();
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default());
+    runtime.run().unwrap();
+  }
+
+  #[test]
+  fn test_host() {
+    let program = host_program();
+    let host = MockHost {};
+    let mut runtime = Runtime::new(
+      program,
+      Some(Arc::new(RefCell::new(host))),
+      AthenaCoreOpts::default(),
+    );
     runtime.run().unwrap();
   }
 

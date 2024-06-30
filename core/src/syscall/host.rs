@@ -13,8 +13,8 @@ impl Syscall for SyscallHostRead {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     // marshal inputs
     let address_words = ADDRESS_LENGTH / 4;
-    let address = ctx.slice_unsafe(arg1, address_words);
-    let key = ctx.slice_unsafe(arg2, BYTES32_LENGTH / 4);
+    let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
+    let address = ctx.slice_unsafe(arg2, address_words);
 
     // read value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
@@ -42,8 +42,8 @@ impl Syscall for SyscallHostWrite {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     // marshal inputs
     let address_words = ADDRESS_LENGTH / 4;
-    let address = ctx.slice_unsafe(arg1, address_words);
-    let key = ctx.slice_unsafe(arg2, BYTES32_LENGTH / 4);
+    let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
+    let address = ctx.slice_unsafe(arg2, address_words);
 
     // we need to read the value to write from the next register
     let a2 = Register::X12;
@@ -60,7 +60,9 @@ impl Syscall for SyscallHostWrite {
     );
 
     // save return code
-    ctx.mw(arg1, status_code as u32);
+    let mut status_word = [0u32; 8];
+    status_word[0] = status_code as u32;
+    ctx.mw_slice(arg1, &status_word);
     None
   }
 }

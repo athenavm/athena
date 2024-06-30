@@ -1,5 +1,5 @@
 [package]
-name = "athena-interface"
+name = "athena-hostfunctions"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,4 +8,6 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-bytemuck = "1.16.0"
+
+[features]
+verify = []

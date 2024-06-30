@@ -204,7 +204,7 @@ mod tests {
 
   #[test]
   /// Check that the Syscall number match the VM crate's.
-  fn test_syscall_consistency_zkvm() {
+  fn test_syscall_consistency_vm() {
     for code in SyscallCode::iter() {
       match code {
         SyscallCode::HALT => assert_eq!(code as u32, athena_vm::syscalls::HALT),

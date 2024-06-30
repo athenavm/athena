@@ -26,15 +26,6 @@ impl From<Vec<u32>> for AddressWrapper {
   }
 }
 
-// impl From<u32> for AddressWrapper {
-//   fn from(value: u32) -> Self {
-//     let mut bytes = [0u8; 24];
-//     let value_bytes = value.to_le_bytes();
-//     bytes[..4].copy_from_slice(&value_bytes);
-//     AddressWrapper(bytes)
-//   }
-// }
-
 impl From<AddressWrapper> for Address {
   fn from(value: AddressWrapper) -> Address {
     value.0
@@ -48,15 +39,6 @@ impl Bytes32Wrapper {
     Bytes32Wrapper(bytes)
   }
 }
-
-// impl From<u32> for Bytes32Wrapper {
-//   fn from(value: u32) -> Self {
-//     let mut bytes = [0u8; 32];
-//     let value_bytes = value.to_le_bytes();
-//     bytes[..4].copy_from_slice(&value_bytes);
-//     Bytes32Wrapper(bytes)
-//   }
-// }
 
 impl From<Vec<u32>> for Bytes32Wrapper {
   fn from(value: Vec<u32>) -> Self {
@@ -72,14 +54,7 @@ impl From<Vec<u32>> for Bytes32Wrapper {
 
 impl From<Bytes32Wrapper> for Vec<u32> {
   fn from(value: Bytes32Wrapper) -> Vec<u32> {
-    value
-      .0
-      .chunks(4) // Process 4 bytes at a time
-      .map(|chunk| {
-        // Convert each 4-byte chunk into a u32
-        u32::from_le_bytes(chunk.try_into().unwrap())
-      })
-      .collect()
+    bytemuck::cast::<[u8; 32], [u32; 8]>(value.0).to_vec()
   }
 }
 
@@ -238,7 +213,6 @@ pub trait HostInterface {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
-  // this should take an opaque context object (txid? something else?)
   fn get_tx_context(&self) -> TransactionContext;
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
