@@ -16,10 +16,10 @@ use anyhow::{Ok, Result};
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
-use athena_interface::HostInterface;
+use athena_interface::{HostInterface, HostProvider};
 
 /// A client for interacting with Athena.
-pub struct ExecutionClient {}
+pub struct ExecutionClient;
 
 impl ExecutionClient {
   /// Creates a new [ExecutionClient].
@@ -42,6 +42,7 @@ impl ExecutionClient {
   ///
   /// ### Examples
   /// ```no_run
+  /// use athena_interface::MockHost;
   /// use athena_sdk::{ExecutionClient, AthenaStdin};
   ///
   /// // Load the program.
@@ -55,13 +56,13 @@ impl ExecutionClient {
   /// stdin.write(&10usize);
   ///
   /// // Execute the program on the inputs.
-  /// let public_values = client.execute(elf, stdin, None).unwrap();
+  /// let public_values = client.execute::<MockHost>(elf, stdin, None).unwrap();
   /// ```
-  pub fn execute(
+  pub fn execute<T: HostInterface>(
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<Arc<RefCell<dyn HostInterface>>>,
+    host: Option<Arc<RefCell<HostProvider<T>>>>,
   ) -> Result<AthenaPublicValues> {
     let program = Program::from(elf);
     let opts = AthenaCoreOpts::default();
@@ -82,8 +83,8 @@ impl Default for ExecutionClient {
 
 #[cfg(test)]
 mod tests {
-
   use crate::{utils, AthenaStdin, ExecutionClient};
+  use athena_interface::MockHost;
 
   #[test]
   fn test_execute() {
@@ -92,7 +93,7 @@ mod tests {
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client.execute(elf, stdin, None).unwrap();
+    client.execute::<MockHost>(elf, stdin, None).unwrap();
   }
 
   #[test]
@@ -103,6 +104,6 @@ mod tests {
     let elf = include_bytes!("../../tests/panic/elf/panic-test");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client.execute(elf, stdin, None).unwrap();
+    client.execute::<MockHost>(elf, stdin, None).unwrap();
   }
 }

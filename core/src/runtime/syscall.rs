@@ -9,6 +9,8 @@ use crate::syscall::{
 };
 use crate::{runtime::MemoryReadRecord, runtime::MemoryWriteRecord};
 
+use athena_interface::HostInterface;
+
 /// A system call is invoked by the the `ecall` instruction with a specific value in register t0.
 /// The syscall number is a 32-bit integer, with the following layout (in little-endian format)
 /// - The first byte is the syscall id.
@@ -62,13 +64,13 @@ impl SyscallCode {
   }
 }
 
-pub trait Syscall: Send + Sync {
+pub trait Syscall<T: HostInterface>: Send + Sync {
   /// Execute the syscall and return the resulting value of register a0. `arg1` and `arg2` are the
   /// values in registers X10 and X11, respectively. While not a hard requirement, the convention
   /// is that the return value is only for system calls such as `HALT`. Most precompiles use `arg1`
   /// and `arg2` to denote the addresses of the input data, and write the result to the memory at
   /// `arg1`.
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32>;
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32>;
 
   /// The number of extra cycles that the syscall takes to execute. Unless this syscall is complex
   /// and requires many cycles, this should be zero.
@@ -78,17 +80,20 @@ pub trait Syscall: Send + Sync {
 }
 
 /// A runtime for syscalls that is protected so that developers cannot arbitrarily modify the runtime.
-pub struct SyscallContext<'a> {
+pub struct SyscallContext<'a, T: HostInterface> {
   pub clk: u32,
 
   pub(crate) next_pc: u32,
   /// This is the exit_code used for the HALT syscall
   pub(crate) exit_code: u32,
-  pub(crate) rt: &'a mut Runtime,
+  pub(crate) rt: &'a mut Runtime<T>,
 }
 
-impl<'a> SyscallContext<'a> {
-  pub fn new(runtime: &'a mut Runtime) -> Self {
+impl<'a, T> SyscallContext<'a, T>
+where
+  T: HostInterface,
+{
+  pub fn new(runtime: &'a mut Runtime<T>) -> Self {
     let clk = runtime.state.clk;
     Self {
       clk,
@@ -162,8 +167,8 @@ impl<'a> SyscallContext<'a> {
   }
 }
 
-pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
-  let mut syscall_map = HashMap::<SyscallCode, Arc<dyn Syscall>>::default();
+pub fn default_syscall_map<T: HostInterface>() -> HashMap<SyscallCode, Arc<dyn Syscall<T>>> {
+  let mut syscall_map = HashMap::<SyscallCode, Arc<dyn Syscall<T>>>::default();
   syscall_map.insert(SyscallCode::HALT, Arc::new(SyscallHalt {}));
   syscall_map.insert(SyscallCode::WRITE, Arc::new(SyscallWrite::new()));
   syscall_map.insert(SyscallCode::HOST_READ, Arc::new(SyscallHostRead::new()));
@@ -177,11 +182,12 @@ pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
 #[cfg(test)]
 mod tests {
   use super::{default_syscall_map, SyscallCode};
+  use athena_interface::MockHost;
   use strum::IntoEnumIterator;
 
   #[test]
   fn test_syscalls_in_default_map() {
-    let default_syscall_map = default_syscall_map();
+    let default_syscall_map = default_syscall_map::<MockHost>();
     for code in SyscallCode::iter() {
       default_syscall_map.get(&code).unwrap();
     }
@@ -189,7 +195,7 @@ mod tests {
 
   #[test]
   fn test_syscall_num_cycles_encoding() {
-    for (syscall_code, syscall_impl) in default_syscall_map().iter() {
+    for (syscall_code, syscall_impl) in default_syscall_map::<MockHost>().iter() {
       let encoded_num_cycles = syscall_code.num_cycles();
       assert_eq!(syscall_impl.num_extra_cycles(), encoded_num_cycles);
     }
@@ -197,7 +203,7 @@ mod tests {
 
   #[test]
   fn test_encoding_roundtrip() {
-    for (syscall_code, _) in default_syscall_map().iter() {
+    for (syscall_code, _) in default_syscall_map::<MockHost>().iter() {
       assert_eq!(SyscallCode::from_u32(*syscall_code as u32), *syscall_code);
     }
   }

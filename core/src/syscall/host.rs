@@ -1,5 +1,7 @@
 use crate::runtime::{Register, Syscall, SyscallContext};
-use athena_interface::{AddressWrapper, Bytes32Wrapper, ADDRESS_LENGTH, BYTES32_LENGTH};
+use athena_interface::{
+  AddressWrapper, Bytes32Wrapper, HostInterface, ADDRESS_LENGTH, BYTES32_LENGTH,
+};
 
 pub struct SyscallHostRead;
 
@@ -9,8 +11,11 @@ impl SyscallHostRead {
   }
 }
 
-impl Syscall for SyscallHostRead {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
+impl<T> Syscall<T> for SyscallHostRead
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
     // marshal inputs
     let address_words = ADDRESS_LENGTH / 4;
     let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
@@ -38,8 +43,11 @@ impl SyscallHostWrite {
   }
 }
 
-impl Syscall for SyscallHostWrite {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
+impl<T> Syscall<T> for SyscallHostWrite
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
     // marshal inputs
     let address_words = ADDRESS_LENGTH / 4;
     let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
