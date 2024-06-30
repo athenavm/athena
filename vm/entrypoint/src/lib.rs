@@ -1,66 +1,69 @@
 pub mod heap;
 pub mod syscalls;
+pub mod host {
+  pub use athena_hostfunctions::*;
+}
 pub mod io {
-    pub use athena_precompiles::io::*;
+  pub use athena_precompiles::io::*;
 }
 pub mod precompiles {
-    pub use athena_precompiles::*;
+  pub use athena_precompiles::*;
 }
 
 extern crate alloc;
 
 #[macro_export]
 macro_rules! entrypoint {
-    ($path:path) => {
-        const VM_ENTRY: fn() = $path;
+  ($path:path) => {
+    const VM_ENTRY: fn() = $path;
 
-        use $crate::heap::SimpleAlloc;
+    use $crate::heap::SimpleAlloc;
 
-        #[global_allocator]
-        static HEAP: SimpleAlloc = SimpleAlloc;
+    #[global_allocator]
+    static HEAP: SimpleAlloc = SimpleAlloc;
 
-        mod vm_generated_main {
+    mod vm_generated_main {
 
-            #[no_mangle]
-            fn main() {
-                super::VM_ENTRY()
-            }
-        }
-    };
+      #[no_mangle]
+      fn main() {
+        super::VM_ENTRY()
+      }
+    }
+  };
 }
 
 #[cfg(target_os = "zkvm")]
 mod vm {
-    use crate::syscalls::syscall_halt;
+  use crate::syscalls::syscall_halt;
 
-    use getrandom::{register_custom_getrandom, Error};
+  use getrandom::{register_custom_getrandom, Error};
 
-    #[cfg(not(feature = "interface"))]
-    #[no_mangle]
-    unsafe extern "C" fn __start() {
-        {
-            extern "C" {
-                fn main();
-            }
-            main()
-        }
-
-        syscall_halt(0);
+  #[cfg(not(feature = "interface"))]
+  #[no_mangle]
+  unsafe extern "C" fn __start() {
+    {
+      extern "C" {
+        fn main();
+      }
+      main()
     }
 
-    static STACK_TOP: u32 = 0x0020_0400;
+    syscall_halt(0);
+  }
 
-    #[cfg(feature = "rv32e")]
-    core::arch::global_asm!(include_str!("memset-rv32e.s"));
-    #[cfg(feature = "rv32e")]
-    core::arch::global_asm!(include_str!("memcpy-rv32e.s"));
-    #[cfg(not(feature = "rv32e"))]
-    core::arch::global_asm!(include_str!("memset.s"));
-    #[cfg(not(feature = "rv32e"))]
-    core::arch::global_asm!(include_str!("memcpy.s"));
+  static STACK_TOP: u32 = 0x0020_0400;
 
-    core::arch::global_asm!(
-        r#"
+  #[cfg(feature = "rv32e")]
+  core::arch::global_asm!(include_str!("memset-rv32e.s"));
+  #[cfg(feature = "rv32e")]
+  core::arch::global_asm!(include_str!("memcpy-rv32e.s"));
+  #[cfg(not(feature = "rv32e"))]
+  core::arch::global_asm!(include_str!("memset.s"));
+  #[cfg(not(feature = "rv32e"))]
+  core::arch::global_asm!(include_str!("memcpy.s"));
+
+  core::arch::global_asm!(
+      r#"
     .section .text._start;
     .globl _start;
     _start:
@@ -72,24 +75,24 @@ mod vm {
         lw sp, 0(sp)
         jal ra, __start;
     "#,
-        sym STACK_TOP
-    );
+      sym STACK_TOP
+  );
 
-    static GETRANDOM_WARNING_ONCE: std::sync::Once = std::sync::Once::new();
+  static GETRANDOM_WARNING_ONCE: std::sync::Once = std::sync::Once::new();
 
-    fn vm_getrandom(s: &mut [u8]) -> Result<(), Error> {
-        use rand::Rng;
-        use rand::SeedableRng;
+  fn vm_getrandom(s: &mut [u8]) -> Result<(), Error> {
+    use rand::Rng;
+    use rand::SeedableRng;
 
-        GETRANDOM_WARNING_ONCE.call_once(|| {
-            println!("WARNING: Using insecure random number generator");
-        });
-        let mut rng = rand::rngs::StdRng::seed_from_u64(123);
-        for i in 0..s.len() {
-            s[i] = rng.gen();
-        }
-        Ok(())
+    GETRANDOM_WARNING_ONCE.call_once(|| {
+      println!("WARNING: Using insecure random number generator");
+    });
+    let mut rng = rand::rngs::StdRng::seed_from_u64(123);
+    for i in 0..s.len() {
+      s[i] = rng.gen();
     }
+    Ok(())
+  }
 
-    register_custom_getrandom!(vm_getrandom);
+  register_custom_getrandom!(vm_getrandom);
 }

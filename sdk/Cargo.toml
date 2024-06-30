@@ -1,12 +1,17 @@
 [package]
 name = "athena-sdk"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
 
 [dependencies]
 serde = { version = "1.0.201", features = ["derive"] }
 anyhow = "1.0.83"
 athena-core = { path = "../core" }
+athena-interface = { path = "../interface" }
 bincode = "1.3.3"
 tracing = "0.1.40"
 hex = "0.4.3"

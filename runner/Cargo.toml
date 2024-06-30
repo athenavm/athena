@@ -1,0 +1,14 @@
+[package]
+name = "athena-runner"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+athcon-sys = { path = "../ffi/athcon/bindings/rust/athcon-sys" }
+athcon-vm = { path = "../ffi/athcon/bindings/rust/athcon-vm" }
+athena-interface = { path = "../interface" }
+athena-sdk = { path = "../sdk" }

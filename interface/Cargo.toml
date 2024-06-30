@@ -1,0 +1,11 @@
+[package]
+name = "athena-interface"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+bytemuck = "1.16.0"

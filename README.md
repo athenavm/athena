@@ -6,6 +6,8 @@ Athena includes a virtual machine (VM) based on the RISC-V ISA, including suppor
 
 ## Project Goals
 - **Developer Experience**: Provide a robust environment with extensive tooling support.
+- **Simplicity**: VMs tend to be extraordinarily complex. The Athena codebase is clean and contains an order of magnitude less code than most VMs.
+- **Modularity**: Athena is totally self-contained and agnostic to the environment where it runs. It has a well-defined Host<>VM CFFI API and ABI that can be used to swap hosts or VMs, and Athena can talk to a host written in Go or another compatible language.
 - **Performance**: Ensure fast execution of smart contracts. (Note that this is a long-term goal and is not a goal at this prototype phase.)
 - **Small On-Chain Footprint**: Deployed Athena code should be as compact as possible.
 - **Security**: Implement strong isolation and safety measures.

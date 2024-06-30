@@ -1,0 +1,13 @@
+[package]
+name = "athcon-sys"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.69.4"

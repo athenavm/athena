@@ -111,7 +111,8 @@ impl ExecuteCmd {
 
         let start_time = Instant::now();
         let client = ExecutionClient::new();
-        let output = client.execute(&elf, stdin).unwrap();
+        // no host interface needed for direct execution
+        let output = client.execute(&elf, stdin, None).unwrap();
 
         let elapsed = elapsed(start_time.elapsed());
         let green = AnsiColor::Green.on_default().effects(Effects::BOLD);
