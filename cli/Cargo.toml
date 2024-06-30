@@ -16,6 +16,7 @@ vergen = { version = "8", default-features = false, features = [
 
 [dependencies]
 anyhow = { version = "1.0.83", features = ["backtrace"] }
+athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
 athena-core = { path = "../core" }
 cargo_metadata = "0.18.1"

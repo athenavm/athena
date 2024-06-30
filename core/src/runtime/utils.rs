@@ -1,5 +1,7 @@
 use std::io::Write;
 
+use athena_interface::HostInterface;
+
 use super::{Instruction, Runtime};
 use crate::runtime::Register;
 
@@ -27,7 +29,10 @@ macro_rules! assert_valid_memory_access {
   };
 }
 
-impl Runtime {
+impl<T> Runtime<T>
+where
+  T: HostInterface,
+{
   #[inline]
   pub fn log(&mut self, instruction: &Instruction) {
     // Write the current program counter to the trace buffer for the cycle tracer.

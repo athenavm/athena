@@ -2,7 +2,10 @@
 //!
 //! A library with no external dependencies that includes core types and traits.
 
-use std::fmt;
+use std::{
+  fmt,
+  ops::{Deref, DerefMut},
+};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -216,4 +219,83 @@ pub trait HostInterface {
   fn get_tx_context(&self) -> TransactionContext;
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
+}
+
+// provide a trait-bound generic struct to represent the host interface
+// this is better, and more performant, than using a trait object
+// since it allows more compile-time checks, and we don't need polymorphism.
+pub struct HostProvider<T: HostInterface> {
+  host: T,
+}
+
+impl<T> HostProvider<T>
+where
+  T: HostInterface,
+{
+  pub fn new(host: T) -> Self {
+    HostProvider { host }
+  }
+}
+
+// pass calls directly to the underlying host instance
+impl<T> Deref for HostProvider<T>
+where
+  T: HostInterface,
+{
+  type Target = T;
+
+  fn deref(&self) -> &Self::Target {
+    &self.host
+  }
+}
+
+impl<T> DerefMut for HostProvider<T>
+where
+  T: HostInterface,
+{
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.host
+  }
+}
+
+// a very simple mock host implementation for testing
+// also useful for filling in the missing generic type
+// when running the VM in standalone mode, without a bound host interface
+pub struct MockHost;
+
+impl MockHost {
+  pub fn new() -> Self {
+    MockHost {}
+  }
+}
+
+impl HostInterface for MockHost {
+  fn account_exists(&self, _addr: &Address) -> bool {
+    true
+  }
+
+  fn get_storage(&self, _addr: &Address, _key: &Bytes32) -> Bytes32 {
+    // return all 1's
+    [1u8; BYTES32_LENGTH]
+  }
+
+  fn set_storage(&mut self, _addr: &Address, _key: &Bytes32, _value: &Bytes32) -> StorageStatus {
+    StorageStatus::StorageAssigned
+  }
+
+  fn get_balance(&self, _addr: &Address) -> u64 {
+    0
+  }
+
+  fn get_tx_context(&self) -> TransactionContext {
+    unimplemented!()
+  }
+
+  fn get_block_hash(&self, _block_height: i64) -> Bytes32 {
+    unimplemented!()
+  }
+
+  fn call(&mut self, _msg: AthenaMessage) -> ExecutionResult {
+    unimplemented!()
+  }
 }

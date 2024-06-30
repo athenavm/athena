@@ -8,8 +8,8 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, MessageKind,
-  StatusCode, StorageStatus, TransactionContext,
+  Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, HostProvider,
+  MessageKind, StatusCode, StorageStatus, TransactionContext,
 };
 use athena_runner::{AthenaVm, Bytes32AsU64, VmInterface};
 
@@ -55,7 +55,9 @@ impl AthconVm for AthenaVMWrapper {
     // Unpack the context
     let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
     let execution_context = AthconExecutionContext::new(host_interface, context);
-    let host = Arc::new(RefCell::new(WrappedHostInterface::new(execution_context)));
+    let host = WrappedHostInterface::new(execution_context);
+    let provider = HostProvider::new(host);
+    let host = Arc::new(RefCell::new(provider));
 
     // Execute the code and proxy the result back to the caller
     let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);

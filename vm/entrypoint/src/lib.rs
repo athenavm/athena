@@ -23,7 +23,6 @@ macro_rules! entrypoint {
     static HEAP: SimpleAlloc = SimpleAlloc;
 
     mod vm_generated_main {
-
       #[no_mangle]
       fn main() {
         super::VM_ENTRY()

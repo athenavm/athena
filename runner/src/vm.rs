@@ -1,15 +1,15 @@
 use std::{cell::RefCell, sync::Arc};
 
 use crate::host::{AthenaCapability, AthenaOption, SetOptionError};
-use athena_interface::{AthenaMessage, ExecutionResult, HostInterface, StatusCode};
+use athena_interface::{AthenaMessage, ExecutionResult, HostInterface, HostProvider, StatusCode};
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
-pub trait VmInterface {
+pub trait VmInterface<T: HostInterface> {
   fn get_capabilities(&self) -> Vec<AthenaCapability>;
   fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
   fn execute(
     &self,
-    host: Arc<RefCell<dyn HostInterface>>,
+    host: Arc<RefCell<HostProvider<T>>>,
     rev: u32,
     msg: AthenaMessage,
     code: &[u8],
@@ -28,7 +28,10 @@ impl AthenaVm {
   }
 }
 
-impl VmInterface for AthenaVm {
+impl<T> VmInterface<T> for AthenaVm
+where
+  T: HostInterface,
+{
   fn get_capabilities(&self) -> Vec<AthenaCapability> {
     vec![]
   }
@@ -39,7 +42,7 @@ impl VmInterface for AthenaVm {
 
   fn execute(
     &self,
-    host: Arc<RefCell<dyn HostInterface>>,
+    host: Arc<RefCell<HostProvider<T>>>,
     _rev: u32,
     msg: AthenaMessage,
     // note: ignore _msg.code, should only be used on deploy
@@ -73,7 +76,10 @@ mod tests {
     }
   }
 
-  impl VmInterface for MockVm {
+  impl<T> VmInterface<T> for MockVm
+  where
+    T: HostInterface,
+  {
     fn get_capabilities(&self) -> Vec<AthenaCapability> {
       vec![]
     }
@@ -84,13 +90,12 @@ mod tests {
 
     fn execute(
       &self,
-      host: Arc<RefCell<dyn HostInterface>>,
+      host: Arc<RefCell<HostProvider<T>>>,
       _rev: u32,
       msg: AthenaMessage,
       _code: &[u8],
     ) -> ExecutionResult {
       // process a few basic messages
-      // let host_interface = host.get_host();
 
       // save context and perform a call
 
@@ -112,11 +117,11 @@ mod tests {
   fn test_vm() {
     // construct a mock host
     let host = MockHost::new(None);
+    let host_provider = HostProvider::new(host);
 
     // construct a mock vm
     let vm = MockVm::new();
-    let host_interface: Arc<RefCell<dyn athena_interface::HostInterface>> =
-      Arc::new(RefCell::new(host));
+    let host_interface = Arc::new(RefCell::new(host_provider));
 
     // test execution
     vm.execute(
