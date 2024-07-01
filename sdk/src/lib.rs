@@ -64,15 +64,16 @@ impl ExecutionClient {
     stdin: AthenaStdin,
     host: Option<Arc<RefCell<HostProvider<T>>>>,
     max_gas: u32,
-  ) -> Result<AthenaPublicValues> {
+  ) -> Result<(AthenaPublicValues, u32)> {
     let program = Program::from(elf);
     let opts =
       AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)]);
     let mut runtime = Runtime::new(program, host, opts);
     runtime.write_vecs(&stdin.buffer);
-    runtime.run()?;
-    Ok(AthenaPublicValues::from(
-      &runtime.state.public_values_stream,
+    let gas_left = runtime.execute().unwrap();
+    Ok((
+      AthenaPublicValues::from(&runtime.state.public_values_stream),
+      gas_left,
     ))
   }
 }

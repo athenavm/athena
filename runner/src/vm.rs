@@ -55,11 +55,11 @@ where
       stdin.write_vec(input_data);
     }
 
-    let output = self
+    let (output, gas_left) = self
       .client
       .execute(&code, stdin, Some(host), msg.gas)
       .unwrap();
-    ExecutionResult::new(StatusCode::Success, 1337, Some(output.to_vec()), None)
+    ExecutionResult::new(StatusCode::Success, gas_left, Some(output.to_vec()), None)
   }
 }
 
