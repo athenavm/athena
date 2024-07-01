@@ -752,7 +752,7 @@ where
 
     // Calculate remaining gas. If we spent too much gas, an error would already have been thrown and
     // we would never reach this code, hence the assertion.
-    let gas_left = self.gas_left();
+    let gas_left = if self.max_gas > 0 { self.gas_left() } else { 0 };
     Ok(u32::try_from(gas_left).expect("Gas conversion error"))
   }
 

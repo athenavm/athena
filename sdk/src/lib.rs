@@ -86,8 +86,10 @@ impl Default for ExecutionClient {
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, sync::Arc};
+
   use crate::{utils, AthenaStdin, ExecutionClient};
-  use athena_interface::MockHost;
+  use athena_interface::{HostProvider, MockHost};
 
   #[test]
   fn test_execute() {
@@ -96,6 +98,28 @@ mod tests {
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
+    client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
+  }
+
+  #[test]
+  fn test_host() {
+    utils::setup_logger();
+    let client = ExecutionClient::new();
+    let elf = include_bytes!("../../tests/host/elf/host-test");
+    let stdin = AthenaStdin::new();
+    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
+    client
+      .execute::<MockHost>(elf, stdin, Some(host), 0)
+      .unwrap();
+  }
+
+  #[test]
+  #[should_panic]
+  fn test_missing_host() {
+    utils::setup_logger();
+    let client = ExecutionClient::new();
+    let elf = include_bytes!("../../tests/host/elf/host-test");
+    let stdin = AthenaStdin::new();
     client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
   }
 
