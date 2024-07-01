@@ -31,3 +31,4 @@ athena-vm = { path = "../vm/entrypoint" }
 
 [features]
 debug = []
+rv32e = []
