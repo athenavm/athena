@@ -56,19 +56,21 @@ impl ExecutionClient {
   /// stdin.write(&10usize);
   ///
   /// // Execute the program on the inputs.
-  /// let public_values = client.execute::<MockHost>(elf, stdin, None).unwrap();
+  /// let public_values = client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
   /// ```
   pub fn execute<T: HostInterface>(
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
     host: Option<Arc<RefCell<HostProvider<T>>>>,
+    max_gas: u32,
   ) -> Result<AthenaPublicValues> {
     let program = Program::from(elf);
-    let opts = AthenaCoreOpts::default();
+    let opts =
+      AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)]);
     let mut runtime = Runtime::new(program, host, opts);
     runtime.write_vecs(&stdin.buffer);
-    runtime.run_untraced()?;
+    runtime.run()?;
     Ok(AthenaPublicValues::from(
       &runtime.state.public_values_stream,
     ))
@@ -93,7 +95,7 @@ mod tests {
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client.execute::<MockHost>(elf, stdin, None).unwrap();
+    client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
   }
 
   #[test]
@@ -104,6 +106,6 @@ mod tests {
     let elf = include_bytes!("../../tests/panic/elf/panic-test");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client.execute::<MockHost>(elf, stdin, None).unwrap();
+    client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
   }
 }

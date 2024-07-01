@@ -64,13 +64,14 @@ pub struct Runtime<T: HostInterface> {
   /// the unconstrained block. The only thing preserved is writes to the input stream.
   pub unconstrained: bool,
 
+  /// Max gas for the runtime. If gas is set to 0, the runtime will not meter gas.
+  pub max_gas: u32,
+
   pub(crate) unconstrained_state: ForkState,
 
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
 
   pub max_syscall_cycles: u32,
-
-  pub emit_events: bool,
 }
 
 #[derive(Error, Debug)]
@@ -81,6 +82,8 @@ pub enum ExecutionError {
   InvalidMemoryAccess(Opcode, u32),
   #[error("unimplemented syscall {0}")]
   UnsupportedSyscall(u32),
+  #[error("out of gas")]
+  OutOfGas(),
   #[error("breakpoint encountered")]
   Breakpoint(),
   #[error("got unimplemented as opcode")]
@@ -95,7 +98,7 @@ where
   pub fn new(
     program: Program,
     host: Option<Arc<RefCell<HostProvider<T>>>>,
-    _opts: AthenaCoreOpts,
+    opts: AthenaCoreOpts,
   ) -> Self {
     // Create a shared reference to the program and host.
     let program = Arc::new(program);
@@ -124,9 +127,9 @@ where
       io_buf: HashMap::new(),
       trace_buf,
       unconstrained: false,
+      max_gas: opts.max_gas(),
       unconstrained_state: ForkState::default(),
       syscall_map,
-      emit_events: true,
       max_syscall_cycles,
     }
   }
@@ -697,6 +700,14 @@ where
     // Increment the clock.
     self.state.global_clk += 1;
 
+    // If there's not enough gas left for another instruction, return an out of gas error.
+    if !self.unconstrained
+      && self.max_gas > 0
+      && self.max_syscall_cycles + self.state.clk > self.max_gas
+    {
+      return Err(ExecutionError::OutOfGas());
+    }
+
     Ok(
       self.state.pc.wrapping_sub(self.program.pc_base)
         >= (self.program.instructions.len() * 4) as u32,
@@ -705,7 +716,6 @@ where
 
   /// Execute up to `self.shard_batch_size` cycles, returning a copy of the prestate and whether the program ended.
   pub fn execute_state(&mut self) -> Result<(ExecutionState, bool), ExecutionError> {
-    self.emit_events = false;
     let state = self.state.clone();
     let done = self.execute()?;
     Ok((state, done))
@@ -728,31 +738,23 @@ where
     tracing::info!("starting execution");
   }
 
-  pub fn run_untraced(&mut self) -> Result<(), ExecutionError> {
-    self.emit_events = false;
-    while !self.execute()? {}
-    Ok(())
-  }
-
   pub fn run(&mut self) -> Result<(), ExecutionError> {
-    self.emit_events = true;
     while !self.execute()? {}
     Ok(())
   }
 
   pub fn dry_run(&mut self) {
-    self.emit_events = false;
     while !self.execute().unwrap() {}
   }
 
-  /// Executes up to `self.shard_batch_size` cycles of the program, returning whether the program has finished.
+  /// Execute a cycle of the program, returning whether the program has finished.
   fn execute(&mut self) -> Result<bool, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
       self.initialize();
     }
 
-    // Loop until we've executed `self.shard_batch_size` shards if `self.shard_batch_size` is set.
+    // Execute one instruction and return whether the program is finished or not
     loop {
       return if self.execute_cycle()? {
         self.postprocess();
@@ -765,7 +767,8 @@ where
 
   fn postprocess(&mut self) {
     tracing::info!(
-      "finished execution clk = {} pc = 0x{:x?}",
+      "finished execution clk = {} global_clk = {} pc = 0x{:x?}",
+      self.state.clk,
       self.state.global_clk,
       self.state.pc
     );
@@ -800,6 +803,10 @@ pub mod tests {
 
   use std::{cell::RefCell, sync::Arc};
 
+  use crate::{
+    runtime::ExecutionError,
+    utils::{self, with_max_gas},
+  };
   use athena_interface::{HostProvider, MockHost};
 
   use crate::{
@@ -851,6 +858,7 @@ pub mod tests {
 
   #[test]
   fn test_host() {
+    utils::setup_logger();
     let program = host_program();
     let host = MockHost::new();
     let provider = HostProvider::new(host);
@@ -858,6 +866,42 @@ pub mod tests {
       program,
       Some(Arc::new(RefCell::new(provider))),
       AthenaCoreOpts::default(),
+    );
+    runtime.run().unwrap();
+  }
+
+  #[test]
+  fn test_host_gas() {
+    let program = host_program();
+    let host = MockHost::new();
+    let provider = HostProvider::new(host);
+    let provider = Arc::new(RefCell::new(provider));
+
+    // program should cost 4332 gas units
+
+    // failure
+    let mut runtime = Runtime::<MockHost>::new(
+      program.clone(),
+      Some(provider.clone()),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(4331)]),
+    );
+    assert!(matches!(runtime.run(), Err(ExecutionError::OutOfGas())));
+
+    // success
+    runtime = Runtime::<MockHost>::new(
+      program.clone(),
+      Some(provider.clone()),
+      // program should cost 4332 gas units
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(4332)]),
+    );
+    runtime.run().unwrap();
+
+    // success
+    runtime = Runtime::<MockHost>::new(
+      program.clone(),
+      Some(provider.clone()),
+      // program should cost 4332 gas units
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(4333)]),
     );
     runtime.run().unwrap();
   }

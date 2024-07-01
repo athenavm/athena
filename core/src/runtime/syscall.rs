@@ -103,10 +103,6 @@ where
     }
   }
 
-  pub fn current_channel(&self) -> u32 {
-    self.rt.state.channel
-  }
-
   pub fn mr(&mut self, addr: u32) -> (MemoryReadRecord, u32) {
     let record = self.rt.mr(addr, self.clk);
     (record, record.value)

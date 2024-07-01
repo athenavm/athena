@@ -72,7 +72,8 @@ where
 
     if !self.unconstrained && self.state.global_clk % 10_000_000 == 0 {
       log::info!(
-        "clk = {} pc = 0x{:x?}",
+        "clk = {} global_clk = {} pc = 0x{:x?}",
+        self.state.clk,
         self.state.global_clk,
         self.state.pc
       );

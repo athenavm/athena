@@ -54,7 +54,11 @@ where
     if let Some(input_data) = msg.input_data {
       stdin.write_vec(input_data);
     }
-    let output = self.client.execute(&code, stdin, Some(host)).unwrap();
+
+    let output = self
+      .client
+      .execute(&code, stdin, Some(host), msg.gas)
+      .unwrap();
     ExecutionResult::new(StatusCode::Success, 1337, Some(output.to_vec()), None)
   }
 }

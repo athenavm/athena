@@ -144,7 +144,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: item.depth,
-      gas: item.gas,
+      gas: u32::try_from(item.gas).expect("Gas value out of range"),
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
@@ -170,7 +170,7 @@ impl From<AthenaMessageWrapper> for ffi::athcon_message {
     ffi::athcon_message {
       kind,
       depth: item.0.depth,
-      gas: item.0.gas,
+      gas: item.0.gas as i64,
       recipient: AddressWrapper(item.0.recipient).into(),
       sender: AddressWrapper(item.0.sender).into(),
       input_data,
@@ -196,7 +196,7 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: item.depth(),
-      gas: item.gas(),
+      gas: u32::try_from(item.gas()).expect("Gas value out of range"),
       recipient: AddressWrapper::from(*item.recipient()).into(),
       sender: AddressWrapper::from(*item.sender()).into(),
       input_data: item.input().cloned(),
@@ -286,7 +286,7 @@ impl From<AthconExecutionResult> for ExecutionResultWrapper {
   fn from(result: AthconExecutionResult) -> Self {
     ExecutionResultWrapper(ExecutionResult::new(
       StatusCodeWrapper::from(result.status_code()).into(),
-      result.gas_left(),
+      u32::try_from(result.gas_left()).expect("Gas value out of range"),
       result.output().cloned(),
       result
         .create_address()
@@ -315,7 +315,7 @@ impl From<ExecutionResultWrapper> for ffi::athcon_result {
       core::ptr::NonNull::<u8>::dangling().as_ptr()
     };
 
-    let gas_left = value.0.gas_left;
+    let gas_left = value.0.gas_left as i64;
     let create_address = value.0.create_address.map_or_else(
       || ffi::athcon_address::default(),
       |address| AddressWrapper(address).into(),
