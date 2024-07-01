@@ -21,8 +21,22 @@ Athena includes a virtual machine (VM) based on the RISC-V ISA, including suppor
 - **Interoperability**: At this time Athena is not intended to interoperate with, or target, other blockchain VMs.
 - **Full System Emulation**: Athena is not intended to run an operating system or standard application binaries. Try https://github.com/d0iasm/rvemu.
 
+## Progress
+
+Athena is currently in a prototype stage. The goal of this stage of the project is to create a working, end to end proof of concept VM that successfully and securely executes transactions on a testnet. We also intend to test proving these transactions in ZK. Here's a map of the immediate goals and progress. See the [Project boards][12] for more up to date progress.
+
+| Phase | Description | Status | Report |
+| ----- | ----------- | ------ | ------ |
+| 0. Initial R&D | Study the status quo, finalize prototype design | ✅ | [read][13] |
+| 1. Prototype VM | Build a VM that can compile and run RISC-V code | ✅ | [read][14] |
+| 2. Blockchain integration | Add FFI and support for host functions, gas metering, etc. | 🚧 | coming soon |
+| 3. go-spacemesh integration | Prototype integration into the go-spacemesh full node | ⛔ | |
+| 4. Testnet launch | Launch a testnet where Athena smart contracts can be tested | ⛔ | |
+| 5. Mechanism/rollup design | Turn Athena into an optimistic rollup with incentives, punishments, etc. | ⛔ | |
+| 6. Succintness/ZK proving | Prototype ZK rollup | ⛔ | |
+
 ## Acknowledgements
-The overall project structure and a large portion of the core code was copied from [SP1][4] under the MIT license with gratitude. Other projects that have been influential on the Athena design include [RiscZero][5] and [PolkaVM][6].
+The overall project structure and a large portion of the core code was copied from [SP1][4] under the MIT license with gratitude. Other projects that have been influential on the Athena design include [RiscZero][5] and [PolkaVM][6]. See [ATTRIBUTIONS.md][11] for others.
 
 ## License
 This project is dual-licensed under both the Apache and MIT Licenses, at your option. Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions. See [Rationale of Apache dual licensing][7].
@@ -40,3 +54,7 @@ This project is dual-licensed under both the Apache and MIT Licenses, at your op
 [8]: https://spacemesh.io/
 [9]: https://www.athenavm.org/athena/update/2024/06/14/june-project-update.html#ecosystem
 [10]: https://five-embeddev.com/riscv-user-isa-manual/Priv-v1.12/rv32.html#rv32
+[11]: ATTRIBUTIONS.md
+[12]: https://github.com/athenavm/athena/projects?query=is%3Aopen
+[13]: https://www.athenavm.org/athena/update/2024/05/09/project-update.html
+[14]: https://www.athenavm.org/athena/update/2024/06/14/june-project-update.html
