@@ -1,17 +1,12 @@
-// use athena_interface::{Address, Bytes32};
-
-cfg_if::cfg_if! {
-    if #[cfg(target_os = "zkvm")] {
-        use core::arch::asm;
-    }
-}
+#[cfg(target_os = "zkvm")]
+use core::arch::asm;
 
 /// Read from host storage at the given address and key.
 ///
 /// The output is stored in the `key` pointer.
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern "C" fn host_read_storage(key: *mut u32, address: *const u32) {
+pub extern "C" fn read_storage(key: *mut u32, address: *const u32) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
@@ -31,7 +26,7 @@ pub extern "C" fn host_read_storage(key: *mut u32, address: *const u32) {
 /// The result status code is stored in the `key` pointer.
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern "C" fn host_write_storage(key: *mut u32, address: *const u32, value: *const u32) {
+pub extern "C" fn write_storage(key: *mut u32, address: *const u32, value: *const u32) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(

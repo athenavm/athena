@@ -121,6 +121,9 @@ pub struct AthenaMessage {
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
   pub value: Balance,
+  // code is currently unused, and it seems redundant.
+  // it's not in the yellow paper.
+  // TODO: remove me?
   pub code: Vec<u8>,
 }
 

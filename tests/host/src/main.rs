@@ -14,13 +14,11 @@ pub fn main() {
   let value = [16843009u32; 8];
 
   // result will be written to key, overwriting input value
-  unsafe {
-    athena_vm::host::host_write_storage(key.as_mut_ptr(), address.as_ptr(), value.as_ptr())
-  };
-  assert_eq!(key, [0u32; 8], "host_write_storage failed");
+  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), address.as_ptr(), value.as_ptr()) };
+  assert_eq!(key, [0u32; 8], "write_storage failed");
 
   // result will be written to key, overwriting input value
-  unsafe { athena_vm::host::host_read_storage(key2.as_mut_ptr(), address.as_ptr()) };
-  assert_eq!(value, key2, "host_read_storage failed");
+  unsafe { athena_vm::host::read_storage(key2.as_mut_ptr(), address.as_ptr()) };
+  assert_eq!(value, key2, "read_storage failed");
   println!("success");
 }
