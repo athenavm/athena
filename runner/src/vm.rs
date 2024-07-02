@@ -118,14 +118,69 @@ mod tests {
   }
 
   #[test]
-  fn test_vm() {
+  #[should_panic]
+  fn test_empty_code() {
     // construct a mock host
     let host = MockHost::new(None);
     let host_provider = HostProvider::new(host);
+    let host_interface = Arc::new(RefCell::new(host_provider));
+
+    // construct a vm
+    AthenaVm::new().execute(
+      host_interface,
+      0,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000,
+        Address::default(),
+        Address::default(),
+        None,
+        Balance::default(),
+        vec![],
+      ),
+      &[],
+    );
+  }
+
+  // #[test]
+  // fn test_minimal_elf() {
+  //   // construct a mock host
+  //   let host = MockHost::new(None);
+  //   let host_provider = HostProvider::new(host);
+  //   let host_interface = Arc::new(RefCell::new(host_provider));
+
+  //   // construct a vm
+  //   let vm = AthenaVm::new();
+
+  //   let execution_result = vm.execute(
+  //     host_interface,
+  //     0,
+  //     AthenaMessage::new(
+  //       MessageKind::Call,
+  //       0,
+  //       1000,
+  //       Address::default(),
+  //       Address::default(),
+  //       None,
+  //       Balance::default(),
+  //       vec![],
+  //     ),
+  //     include_bytes!("../../tests/minimal/elf/minimal-test.elf"),
+  //   );
+  //   assert_eq!(execution_result.gas_left, 1000);
+  //   assert_eq!(execution_result.status_code, StatusCode::Success);
+  // }
+
+  #[test]
+  fn test_mock_vm() {
+    // construct a mock host
+    let host = MockHost::new(None);
+    let host_provider = HostProvider::new(host);
+    let host_interface = Arc::new(RefCell::new(host_provider));
 
     // construct a mock vm
     let vm = MockVm::new();
-    let host_interface = Arc::new(RefCell::new(host_provider));
 
     // test execution
     vm.execute(
