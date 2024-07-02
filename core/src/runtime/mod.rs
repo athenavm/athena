@@ -65,7 +65,7 @@ pub struct Runtime<T: HostInterface> {
   pub unconstrained: bool,
 
   /// Max gas for the runtime. If gas is set to 0, the runtime will not meter gas.
-  pub max_gas: u32,
+  pub max_gas: Option<u32>,
 
   pub(crate) unconstrained_state: ForkState,
 
@@ -702,8 +702,10 @@ where
 
     // We're allowed to spend all of our gas, but no more.
     // Gas checking is "lazy" here: it happens _after_ the instruction is executed.
-    if !self.unconstrained && self.max_gas > 0 && self.gas_left() < 0 {
-      return Err(ExecutionError::OutOfGas());
+    if let Some(gas_left) = self.gas_left() {
+      if !self.unconstrained && gas_left < 0 {
+        return Err(ExecutionError::OutOfGas());
+      }
     }
 
     Ok(
@@ -712,9 +714,11 @@ where
     )
   }
 
-  fn gas_left(&self) -> i64 {
+  fn gas_left(&self) -> Option<i64> {
     // gas left can be negative, if we spent too much on the last instruction
-    self.max_gas as i64 - self.state.clk as i64
+    return self
+      .max_gas
+      .map(|max_gas| max_gas as i64 - self.state.clk as i64);
   }
 
   fn initialize(&mut self) {
@@ -735,7 +739,7 @@ where
   }
 
   /// Execute the program, returning remaining gas. Execution will either complete or produce an error.
-  pub fn execute(&mut self) -> Result<u32, ExecutionError> {
+  pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
       self.initialize();
@@ -752,8 +756,11 @@ where
 
     // Calculate remaining gas. If we spent too much gas, an error would already have been thrown and
     // we would never reach this code, hence the assertion.
-    let gas_left = if self.max_gas > 0 { self.gas_left() } else { 0 };
-    Ok(u32::try_from(gas_left).expect("Gas conversion error"))
+    Ok(
+      self
+        .gas_left()
+        .map(|gas_left| u32::try_from(gas_left).expect("Gas conversion error")),
+    )
   }
 
   fn postprocess(&mut self) {
@@ -858,7 +865,8 @@ pub mod tests {
       Some(Arc::new(RefCell::new(provider))),
       AthenaCoreOpts::default(),
     );
-    runtime.execute().unwrap();
+    let gas_left = runtime.execute().unwrap();
+    assert_eq!(gas_left, None);
   }
 
   #[test]
@@ -886,7 +894,7 @@ pub mod tests {
       AthenaCoreOpts::default().with_options(vec![with_max_gas(4332)]),
     );
     let gas_left = runtime.execute().unwrap();
-    assert_eq!(gas_left, 0);
+    assert_eq!(gas_left, Some(0));
 
     // success
     runtime = Runtime::<MockHost>::new(
@@ -896,7 +904,7 @@ pub mod tests {
       AthenaCoreOpts::default().with_options(vec![with_max_gas(4333)]),
     );
     let gas_left = runtime.execute().unwrap();
-    assert_eq!(gas_left, 1);
+    assert_eq!(gas_left, Some(1));
   }
 
   #[test]

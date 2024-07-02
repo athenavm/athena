@@ -493,7 +493,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     let message = ::athcon_sys::athcon_message {
       kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
       depth: 0,
-      gas: 0,
+      gas: 10000,
       recipient: ::athcon_sys::athcon_address::default(),
       sender: ::athcon_sys::athcon_address::default(),
       input_data: std::ptr::null(),

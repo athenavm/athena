@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, Copy)]
 pub struct AthenaCoreOpts {
-  max_gas: u32,
+  max_gas: Option<u32>,
 }
 
 impl AthenaCoreOpts {
@@ -16,20 +16,20 @@ impl AthenaCoreOpts {
     self
   }
 
-  pub fn max_gas(&self) -> u32 {
+  pub fn max_gas(&self) -> Option<u32> {
     self.max_gas
   }
 }
 
 impl Default for AthenaCoreOpts {
   fn default() -> Self {
-    Self { max_gas: 0 }
+    Self { max_gas: None }
   }
 }
 
 // Functional option for gas_metering
 pub fn with_max_gas(value: u32) -> impl FnOnce(&mut AthenaCoreOpts) {
   move |opts: &mut AthenaCoreOpts| {
-    opts.max_gas = value;
+    opts.max_gas = Some(value);
   }
 }

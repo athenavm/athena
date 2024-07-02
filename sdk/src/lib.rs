@@ -56,18 +56,22 @@ impl ExecutionClient {
   /// stdin.write(&10usize);
   ///
   /// // Execute the program on the inputs.
-  /// let public_values = client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
+  /// let (public_values, gas_left) = client.execute::<MockHost>(elf, stdin, None, None).unwrap();
   /// ```
   pub fn execute<T: HostInterface>(
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
     host: Option<Arc<RefCell<HostProvider<T>>>>,
-    max_gas: u32,
-  ) -> Result<(AthenaPublicValues, u32)> {
+    max_gas: Option<u32>,
+  ) -> Result<(AthenaPublicValues, Option<u32>)> {
     let program = Program::from(elf);
-    let opts =
-      AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)]);
+    let opts = match max_gas {
+      None => AthenaCoreOpts::default(),
+      Some(max_gas) => {
+        AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)])
+      }
+    };
     let mut runtime = Runtime::new(program, host, opts);
     runtime.write_vecs(&stdin.buffer);
     let gas_left = runtime.execute().unwrap();
@@ -98,7 +102,7 @@ mod tests {
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
+    client.execute::<MockHost>(elf, stdin, None, None).unwrap();
   }
 
   #[test]
@@ -109,7 +113,7 @@ mod tests {
     let stdin = AthenaStdin::new();
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
     client
-      .execute::<MockHost>(elf, stdin, Some(host), 0)
+      .execute::<MockHost>(elf, stdin, Some(host), None)
       .unwrap();
   }
 
@@ -120,7 +124,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
-    client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
+    client.execute::<MockHost>(elf, stdin, None, None).unwrap();
   }
 
   #[test]
@@ -131,6 +135,6 @@ mod tests {
     let elf = include_bytes!("../../tests/panic/elf/panic-test");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client.execute::<MockHost>(elf, stdin, None, 0).unwrap();
+    client.execute::<MockHost>(elf, stdin, None, None).unwrap();
   }
 }
