@@ -89,7 +89,7 @@ pub mod tests {
     let points = points();
     runtime.write_stdin(&points.0);
     runtime.write_stdin(&points.1);
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     let added_point = runtime.read_public_values::<MyPointUnaligned>();
     assert_eq!(
       added_point,

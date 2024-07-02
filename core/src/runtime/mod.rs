@@ -64,13 +64,14 @@ pub struct Runtime<T: HostInterface> {
   /// the unconstrained block. The only thing preserved is writes to the input stream.
   pub unconstrained: bool,
 
+  /// Max gas for the runtime. If gas is set to 0, the runtime will not meter gas.
+  pub max_gas: Option<u32>,
+
   pub(crate) unconstrained_state: ForkState,
 
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
 
   pub max_syscall_cycles: u32,
-
-  pub emit_events: bool,
 }
 
 #[derive(Error, Debug)]
@@ -81,6 +82,8 @@ pub enum ExecutionError {
   InvalidMemoryAccess(Opcode, u32),
   #[error("unimplemented syscall {0}")]
   UnsupportedSyscall(u32),
+  #[error("out of gas")]
+  OutOfGas(),
   #[error("breakpoint encountered")]
   Breakpoint(),
   #[error("got unimplemented as opcode")]
@@ -95,7 +98,7 @@ where
   pub fn new(
     program: Program,
     host: Option<Arc<RefCell<HostProvider<T>>>>,
-    _opts: AthenaCoreOpts,
+    opts: AthenaCoreOpts,
   ) -> Self {
     // Create a shared reference to the program and host.
     let program = Arc::new(program);
@@ -124,9 +127,9 @@ where
       io_buf: HashMap::new(),
       trace_buf,
       unconstrained: false,
+      max_gas: opts.max_gas(),
       unconstrained_state: ForkState::default(),
       syscall_map,
-      emit_events: true,
       max_syscall_cycles,
     }
   }
@@ -697,18 +700,25 @@ where
     // Increment the clock.
     self.state.global_clk += 1;
 
+    // We're allowed to spend all of our gas, but no more.
+    // Gas checking is "lazy" here: it happens _after_ the instruction is executed.
+    if let Some(gas_left) = self.gas_left() {
+      if !self.unconstrained && gas_left < 0 {
+        return Err(ExecutionError::OutOfGas());
+      }
+    }
+
     Ok(
       self.state.pc.wrapping_sub(self.program.pc_base)
         >= (self.program.instructions.len() * 4) as u32,
     )
   }
 
-  /// Execute up to `self.shard_batch_size` cycles, returning a copy of the prestate and whether the program ended.
-  pub fn execute_state(&mut self) -> Result<(ExecutionState, bool), ExecutionError> {
-    self.emit_events = false;
-    let state = self.state.clone();
-    let done = self.execute()?;
-    Ok((state, done))
+  fn gas_left(&self) -> Option<i64> {
+    // gas left can be negative, if we spent too much on the last instruction
+    return self
+      .max_gas
+      .map(|max_gas| max_gas as i64 - self.state.clk as i64);
   }
 
   fn initialize(&mut self) {
@@ -728,44 +738,35 @@ where
     tracing::info!("starting execution");
   }
 
-  pub fn run_untraced(&mut self) -> Result<(), ExecutionError> {
-    self.emit_events = false;
-    while !self.execute()? {}
-    Ok(())
-  }
-
-  pub fn run(&mut self) -> Result<(), ExecutionError> {
-    self.emit_events = true;
-    while !self.execute()? {}
-    Ok(())
-  }
-
-  pub fn dry_run(&mut self) {
-    self.emit_events = false;
-    while !self.execute().unwrap() {}
-  }
-
-  /// Executes up to `self.shard_batch_size` cycles of the program, returning whether the program has finished.
-  fn execute(&mut self) -> Result<bool, ExecutionError> {
+  /// Execute the program, returning remaining gas. Execution will either complete or produce an error.
+  pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
       self.initialize();
     }
 
-    // Loop until we've executed `self.shard_batch_size` shards if `self.shard_batch_size` is set.
+    // Loop until program finishes execution or until an error occurs, whichever comes first
     loop {
-      return if self.execute_cycle()? {
-        self.postprocess();
-        Ok(true)
-      } else {
-        Ok(false)
-      };
+      if self.execute_cycle()? {
+        break;
+      }
     }
+
+    self.postprocess();
+
+    // Calculate remaining gas. If we spent too much gas, an error would already have been thrown and
+    // we would never reach this code, hence the assertion.
+    Ok(
+      self
+        .gas_left()
+        .map(|gas_left| u32::try_from(gas_left).expect("Gas conversion error")),
+    )
   }
 
   fn postprocess(&mut self) {
     tracing::info!(
-      "finished execution clk = {} pc = 0x{:x?}",
+      "finished execution clk = {} global_clk = {} pc = 0x{:x?}",
+      self.state.clk,
       self.state.global_clk,
       self.state.pc
     );
@@ -800,6 +801,10 @@ pub mod tests {
 
   use std::{cell::RefCell, sync::Arc};
 
+  use crate::{
+    runtime::ExecutionError,
+    utils::{self, with_max_gas},
+  };
   use athena_interface::{HostProvider, MockHost};
 
   use crate::{
@@ -837,7 +842,7 @@ pub mod tests {
   fn test_simple_program_run() {
     let program = simple_program();
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 42);
   }
 
@@ -846,11 +851,12 @@ pub mod tests {
   fn test_panic() {
     let program = panic_program();
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
   }
 
   #[test]
   fn test_host() {
+    utils::setup_logger();
     let program = host_program();
     let host = MockHost::new();
     let provider = HostProvider::new(host);
@@ -859,7 +865,46 @@ pub mod tests {
       Some(Arc::new(RefCell::new(provider))),
       AthenaCoreOpts::default(),
     );
-    runtime.run().unwrap();
+    let gas_left = runtime.execute().unwrap();
+    assert_eq!(gas_left, None);
+  }
+
+  #[test]
+  fn test_host_gas() {
+    let program = host_program();
+    let host = MockHost::new();
+    let provider = HostProvider::new(host);
+    let provider = Arc::new(RefCell::new(provider));
+
+    // program should cost 4332 gas units
+
+    // failure
+    let mut runtime = Runtime::<MockHost>::new(
+      program.clone(),
+      Some(provider.clone()),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(4331)]),
+    );
+    assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
+
+    // success
+    runtime = Runtime::<MockHost>::new(
+      program.clone(),
+      Some(provider.clone()),
+      // program should cost 4332 gas units
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(4332)]),
+    );
+    let gas_left = runtime.execute().unwrap();
+    assert_eq!(gas_left, Some(0));
+
+    // success
+    runtime = Runtime::<MockHost>::new(
+      program.clone(),
+      Some(provider.clone()),
+      // program should cost 4332 gas units
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(4333)]),
+    );
+    let gas_left = runtime.execute().unwrap();
+    assert_eq!(gas_left, Some(1));
   }
 
   #[test]
@@ -875,7 +920,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 42);
   }
 
@@ -892,7 +937,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 32);
   }
 
@@ -909,7 +954,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 32);
   }
 
@@ -927,7 +972,7 @@ pub mod tests {
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
 
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 37);
   }
 
@@ -944,7 +989,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 5);
   }
 
@@ -961,7 +1006,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1184);
   }
 
@@ -978,7 +1023,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1);
   }
 
@@ -995,7 +1040,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1);
   }
 
@@ -1012,7 +1057,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
 
@@ -1029,7 +1074,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
 
@@ -1046,7 +1091,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 84);
   }
 
@@ -1062,7 +1107,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 5 - 1 + 4);
   }
 
@@ -1078,7 +1123,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 10);
   }
 
@@ -1094,7 +1139,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 47);
   }
 
@@ -1110,7 +1155,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
 
@@ -1124,7 +1169,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 80);
   }
 
@@ -1138,7 +1183,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 2);
   }
 
@@ -1152,7 +1197,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 2);
   }
 
@@ -1166,7 +1211,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
 
@@ -1180,7 +1225,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
 
@@ -1199,7 +1244,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.registers()[Register::X5 as usize], 8);
     assert_eq!(runtime.registers()[Register::X11 as usize], 100);
     assert_eq!(runtime.state.pc, 108);
@@ -1213,7 +1258,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
     assert_eq!(runtime.registers()[Register::X12 as usize], expected);
   }
 
@@ -1431,7 +1476,7 @@ pub mod tests {
   fn test_simple_memory_program_run() {
     let program = simple_memory_program();
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
-    runtime.run().unwrap();
+    runtime.execute().unwrap();
 
     // Assert SW & LW case
     assert_eq!(runtime.register(Register::X28), 0x12348765);
