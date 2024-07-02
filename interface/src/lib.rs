@@ -116,7 +116,7 @@ pub enum MessageKind {
 pub struct AthenaMessage {
   pub kind: MessageKind,
   pub depth: i32,
-  pub gas: i64,
+  pub gas: u32,
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
@@ -128,7 +128,7 @@ impl AthenaMessage {
   pub fn new(
     kind: MessageKind,
     depth: i32,
-    gas: i64,
+    gas: u32,
     recipient: Address,
     sender: Address,
     input_data: Option<Vec<u8>>,
@@ -190,7 +190,7 @@ impl fmt::Display for StatusCode {
 #[derive(Debug)]
 pub struct ExecutionResult {
   pub status_code: StatusCode,
-  pub gas_left: i64,
+  pub gas_left: u32,
   pub output: Option<Vec<u8>>,
   pub create_address: Option<Address>,
 }
@@ -198,7 +198,7 @@ pub struct ExecutionResult {
 impl ExecutionResult {
   pub fn new(
     status_code: StatusCode,
-    gas_left: i64,
+    gas_left: u32,
     output: Option<Vec<u8>>,
     create_address: Option<Address>,
   ) -> Self {
