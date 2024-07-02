@@ -355,6 +355,7 @@ where
 
   /// Fetch the instruction at the current program counter.
   fn fetch(&self) -> Instruction {
+    assert!(self.state.pc >= self.program.pc_start);
     let idx = ((self.state.pc - self.program.pc_base) / 4) as usize;
     self.program.instructions[idx]
   }
@@ -805,7 +806,7 @@ pub mod tests {
   use crate::{
     runtime::Register,
     utils::{
-      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF},
+      tests::{TEST_FIBONACCI_ELF, TEST_HOST_ELF, TEST_PANIC_ELF},
       AthenaCoreOpts,
     },
   };
@@ -830,7 +831,7 @@ pub mod tests {
   }
 
   pub fn host_program() -> Program {
-    Program::from(TEST_HOST)
+    Program::from(TEST_HOST_ELF)
   }
 
   #[test]
