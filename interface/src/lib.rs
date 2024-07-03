@@ -2,6 +2,9 @@
 //!
 //! A library with no external dependencies that includes core types and traits.
 
+mod context;
+pub use context::*;
+
 use std::{
   fmt,
   ops::{Deref, DerefMut},
@@ -115,7 +118,7 @@ pub enum MessageKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AthenaMessage {
   pub kind: MessageKind,
-  pub depth: i32,
+  pub depth: u32,
   pub gas: u32,
   pub recipient: Address,
   pub sender: Address,
@@ -130,7 +133,7 @@ pub struct AthenaMessage {
 impl AthenaMessage {
   pub fn new(
     kind: MessageKind,
-    depth: i32,
+    depth: u32,
     gas: u32,
     recipient: Address,
     sender: Address,
@@ -152,6 +155,7 @@ impl AthenaMessage {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u32)]
 pub enum StatusCode {
   Success,
   Failure,

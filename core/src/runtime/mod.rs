@@ -30,7 +30,7 @@ use thiserror::Error;
 
 use crate::utils::AthenaCoreOpts;
 
-use athena_interface::{HostInterface, HostProvider};
+use athena_interface::{AthenaContext, HostInterface, HostProvider};
 
 /// An implementation of a runtime for the Athena RISC-V VM.
 ///
@@ -42,6 +42,9 @@ use athena_interface::{HostInterface, HostProvider};
 pub struct Runtime<T: HostInterface> {
   /// The program.
   pub program: Arc<Program>,
+
+  /// Runtime context.
+  pub context: Option<AthenaContext>,
 
   /// The state of the execution.
   pub state: ExecutionState,
@@ -99,6 +102,7 @@ where
     program: Program,
     host: Option<Arc<RefCell<HostProvider<T>>>>,
     opts: AthenaCoreOpts,
+    context: Option<AthenaContext>,
   ) -> Self {
     // Create a shared reference to the program and host.
     let program = Arc::new(program);
@@ -120,6 +124,7 @@ where
       .unwrap_or(0);
 
     Self {
+      context,
       state: ExecutionState::new(program.pc_start),
       program,
       host,
@@ -714,7 +719,7 @@ where
     )
   }
 
-  fn gas_left(&self) -> Option<i64> {
+  pub(crate) fn gas_left(&self) -> Option<i64> {
     // gas left can be negative, if we spent too much on the last instruction
     return self
       .max_gas

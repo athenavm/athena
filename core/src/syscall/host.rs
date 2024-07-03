@@ -1,6 +1,7 @@
 use crate::runtime::{Register, Syscall, SyscallContext};
 use athena_interface::{
-  AddressWrapper, Bytes32Wrapper, HostInterface, ADDRESS_LENGTH, BYTES32_LENGTH,
+  AddressWrapper, AthenaMessage, Bytes32Wrapper, HostInterface, MessageKind, ADDRESS_LENGTH,
+  BYTES32_LENGTH,
 };
 
 pub struct SyscallHostRead;
@@ -71,6 +72,69 @@ where
     let mut status_word = [0u32; 8];
     status_word[0] = status_code as u32;
     ctx.mw_slice(arg1, &status_word);
+    None
+  }
+}
+
+pub struct SyscallHostCall;
+
+impl SyscallHostCall {
+  pub const fn new() -> Self {
+    Self
+  }
+}
+
+impl<T> Syscall<T> for SyscallHostCall
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+    // make sure we have a runtime context
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
+    let host = ctx.rt.host.as_mut().expect("Missing host interface");
+
+    // get remaining gas
+    // note: this does not factor in the cost of the current instruction
+    let gas_left = ctx.rt.gas_left().expect("Missing gas information");
+
+    // note: the host is responsible for checking stack depth, not us
+
+    // marshal inputs
+    let address_words = ADDRESS_LENGTH / 4;
+    let address = ctx.slice_unsafe(arg1, address_words);
+    let address = AddressWrapper::from(address);
+
+    // we need to read the input length from the next register
+    let a2 = Register::X12;
+    let rt = &mut ctx.rt;
+    let len = rt.register(a2) as usize;
+    // let len = ctx.word_unsafe(len_ptr);
+
+    // `len` is denominated in number of bytes; we read words in chunks of four bytes
+    let input = ctx.slice_unsafe(arg2, len / 4);
+
+    // construct the outbound message
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      athena_ctx.depth() + 1,
+      u32::try_from(gas_left).expect("Invalid gas left"),
+      address.into(),
+      athena_ctx.address().clone(),
+      None,
+      0,
+      Vec::new(),
+    );
+    let result = host.borrow_mut().call(msg);
+
+    // save return code
+    let mut status_word = [0u32; 8];
+    status_word[0] = result.status_code as u32;
+    ctx.mw_slice(arg1, &status_word);
+
     None
   }
 }
