@@ -30,7 +30,7 @@ use thiserror::Error;
 
 use crate::utils::AthenaCoreOpts;
 
-use athena_interface::{AthenaContext, HostInterface, HostProvider};
+use athena_interface::{AthenaContext, HostInterface, HostProvider, StatusCode};
 
 /// An implementation of a runtime for the Athena RISC-V VM.
 ///
@@ -81,6 +81,8 @@ pub struct Runtime<T: HostInterface> {
 pub enum ExecutionError {
   #[error("execution failed with exit code {0}")]
   HaltWithNonZeroExitCode(u32),
+  #[error("host call failed with status code {0}")]
+  HostCallFailed(StatusCode),
   #[error("invalid memory access for opcode {0} and address {1}")]
   InvalidMemoryAccess(Opcode, u32),
   #[error("unimplemented syscall {0}")]
@@ -141,7 +143,7 @@ where
 
   /// Recover runtime state from a program and existing execution state.
   pub fn recover(program: Program, state: ExecutionState, opts: AthenaCoreOpts) -> Self {
-    let mut runtime = Self::new(program, None, opts);
+    let mut runtime = Self::new(program, None, opts, None);
     runtime.state = state;
     runtime
   }
@@ -592,6 +594,13 @@ where
               a = syscall_id;
             }
 
+            // Check for failure from the call host function.
+            if syscall == SyscallCode::HOST_CALL {
+              let return_code = res.unwrap();
+              let status_code = StatusCode::try_from(return_code).unwrap();
+              return Err(ExecutionError::HostCallFailed(status_code));
+            }
+
             // If the syscall is `HALT` and the exit code is non-zero, return an error.
             if syscall == SyscallCode::HALT && precompile_rt.exit_code != 0 {
               return Err(ExecutionError::HaltWithNonZeroExitCode(
@@ -846,7 +855,7 @@ pub mod tests {
   #[test]
   fn test_simple_program_run() {
     let program = simple_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 42);
   }
@@ -855,7 +864,7 @@ pub mod tests {
   #[should_panic]
   fn test_panic() {
     let program = panic_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
   }
 
@@ -869,6 +878,7 @@ pub mod tests {
       program,
       Some(Arc::new(RefCell::new(provider))),
       AthenaCoreOpts::default(),
+      None,
     );
     let gas_left = runtime.execute().unwrap();
     assert_eq!(gas_left, None);
@@ -888,6 +898,7 @@ pub mod tests {
       program.clone(),
       Some(provider.clone()),
       AthenaCoreOpts::default().with_options(vec![with_max_gas(4331)]),
+      None,
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
 
@@ -897,6 +908,7 @@ pub mod tests {
       Some(provider.clone()),
       // program should cost 4332 gas units
       AthenaCoreOpts::default().with_options(vec![with_max_gas(4332)]),
+      None,
     );
     let gas_left = runtime.execute().unwrap();
     assert_eq!(gas_left, Some(0));
@@ -907,6 +919,7 @@ pub mod tests {
       Some(provider.clone()),
       // program should cost 4332 gas units
       AthenaCoreOpts::default().with_options(vec![with_max_gas(4333)]),
+      None,
     );
     let gas_left = runtime.execute().unwrap();
     assert_eq!(gas_left, Some(1));
@@ -924,7 +937,7 @@ pub mod tests {
       Instruction::new(Opcode::ADD, 31, 30, 29, false, false),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 42);
   }
@@ -941,7 +954,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 32);
   }
@@ -958,7 +971,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 32);
   }
@@ -975,7 +988,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
 
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 37);
@@ -993,7 +1006,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 5);
   }
@@ -1010,7 +1023,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1184);
   }
@@ -1027,7 +1040,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1);
   }
@@ -1044,7 +1057,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1);
   }
@@ -1061,7 +1074,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1078,7 +1091,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1095,7 +1108,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 84);
   }
@@ -1111,7 +1124,7 @@ pub mod tests {
       Instruction::new(Opcode::ADD, 31, 30, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 5 - 1 + 4);
   }
@@ -1127,7 +1140,7 @@ pub mod tests {
       Instruction::new(Opcode::XOR, 31, 30, 42, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 10);
   }
@@ -1143,7 +1156,7 @@ pub mod tests {
       Instruction::new(Opcode::OR, 31, 30, 42, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 47);
   }
@@ -1159,7 +1172,7 @@ pub mod tests {
       Instruction::new(Opcode::AND, 31, 30, 42, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1173,7 +1186,7 @@ pub mod tests {
       Instruction::new(Opcode::SLL, 31, 29, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 80);
   }
@@ -1187,7 +1200,7 @@ pub mod tests {
       Instruction::new(Opcode::SRL, 31, 29, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 2);
   }
@@ -1201,7 +1214,7 @@ pub mod tests {
       Instruction::new(Opcode::SRA, 31, 29, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 2);
   }
@@ -1215,7 +1228,7 @@ pub mod tests {
       Instruction::new(Opcode::SLT, 31, 29, 37, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1229,7 +1242,7 @@ pub mod tests {
       Instruction::new(Opcode::SLTU, 31, 29, 37, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1248,7 +1261,7 @@ pub mod tests {
       Instruction::new(Opcode::JALR, 5, 11, 8, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.registers()[Register::X5 as usize], 8);
     assert_eq!(runtime.registers()[Register::X11 as usize], 100);
@@ -1262,7 +1275,7 @@ pub mod tests {
       Instruction::new(opcode, 12, 10, 11, false, false),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.registers()[Register::X12 as usize], expected);
   }
@@ -1480,7 +1493,7 @@ pub mod tests {
   #[test]
   fn test_simple_memory_program_run() {
     let program = simple_memory_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
 
     // Assert SW & LW case

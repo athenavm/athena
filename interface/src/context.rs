@@ -6,16 +6,14 @@ pub struct AthenaContext {
   address: Address,
   caller: Address,
   depth: u32,
-  max_depth: u32,
 }
 
 impl AthenaContext {
-  pub fn new(address: Address, caller: Address, depth: u32, max_depth: u32) -> Self {
+  pub fn new(address: Address, caller: Address, depth: u32) -> Self {
     AthenaContext {
       address,
       caller,
       depth,
-      max_depth,
     }
   }
 
@@ -29,9 +27,5 @@ impl AthenaContext {
 
   pub fn depth(&self) -> u32 {
     self.depth
-  }
-
-  pub fn max_depth(&self) -> u32 {
-    self.max_depth
   }
 }

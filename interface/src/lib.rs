@@ -6,6 +6,7 @@ mod context;
 pub use context::*;
 
 use std::{
+  convert::TryFrom,
   fmt,
   ops::{Deref, DerefMut},
 };
@@ -171,6 +172,32 @@ pub enum StatusCode {
   InternalError,
   Rejected,
   OutOfMemory,
+}
+
+impl TryFrom<u32> for StatusCode {
+  type Error = &'static str;
+
+  fn try_from(value: u32) -> Result<Self, Self::Error> {
+    match value {
+      x if x == StatusCode::Success as u32 => Ok(StatusCode::Success),
+      x if x == StatusCode::Failure as u32 => Ok(StatusCode::Failure),
+      x if x == StatusCode::Revert as u32 => Ok(StatusCode::Revert),
+      x if x == StatusCode::OutOfGas as u32 => Ok(StatusCode::OutOfGas),
+      x if x == StatusCode::UndefinedInstruction as u32 => Ok(StatusCode::UndefinedInstruction),
+      x if x == StatusCode::InvalidMemoryAccess as u32 => Ok(StatusCode::InvalidMemoryAccess),
+      x if x == StatusCode::CallDepthExceeded as u32 => Ok(StatusCode::CallDepthExceeded),
+      x if x == StatusCode::PrecompileFailure as u32 => Ok(StatusCode::PrecompileFailure),
+      x if x == StatusCode::ContractValidationFailure as u32 => {
+        Ok(StatusCode::ContractValidationFailure)
+      }
+      x if x == StatusCode::ArgumentOutOfRange as u32 => Ok(StatusCode::ArgumentOutOfRange),
+      x if x == StatusCode::InsufficientBalance as u32 => Ok(StatusCode::InsufficientBalance),
+      x if x == StatusCode::InternalError as u32 => Ok(StatusCode::InternalError),
+      x if x == StatusCode::Rejected as u32 => Ok(StatusCode::Rejected),
+      x if x == StatusCode::OutOfMemory as u32 => Ok(StatusCode::OutOfMemory),
+      _ => Err("Invalid StatusCode"),
+    }
+  }
 }
 
 impl fmt::Display for StatusCode {

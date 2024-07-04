@@ -5,7 +5,8 @@ use strum_macros::EnumIter;
 
 use crate::runtime::{Register, Runtime};
 use crate::syscall::{
-  SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostRead, SyscallHostWrite, SyscallWrite,
+  SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostCall, SyscallHostRead, SyscallHostWrite,
+  SyscallWrite,
 };
 use crate::{runtime::MemoryReadRecord, runtime::MemoryWriteRecord};
 

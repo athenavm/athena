@@ -1,7 +1,9 @@
 use std::{cell::RefCell, sync::Arc};
 
 use crate::host::{AthenaCapability, AthenaOption, SetOptionError};
-use athena_interface::{AthenaMessage, ExecutionResult, HostInterface, HostProvider, StatusCode};
+use athena_interface::{
+  AthenaContext, AthenaMessage, ExecutionResult, HostInterface, HostProvider, StatusCode,
+};
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
 pub trait VmInterface<T: HostInterface> {
@@ -48,6 +50,9 @@ where
     // note: ignore _msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
+    // construct context object
+    let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
+
     let mut stdin = AthenaStdin::new();
 
     // input data is optional
@@ -57,7 +62,7 @@ where
 
     let (output, gas_left) = self
       .client
-      .execute(&code, stdin, Some(host), Some(msg.gas))
+      .execute(&code, stdin, Some(host), Some(msg.gas), Some(context))
       .unwrap();
     ExecutionResult::new(
       StatusCode::Success,
