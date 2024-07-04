@@ -135,9 +135,6 @@ where
       0,
       Vec::new(),
     );
-    let result = host.call(msg);
-
-    // no return value
-    None
+    Some(host.call(msg) as u32)
   }
 }
