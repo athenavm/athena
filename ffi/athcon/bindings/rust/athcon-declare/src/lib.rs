@@ -40,14 +40,15 @@ use heck::SnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::AttributeArgs;
 use syn::Ident;
 use syn::ItemStruct;
 use syn::Lit;
 use syn::LitInt;
 use syn::LitStr;
 use syn::NestedMeta;
+use syn::{Meta, Token};
 
 struct VMNameSet {
   type_name: String,
@@ -119,7 +120,7 @@ impl VMNameSet {
 }
 
 impl VMMetaData {
-  fn new(args: AttributeArgs) -> Self {
+  fn new(args: Punctuated<Meta, Token![,]>) -> Self {
     assert_eq!(args.len(), 3, "Incorrect number of arguments supplied");
 
     let vm_name_meta = &args[0];
@@ -223,7 +224,7 @@ pub fn athcon_declare_vm(args: TokenStream, item: TokenStream) -> TokenStream {
   let names = VMNameSet::new(vm_type_name);
 
   // Parse the arguments for the macro.
-  let meta_args = parse_macro_input!(args as AttributeArgs);
+  let meta_args = parse_macro_input!(args as Punctuated<Meta, Token![,]>);
   let vm_data = VMMetaData::new(meta_args);
 
   // Get all the tokens from the respective helpers.
