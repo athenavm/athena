@@ -8,11 +8,8 @@ license.workspace = true
 edition.workspace = true
 
 [build-dependencies]
-vergen = { version = "8", default-features = false, features = [
-  "build",
-  "git",
-  "git2",
-] }
+anyhow = { version = "1.0.83", features = ["backtrace"] }
+vergen-git2 = { version = "1.0.0", default-features = false, features = [ "build" ] }
 
 [dependencies]
 anyhow = { version = "1.0.83", features = ["backtrace"] }
