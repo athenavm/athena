@@ -35,8 +35,8 @@
 
 extern crate proc_macro;
 
-use heck::ShoutySnakeCase;
-use heck::SnakeCase;
+use heck::AsShoutySnakeCase;
+use heck::AsSnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
@@ -65,12 +65,9 @@ struct VMMetaData {
 #[allow(dead_code)]
 impl VMNameSet {
   fn new(ident: String) -> Self {
-    let caps = ident.to_shouty_snake_case();
-    let lowercase = ident
-      .to_snake_case()
-      .chars()
-      .filter(|c| *c != '_')
-      .collect();
+    let caps = format!("{}", AsShoutySnakeCase(ident.clone()));
+    let lowercase = format!("{}", AsSnakeCase(ident.clone()));
+    let lowercase = lowercase.chars().filter(|c| *c != '_').collect();
     VMNameSet {
       type_name: ident,
       name_allcaps: caps,
