@@ -935,6 +935,56 @@ pub mod tests {
   }
 
   #[test]
+  fn test_bad_call() {
+    utils::setup_logger();
+
+    let instructions = vec![
+      // X10 is arg1 (ptr to address)
+      // memory location to store an address
+      Instruction::new(
+        Opcode::ADD,
+        Register::X10 as u32,
+        0,
+        0x12345678,
+        false,
+        true,
+      ),
+      // store arbitrary address here
+      Instruction::new(Opcode::SW, Register::X10 as u32, 0, 0x12345678, false, true),
+      // X11 is arg2 (ptr to input)
+      // zero pointer
+      Instruction::new(Opcode::ADD, Register::X11 as u32, 0, 0, false, true),
+      // X12 is arg3 (input len)
+      // no input
+      Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
+      // X5 is syscall ID: 0xA2 (HOST_CALL)
+      Instruction::new(Opcode::ADD, Register::X5 as u32, 0, 0xA2, false, true),
+      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+    ];
+    let program = Program::new(instructions, 0, 0);
+
+    let host = MockHost::new();
+    let provider = HostProvider::new(host);
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    let mut runtime = Runtime::<MockHost>::new(
+      program,
+      Some(Arc::new(RefCell::new(provider))),
+      opts,
+      Some(ctx),
+    );
+    match runtime.execute() {
+      Err(e) => match e {
+        ExecutionError::HostCallFailed(code) => {
+          assert_eq!(code, athena_interface::StatusCode::Failure);
+        }
+        _ => panic!("unexpected error: {:?}", e),
+      },
+      Ok(_) => panic!("expected error, got Ok"),
+    }
+  }
+
+  #[test]
   fn test_add() {
     // main:
     //     addi x29, x0, 5

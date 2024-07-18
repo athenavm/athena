@@ -312,8 +312,6 @@ pub struct MockHost {
 
   // stores balance keyed by address
   balance: BTreeMap<Address, Balance>,
-  // stores contract bytecode
-  // codebase: HashMap<Address, Vec<u8>>,
 }
 
 impl MockHost {
@@ -338,7 +336,6 @@ impl Default for MockHost {
     // init
     let mut storage = BTreeMap::new();
     let mut balance = BTreeMap::new();
-    // let mut codebase = HashMap::new();
 
     // pre-populate some balances, values, and code for testing
     balance.insert(ADDRESS_ALICE, SOME_COINS);
@@ -346,11 +343,7 @@ impl Default for MockHost {
     balance.insert(ADDRESS_CHARLIE, SOME_COINS);
     storage.insert((ADDRESS_ALICE, HELLO_WORLD), HELLO_WORLD);
 
-    Self {
-      storage,
-      balance,
-      // codebase,
-    }
+    Self { storage, balance }
   }
 }
 
