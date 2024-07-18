@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use crate::runtime::{Register, Syscall, SyscallContext};
 use athena_interface::{
   AddressWrapper, AthenaMessage, Bytes32Wrapper, HostInterface, MessageKind, ADDRESS_LENGTH,
@@ -97,7 +95,7 @@ where
       .context
       .as_ref()
       .expect("Missing Athena runtime context");
-    let host = ctx
+    let mut host = ctx
       .rt
       .host
       .as_ref()
@@ -135,6 +133,12 @@ where
       0,
       Vec::new(),
     );
-    Some(host.call(msg) as u32)
+    let res = host.call(msg);
+
+    // calculate gas spent
+    let gas_spent = gas_left - res.gas_left;
+    rt.state.clk += gas_spent;
+
+    Some(res.status_code as u32)
   }
 }
