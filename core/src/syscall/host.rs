@@ -104,7 +104,12 @@ where
 
     // get remaining gas
     // note: this does not factor in the cost of the current instruction
-    let gas_left = ctx.rt.gas_left().expect("Missing gas information");
+    let gas_left: u32 = ctx
+      .rt
+      .gas_left()
+      .expect("Missing gas information")
+      .try_into()
+      .expect("gas arithmetic error");
 
     // note: the host is responsible for checking stack depth, not us
 
@@ -115,12 +120,24 @@ where
 
     // we need to read the input length from the next register
     let a2 = Register::X12;
-    let rt = &mut ctx.rt;
-    let len = rt.register(a2) as usize;
-    // let len = ctx.word_unsafe(len_ptr);
+    let len = ctx.rt.register(a2) as usize;
+
+    // check byte alignment
+    assert!(len % 4 == 0, "input is not byte-aligned");
 
     // `len` is denominated in number of bytes; we read words in chunks of four bytes
-    let input = ctx.slice_unsafe(arg2, len / 4);
+    // then convert into a standard bytearray.
+    let input = if len > 0 {
+      let input_slice = ctx.slice_unsafe(arg2, len / 4);
+      Some(
+        input_slice
+          .iter()
+          .flat_map(|&num| num.to_le_bytes().to_vec())
+          .collect(),
+      )
+    } else {
+      None
+    };
 
     // construct the outbound message
     let msg = AthenaMessage::new(
@@ -129,15 +146,19 @@ where
       u32::try_from(gas_left).expect("Invalid gas left"),
       address.into(),
       athena_ctx.address().clone(),
-      None,
+      input,
       0,
       Vec::new(),
     );
     let res = host.call(msg);
 
     // calculate gas spent
-    let gas_spent = gas_left - res.gas_left;
-    rt.state.clk += gas_spent;
+    // TODO: should this be a panic or should it just return an out of gas error?
+    // for now, it's a panic, since this should not happen.
+    let gas_spent = gas_left
+      .checked_sub(res.gas_left)
+      .expect("host call spent more than available gas");
+    ctx.rt.state.clk += gas_spent;
 
     Some(res.status_code as u32)
   }

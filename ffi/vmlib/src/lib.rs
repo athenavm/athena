@@ -143,7 +143,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     let byteswrapper: Bytes32Wrapper = item.value.into();
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
-      depth: item.depth,
+      depth: u32::try_from(item.depth).expect("Depth value out of range"),
       gas: u32::try_from(item.gas).expect("Gas value out of range"),
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
@@ -169,7 +169,7 @@ impl From<AthenaMessageWrapper> for ffi::athcon_message {
     let value: Bytes32AsU64 = item.0.value.into();
     ffi::athcon_message {
       kind,
-      depth: item.0.depth,
+      depth: item.0.depth as i32,
       gas: item.0.gas as i64,
       recipient: AddressWrapper(item.0.recipient).into(),
       sender: AddressWrapper(item.0.sender).into(),
@@ -195,7 +195,7 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
     let byteswrapper = Bytes32Wrapper::from(*item.value());
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
-      depth: item.depth(),
+      depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
       recipient: AddressWrapper::from(*item.recipient()).into(),
       sender: AddressWrapper::from(*item.sender()).into(),

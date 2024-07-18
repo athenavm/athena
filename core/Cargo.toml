@@ -15,7 +15,6 @@ elf = "0.7.4"
 log = "0.4.21"
 nohash-hasher = "0.2.0"
 rrs-lib = { git = "https://github.com/GregAC/rrs.git" }
-
 cfg-if = "1.0.0"
 hex = "0.4.3"
 serde_with = "3.8.1"

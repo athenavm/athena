@@ -56,7 +56,7 @@ impl ExecutionClient {
   /// stdin.write(&10usize);
   ///
   /// // Execute the program on the inputs.
-  /// let (public_values, gas_left) = client.execute::<MockHost>(elf, stdin, None, None).unwrap();
+  /// let (public_values, gas_left) = client.execute::<MockHost>(elf, stdin, None, None, None).unwrap();
   /// ```
   pub fn execute<T: HostInterface>(
     &self,
