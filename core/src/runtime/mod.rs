@@ -598,7 +598,9 @@ where
             if syscall == SyscallCode::HOST_CALL {
               let return_code = res.unwrap();
               let status_code = StatusCode::try_from(return_code).unwrap();
-              return Err(ExecutionError::HostCallFailed(status_code));
+              if status_code != StatusCode::Success {
+                return Err(ExecutionError::HostCallFailed(status_code));
+              }
             }
 
             // If the syscall is `HALT` and the exit code is non-zero, return an error.
@@ -819,7 +821,7 @@ pub mod tests {
     runtime::ExecutionError,
     utils::{self, with_max_gas},
   };
-  use athena_interface::{HostProvider, MockHost};
+  use athena_interface::{Address, AthenaContext, HostProvider, MockHost};
 
   use crate::{
     runtime::Register,
@@ -874,41 +876,48 @@ pub mod tests {
     let program = host_program();
     let host = MockHost::new();
     let provider = HostProvider::new(host);
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),
-      AthenaCoreOpts::default(),
-      None,
+      opts,
+      Some(ctx),
     );
     let gas_left = runtime.execute().unwrap();
-    assert_eq!(gas_left, None);
+
+    // don't bother checking exact gas value, that's checked in the following test
+    assert!(gas_left.is_some());
   }
 
   #[test]
   fn test_host_gas() {
     let program = host_program();
-    let host = MockHost::new();
-    let provider = HostProvider::new(host);
-    let provider = Arc::new(RefCell::new(provider));
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+
+    // we need a new host provider for each test to reset state
+    fn get_provider() -> Arc<RefCell<HostProvider<MockHost>>> {
+      Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
+    }
 
     // program should cost 4332 gas units
 
     // failure
     let mut runtime = Runtime::<MockHost>::new(
       program.clone(),
-      Some(provider.clone()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(4331)]),
-      None,
+      Some(get_provider()),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(11236)]),
+      Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
 
     // success
     runtime = Runtime::<MockHost>::new(
       program.clone(),
-      Some(provider.clone()),
+      Some(get_provider()),
       // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(4332)]),
-      None,
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(11237)]),
+      Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
     assert_eq!(gas_left, Some(0));
@@ -916,10 +925,10 @@ pub mod tests {
     // success
     runtime = Runtime::<MockHost>::new(
       program.clone(),
-      Some(provider.clone()),
+      Some(get_provider()),
       // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(4333)]),
-      None,
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(11238)]),
+      Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
     assert_eq!(gas_left, Some(1));

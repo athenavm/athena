@@ -18,6 +18,7 @@ pub fn main() {
   let value_unset: [u32; 8] = [0; 8];
   let address_alice = address_to_32bit_words(ADDRESS_ALICE);
   let address_bob = address_to_32bit_words(ADDRESS_BOB);
+  let address_charlie = address_to_32bit_words(ADDRESS_CHARLIE);
 
   // note: for all of these calls, the result is written to the first argument, hence as_mut_ptr()
 
@@ -51,6 +52,14 @@ pub fn main() {
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
   unsafe { athena_vm::host::read_storage(key.as_mut_ptr(), address_bob.as_ptr()) };
   assert_eq!(value, key, "read_storage failed");
+
+  // Alice does not accept calls
+  // unsafe { athena_vm::host::call(address_alice.as_ptr(), std::ptr::null(), 0) };
+
+  // Charlie does accept calls
+  // Note: there is no way to check the result of a call
+  // It either works, or it panics
+  unsafe { athena_vm::host::call(address_charlie.as_ptr(), std::ptr::null(), 0) };
 
   println!("success");
 }

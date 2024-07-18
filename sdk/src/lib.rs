@@ -12,9 +12,8 @@ pub mod utils {
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use anyhow::{Ok, Result};
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
-use athena_core::runtime::{Program, Runtime};
+use athena_core::runtime::{ExecutionError, Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
 use athena_interface::{AthenaContext, HostInterface, HostProvider};
 
@@ -65,7 +64,7 @@ impl ExecutionClient {
     host: Option<Arc<RefCell<HostProvider<T>>>>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
-  ) -> Result<(AthenaPublicValues, Option<u32>)> {
+  ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
     let program = Program::from(elf);
     let opts = match max_gas {
       None => AthenaCoreOpts::default(),
@@ -75,11 +74,12 @@ impl ExecutionClient {
     };
     let mut runtime = Runtime::new(program, host, opts, context);
     runtime.write_vecs(&stdin.buffer);
-    let gas_left = runtime.execute().unwrap();
-    Ok((
-      AthenaPublicValues::from(&runtime.state.public_values_stream),
-      gas_left,
-    ))
+    runtime.execute().map(|gas_left| {
+      (
+        AthenaPublicValues::from(&runtime.state.public_values_stream),
+        gas_left,
+      )
+    })
   }
 }
 
@@ -94,7 +94,7 @@ mod tests {
   use std::{cell::RefCell, sync::Arc};
 
   use crate::{utils, AthenaStdin, ExecutionClient};
-  use athena_interface::{HostProvider, MockHost};
+  use athena_interface::{AthenaContext, HostProvider, MockHost, ADDRESS_ALICE};
 
   #[test]
   fn test_execute() {
@@ -115,8 +115,9 @@ mod tests {
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
+    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     client
-      .execute::<MockHost>(elf, stdin, Some(host), None, None)
+      .execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx))
       .unwrap();
   }
 

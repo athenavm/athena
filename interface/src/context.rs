@@ -2,6 +2,8 @@
 /// execution message that's guaranteed not to change during the context of the
 /// program execution.
 use crate::Address;
+
+#[derive(Debug, Clone)]
 pub struct AthenaContext {
   address: Address,
   caller: Address,

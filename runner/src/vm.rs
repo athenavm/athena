@@ -1,6 +1,7 @@
 use std::{cell::RefCell, sync::Arc};
 
 use crate::host::{AthenaCapability, AthenaOption, SetOptionError};
+use athena_core::runtime::ExecutionError;
 use athena_interface::{
   AthenaContext, AthenaMessage, ExecutionResult, HostInterface, HostProvider, StatusCode,
 };
@@ -60,16 +61,25 @@ where
       stdin.write_vec(input_data);
     }
 
-    let (output, gas_left) = self
+    // let (output, gas_left) = self
+    match self
       .client
       .execute(&code, stdin, Some(host), Some(msg.gas), Some(context))
-      .unwrap();
-    ExecutionResult::new(
-      StatusCode::Success,
-      gas_left.unwrap(),
-      Some(output.to_vec()),
-      None,
-    )
+    {
+      Ok((public_values, gas_left)) => ExecutionResult::new(
+        StatusCode::Success,
+        gas_left.unwrap(),
+        Some(public_values.to_vec()),
+        None,
+      ),
+      // map error to execution result
+      Err(e) => match e {
+        ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
+        ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
+        // general error
+        _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
+      },
+    }
   }
 }
 
