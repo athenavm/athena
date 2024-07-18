@@ -6,6 +6,7 @@ mod context;
 pub use context::*;
 
 use std::{
+  collections::BTreeMap,
   convert::TryFrom,
   fmt,
   ops::{Deref, DerefMut},
@@ -71,6 +72,16 @@ impl From<Bytes32Wrapper> for Bytes32 {
   }
 }
 
+impl From<Address> for Bytes32Wrapper {
+  fn from(value: Address) -> Bytes32Wrapper {
+    let mut bytes = [0u8; 32];
+    bytes[..24].copy_from_slice(&value);
+    Bytes32Wrapper(bytes)
+  }
+}
+
+// This is based on EIP-2200.
+// See https://evmc.ethereum.org/storagestatus.html.
 #[derive(Debug, PartialEq)]
 #[repr(u32)]
 pub enum StorageStatus {
@@ -295,30 +306,77 @@ where
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
-pub struct MockHost;
+pub struct MockHost {
+  // stores state keyed by address and key
+  storage: BTreeMap<(Address, Bytes32), Bytes32>,
+
+  // stores balance keyed by address
+  balance: BTreeMap<Address, Balance>,
+  // stores contract bytecode
+  // codebase: HashMap<Address, Vec<u8>>,
+}
 
 impl MockHost {
   pub fn new() -> Self {
-    MockHost {}
+    MockHost::default()
+  }
+}
+
+pub const ADDRESS_ALICE: Address = [1u8; ADDRESS_LENGTH];
+pub const ADDRESS_BOB: Address = [2u8; ADDRESS_LENGTH];
+pub const ADDRESS_CHARLIE: Address = [3u8; ADDRESS_LENGTH];
+pub const SOME_COINS: Balance = 1000000;
+// "sentinel value" useful for testing: 0xc0ffee
+// also useful as a morning wake up!
+pub const HELLO_WORLD: Bytes32 = [
+  0xc0, 0xff, 0xee, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+impl Default for MockHost {
+  fn default() -> Self {
+    // init
+    let mut storage = BTreeMap::new();
+    let mut balance = BTreeMap::new();
+    // let mut codebase = HashMap::new();
+
+    // pre-populate some balances, values, and code for testing
+    balance.insert(ADDRESS_ALICE, SOME_COINS);
+    balance.insert(ADDRESS_BOB, SOME_COINS);
+    balance.insert(ADDRESS_CHARLIE, SOME_COINS);
+    storage.insert((ADDRESS_ALICE, HELLO_WORLD), HELLO_WORLD);
+
+    Self {
+      storage,
+      balance,
+      // codebase,
+    }
   }
 }
 
 impl HostInterface for MockHost {
   fn account_exists(&self, _addr: &Address) -> bool {
-    true
+    self.balance.contains_key(_addr)
   }
 
   fn get_storage(&self, _addr: &Address, _key: &Bytes32) -> Bytes32 {
-    // return all 1's
-    [1u8; BYTES32_LENGTH]
+    self
+      .storage
+      .get(&(*_addr, *_key))
+      .copied()
+      .unwrap_or(Bytes32::default())
   }
 
   fn set_storage(&mut self, _addr: &Address, _key: &Bytes32, _value: &Bytes32) -> StorageStatus {
-    StorageStatus::StorageAssigned
+    // this is a very simplistic implementation and does NOT handle all possible cases correctly
+    match self.storage.insert((*_addr, *_key), *_value) {
+      None => StorageStatus::StorageAdded,
+      Some(_) => StorageStatus::StorageModified,
+    }
   }
 
   fn get_balance(&self, _addr: &Address) -> u64 {
-    0
+    self.balance.get(_addr).copied().unwrap_or(0)
   }
 
   fn get_tx_context(&self) -> TransactionContext {
@@ -329,7 +387,18 @@ impl HostInterface for MockHost {
     unimplemented!()
   }
 
-  fn call(&mut self, _msg: AthenaMessage) -> ExecutionResult {
-    unimplemented!()
+  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+    // mock host knows about one callable contract
+    let status_code = if msg.recipient == ADDRESS_CHARLIE {
+      // calling charlie works
+      StatusCode::Success
+    } else {
+      // no one else picks up the phone
+      StatusCode::Failure
+    };
+
+    let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
+
+    return ExecutionResult::new(status_code, gas_left, None, None);
   }
 }
