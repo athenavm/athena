@@ -6,10 +6,12 @@ mod context;
 pub use context::*;
 
 use std::{
+  cell::RefCell,
   collections::BTreeMap,
   convert::TryFrom,
   fmt,
   ops::{Deref, DerefMut},
+  sync::Arc,
 };
 
 pub const ADDRESS_LENGTH: usize = 24;
@@ -306,17 +308,27 @@ where
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
-pub struct MockHost {
+pub struct MockHost<'a> {
+  // VM instance
+  vm: MockVm,
+
   // stores state keyed by address and key
   storage: BTreeMap<(Address, Bytes32), Bytes32>,
 
   // stores balance keyed by address
   balance: BTreeMap<Address, Balance>,
+
+  // stores contract code
+  programs: BTreeMap<Address, &'a [u8]>,
 }
 
-impl MockHost {
+impl<'a> MockHost<'a> {
   pub fn new() -> Self {
     MockHost::default()
+  }
+
+  pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
+    self.programs.insert(address, code);
   }
 }
 
@@ -331,11 +343,15 @@ pub const HELLO_WORLD: Bytes32 = [
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-impl Default for MockHost {
+impl<'a> Default for MockHost<'a> {
   fn default() -> Self {
+    // instantiate a mock VM
+    let vm = MockVm::new();
+
     // init
     let mut storage = BTreeMap::new();
     let mut balance = BTreeMap::new();
+    let programs = BTreeMap::new();
 
     // pre-populate some balances, values, and code for testing
     balance.insert(ADDRESS_ALICE, SOME_COINS);
@@ -343,11 +359,16 @@ impl Default for MockHost {
     balance.insert(ADDRESS_CHARLIE, SOME_COINS);
     storage.insert((ADDRESS_ALICE, HELLO_WORLD), HELLO_WORLD);
 
-    Self { storage, balance }
+    Self {
+      vm,
+      storage,
+      balance,
+      programs,
+    }
   }
 }
 
-impl HostInterface for MockHost {
+impl<'a> HostInterface for MockHost<'a> {
   fn account_exists(&self, _addr: &Address) -> bool {
     self.balance.contains_key(_addr)
   }
@@ -381,7 +402,25 @@ impl HostInterface for MockHost {
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
-    // mock host knows about one callable contract
+    // check programs list first
+    if let Some(code) = self.programs.get(&msg.recipient).cloned() {
+      // create an owned, cloned copy of VM before taking the host from self
+      let vm = self.vm.clone();
+
+      // HostProvider requires an owned instance, so we need to take it from self
+      let provider = HostProvider::new(std::mem::take(self));
+      let host = Arc::new(RefCell::new(provider));
+      let res = vm.execute(host.clone(), AthenaRevision::AthenaFrontier, msg, code);
+
+      // Restore self
+      *self = Arc::try_unwrap(host)
+        .unwrap_or_else(|_| panic!("Arc still has multiple strong references"))
+        .into_inner()
+        .host;
+      return res;
+    }
+
+    // otherwise, pass a call to Charlie, fail all other calls
     let status_code = if msg.recipient == ADDRESS_CHARLIE {
       // calling charlie works
       StatusCode::Success
@@ -393,5 +432,139 @@ impl HostInterface for MockHost {
     let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
 
     return ExecutionResult::new(status_code, gas_left, None, None);
+  }
+}
+
+// currently unused
+#[derive(Debug, Clone, Copy)]
+pub enum AthenaCapability {}
+
+// currently unused
+#[derive(Debug, Clone)]
+pub enum AthenaOption {}
+
+#[derive(Debug)]
+pub enum SetOptionError {
+  InvalidKey,
+  InvalidValue,
+}
+
+#[derive(Debug)]
+pub enum AthenaRevision {
+  AthenaFrontier,
+}
+
+pub trait VmInterface<T: HostInterface> {
+  fn get_capabilities(&self) -> Vec<AthenaCapability>;
+  fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
+  fn execute(
+    &self,
+    host: Arc<RefCell<HostProvider<T>>>,
+    rev: AthenaRevision,
+    msg: AthenaMessage,
+    code: &[u8],
+  ) -> ExecutionResult;
+}
+
+// a very simple mock VM implementation
+#[derive(Clone)]
+struct MockVm {}
+
+impl MockVm {
+  fn new() -> Self {
+    MockVm {}
+  }
+}
+
+impl<T> VmInterface<T> for MockVm
+where
+  T: HostInterface,
+{
+  fn get_capabilities(&self) -> Vec<AthenaCapability> {
+    vec![]
+  }
+
+  fn set_option(&self, _option: AthenaOption, _value: &str) -> Result<(), SetOptionError> {
+    Err(SetOptionError::InvalidKey)
+  }
+
+  fn execute(
+    &self,
+    host: Arc<RefCell<HostProvider<T>>>,
+    _rev: AthenaRevision,
+    msg: AthenaMessage,
+    _code: &[u8],
+  ) -> ExecutionResult {
+    // process a few basic messages
+
+    // save context and perform a call
+
+    // restore context
+
+    // get block hash
+    let output = host.borrow().get_block_hash(0);
+
+    ExecutionResult::new(
+      StatusCode::Success,
+      msg.gas - 1,
+      Some(output.to_vec()),
+      None,
+    )
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::{cell::RefCell, sync::Arc};
+
+  #[test]
+  fn test_mock_vm() {
+    // construct a mock host
+    let host = MockHost::new();
+    let host_provider = HostProvider::new(host);
+    let host_interface = Arc::new(RefCell::new(host_provider));
+
+    // construct a mock vm
+    let vm = MockVm::new();
+
+    // test execution
+    vm.execute(
+      host_interface,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000,
+        Address::default(),
+        Address::default(),
+        None,
+        Balance::default(),
+        vec![],
+      ),
+      &[],
+    );
+  }
+
+  #[test]
+  fn test_get_storage() {
+    let mut host = MockHost::new();
+    let address = [8; 24];
+    let key = [1; 32];
+    let value = [2; 32];
+    assert_eq!(
+      host.set_storage(&address, &key, &value),
+      StorageStatus::StorageAssigned
+    );
+    let retrieved_value = host.get_storage(&address, &key);
+    assert_eq!(retrieved_value, value);
+  }
+
+  #[test]
+  fn test_get_balance() {
+    let host = MockHost::new();
+    let address = [8; 24];
+    let balance = host.get_balance(&address);
+    assert_eq!(balance, 0);
   }
 }

@@ -1,23 +1,11 @@
 use std::{cell::RefCell, sync::Arc};
 
-use crate::host::{AthenaCapability, AthenaOption, SetOptionError};
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
-  AthenaContext, AthenaMessage, ExecutionResult, HostInterface, HostProvider, StatusCode,
+  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
+  HostInterface, HostProvider, SetOptionError, StatusCode, VmInterface,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-
-pub trait VmInterface<T: HostInterface> {
-  fn get_capabilities(&self) -> Vec<AthenaCapability>;
-  fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
-  fn execute(
-    &self,
-    host: Arc<RefCell<HostProvider<T>>>,
-    rev: u32,
-    msg: AthenaMessage,
-    code: &[u8],
-  ) -> ExecutionResult;
-}
 
 pub struct AthenaVm {
   client: ExecutionClient,
@@ -46,7 +34,7 @@ where
   fn execute(
     &self,
     host: Arc<RefCell<HostProvider<T>>>,
-    _rev: u32,
+    _rev: AthenaRevision,
     msg: AthenaMessage,
     // note: ignore _msg.code, should only be used on deploy
     code: &[u8],
@@ -88,124 +76,20 @@ mod tests {
   use std::{cell::RefCell, sync::Arc};
 
   use super::*;
-  use crate::host::MockHost;
-  use crate::VmInterface;
-  use athena_interface::{Address, AthenaMessage, Balance, MessageKind, StatusCode};
-
-  struct MockVm {}
-
-  impl MockVm {
-    fn new() -> Self {
-      MockVm {}
-    }
-  }
-
-  impl<T> VmInterface<T> for MockVm
-  where
-    T: HostInterface,
-  {
-    fn get_capabilities(&self) -> Vec<AthenaCapability> {
-      vec![]
-    }
-
-    fn set_option(&self, _option: AthenaOption, _value: &str) -> Result<(), SetOptionError> {
-      Err(SetOptionError::InvalidKey)
-    }
-
-    fn execute(
-      &self,
-      host: Arc<RefCell<HostProvider<T>>>,
-      _rev: u32,
-      msg: AthenaMessage,
-      _code: &[u8],
-    ) -> ExecutionResult {
-      // process a few basic messages
-
-      // save context and perform a call
-
-      // restore context
-
-      // get block hash
-      let output = host.borrow().get_block_hash(0);
-
-      ExecutionResult::new(
-        StatusCode::Success,
-        msg.gas - 1,
-        Some(output.to_vec()),
-        None,
-      )
-    }
-  }
+  use athena_interface::{Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost};
 
   #[test]
   #[should_panic]
   fn test_empty_code() {
     // construct a mock host
-    let host = MockHost::new(None);
+    let host = MockHost::new();
     let host_provider = HostProvider::new(host);
     let host_interface = Arc::new(RefCell::new(host_provider));
 
     // construct a vm
     AthenaVm::new().execute(
       host_interface,
-      0,
-      AthenaMessage::new(
-        MessageKind::Call,
-        0,
-        1000,
-        Address::default(),
-        Address::default(),
-        None,
-        Balance::default(),
-        vec![],
-      ),
-      &[],
-    );
-  }
-
-  // #[test]
-  // fn test_minimal_elf() {
-  //   // construct a mock host
-  //   let host = MockHost::new(None);
-  //   let host_provider = HostProvider::new(host);
-  //   let host_interface = Arc::new(RefCell::new(host_provider));
-
-  //   // construct a vm
-  //   let vm = AthenaVm::new();
-
-  //   let execution_result = vm.execute(
-  //     host_interface,
-  //     0,
-  //     AthenaMessage::new(
-  //       MessageKind::Call,
-  //       0,
-  //       1000,
-  //       Address::default(),
-  //       Address::default(),
-  //       None,
-  //       Balance::default(),
-  //       vec![],
-  //     ),
-  //     include_bytes!("../../tests/minimal/elf/minimal-test.elf"),
-  //   );
-  //   assert_eq!(execution_result.gas_left, 1000);
-  //   assert_eq!(execution_result.status_code, StatusCode::Success);
-  // }
-
-  #[test]
-  fn test_mock_vm() {
-    // construct a mock host
-    let host = MockHost::new(None);
-    let host_provider = HostProvider::new(host);
-    let host_interface = Arc::new(RefCell::new(host_provider));
-
-    // construct a mock vm
-    let vm = MockVm::new();
-
-    // test execution
-    vm.execute(
-      host_interface,
-      0,
+      AthenaRevision::AthenaFrontier,
       AthenaMessage::new(
         MessageKind::Call,
         0,

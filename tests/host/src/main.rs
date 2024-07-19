@@ -1,7 +1,7 @@
 #![no_main]
 athena_vm::entrypoint!(main);
 
-use athena_vm::helpers::{address_to_32bit_words, address_to_bytes32, bytes32_to_32bit_words};
+use athena_vm::helpers::{address_to_32bit_words, bytes32_to_32bit_words};
 use athena_vm::types::{
   StorageStatus::StorageAdded, StorageStatus::StorageModified, ADDRESS_ALICE, ADDRESS_BOB,
   ADDRESS_CHARLIE, HELLO_WORLD, SOME_COINS,

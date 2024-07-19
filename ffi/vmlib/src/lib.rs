@@ -8,10 +8,10 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, HostProvider,
-  MessageKind, StatusCode, StorageStatus, TransactionContext,
+  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, ExecutionResult, HostInterface,
+  HostProvider, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
-use athena_runner::{AthenaVm, Bytes32AsU64, VmInterface};
+use athena_runner::{AthenaVm, Bytes32AsU64};
 
 #[athcon_declare_vm("Athena", "athena1", "0.1.0")]
 pub struct AthenaVMWrapper {
@@ -60,8 +60,21 @@ impl AthconVm for AthenaVMWrapper {
     let host = Arc::new(RefCell::new(provider));
 
     // Execute the code and proxy the result back to the caller
-    let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);
+    let execution_result =
+      self
+        .athena_vm
+        .execute(host, RevisionWrapper::from(rev).0, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
+  }
+}
+
+struct RevisionWrapper(AthenaRevision);
+
+impl From<Revision> for RevisionWrapper {
+  fn from(rev: Revision) -> Self {
+    match rev {
+      Revision::ATHCON_FRONTIER => RevisionWrapper(AthenaRevision::AthenaFrontier),
+    }
   }
 }
 
