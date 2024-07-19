@@ -147,4 +147,22 @@ mod tests {
       Err(_) => panic!("expected out-of-gas error"),
     }
   }
+
+  #[test]
+  fn test_stack_depth() {
+    utils::setup_logger();
+    let client = ExecutionClient::new();
+    let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
+    let stdin = AthenaStdin::new();
+    let vm = AthenaVm::new();
+    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    let res = client.execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx));
+    match res {
+      Ok(_) => panic!("expected stack depth error"),
+      Err(ExecutionError::HostCallFailed(StatusCode::CallDepthExceeded)) => (),
+      Err(_) => panic!("expected stack depth error"),
+    }
+  }
 }
