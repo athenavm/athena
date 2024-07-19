@@ -15,6 +15,7 @@ const STORAGE_MODIFIED: [u32; 8] = [StorageModified as u32, 0, 0, 0, 0, 0, 0, 0]
 // emulate a return value by writing the return value to storage.
 // Athena doesn't support return values yet.
 fn return_value(value: u32) {
+  println!("Returning {}", value);
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
   let val: [u32; 8] = [value, 0, 0, 0, 0, 0, 0, 0];
   let address = address_to_32bit_words(ADDRESS_ALICE);
@@ -23,13 +24,14 @@ fn return_value(value: u32) {
     key == STORAGE_ADDED || key == STORAGE_MODIFIED,
     "write_storage failed"
   );
+  athena_vm::io::write::<u32>(&value);
 }
 
 fn recursive_call(value: u32) -> u32 {
   // we need a pointer to the value as an array
-  let val: [u32; 1] = [value];
+  let val: [u32; 4] = [value, 0, 0, 0];
   let address = address_to_32bit_words(ADDRESS_ALICE);
-  unsafe { athena_vm::host::call(address.as_ptr(), val.as_ptr(), 1) };
+  unsafe { athena_vm::host::call(address.as_ptr(), val.as_ptr(), 4) };
 
   // read the return value
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
@@ -43,6 +45,8 @@ pub fn main() {
   // Behind the scenes, this compiles down to a custom system call which handles reading inputs.
   let n = athena_vm::io::read::<u32>();
 
+  println!("Calculating the {}th Fibonacci number", n);
+
   // Base case
   if n <= 1 {
     return_value(n);
@@ -51,6 +55,8 @@ pub fn main() {
 
   // Recursive case
   let a = recursive_call(n - 1);
+  println!("Got {} for n - 1", a);
   let b = recursive_call(n - 2);
+  println!("Got {} for n - 2", b);
   return_value(a + b);
 }

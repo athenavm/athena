@@ -134,21 +134,6 @@ mod tests {
   }
 
   #[test]
-  fn test_recursive_call() {
-    utils::setup_logger();
-    let client = ExecutionClient::new();
-    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
-    let mut stdin = AthenaStdin::new();
-    stdin.write::<u32>(&10);
-    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
-    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
-    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
-    client
-      .execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx))
-      .unwrap();
-  }
-
-  #[test]
   #[should_panic]
   fn test_execute_panic() {
     utils::setup_logger();

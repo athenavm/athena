@@ -49,7 +49,6 @@ where
       stdin.write_vec(input_data);
     }
 
-    // let (output, gas_left) = self
     match self
       .client
       .execute(&code, stdin, Some(host), Some(msg.gas), Some(context))
@@ -76,7 +75,10 @@ mod tests {
   use std::{cell::RefCell, sync::Arc};
 
   use super::*;
-  use athena_interface::{Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost};
+  use athena_interface::{
+    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
+  };
+  use athena_sdk::utils;
 
   #[test]
   #[should_panic]
@@ -102,5 +104,47 @@ mod tests {
       ),
       &[],
     );
+  }
+
+  // Note: we run this test here, as opposed to at a lower level (inside the SDK), since recursive host calls
+  // require access to an actual VM instance.
+  #[test]
+  fn test_recursive_call() {
+    utils::setup_logger();
+    let client = ExecutionClient::new();
+    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
+    let mut stdin = AthenaStdin::new();
+    stdin.write::<u32>(&8);
+    let vm = AthenaVm::new();
+    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    let (mut output, _) = client
+      .execute::<MockHost>(
+        elf,
+        stdin,
+        Some(host.clone()),
+        Some(1_000_000),
+        Some(ctx.clone()),
+      )
+      .unwrap();
+    let result = output.read::<u32>();
+    assert_eq!(result, 21, "got wrong fibonacci value");
+
+    // trying to go any higher should result in an out-of-gas error
+    let mut stdin = AthenaStdin::new();
+    stdin.write::<u32>(&9);
+    let res = client.execute::<MockHost>(
+      elf,
+      stdin,
+      Some(host.clone()),
+      Some(1_000_000),
+      Some(ctx.clone()),
+    );
+    match res {
+      Ok(_) => panic!("expected out-of-gas error"),
+      Err(ExecutionError::HostCallFailed(StatusCode::OutOfGas)) => (),
+      Err(_) => panic!("expected out-of-gas error"),
+    }
   }
 }

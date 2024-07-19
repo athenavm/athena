@@ -310,7 +310,7 @@ where
 // when running the VM in standalone mode, without a bound host interface
 pub struct MockHost<'a> {
   // VM instance
-  vm: MockVm,
+  vm: Option<&'a dyn VmInterface<MockHost<'a>>>,
 
   // stores state keyed by address and key
   storage: BTreeMap<(Address, Bytes32), Bytes32>,
@@ -325,6 +325,13 @@ pub struct MockHost<'a> {
 impl<'a> MockHost<'a> {
   pub fn new() -> Self {
     MockHost::default()
+  }
+
+  pub fn new_with_vm(vm: &'a dyn VmInterface<MockHost<'a>>) -> Self {
+    MockHost {
+      vm: Some(vm),
+      ..MockHost::default()
+    }
   }
 
   pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
@@ -345,9 +352,6 @@ pub const HELLO_WORLD: Bytes32 = [
 
 impl<'a> Default for MockHost<'a> {
   fn default() -> Self {
-    // instantiate a mock VM
-    let vm = MockVm::new();
-
     // init
     let mut storage = BTreeMap::new();
     let mut balance = BTreeMap::new();
@@ -360,7 +364,7 @@ impl<'a> Default for MockHost<'a> {
     storage.insert((ADDRESS_ALICE, HELLO_WORLD), HELLO_WORLD);
 
     Self {
-      vm,
+      vm: None,
       storage,
       balance,
       programs,
@@ -402,6 +406,13 @@ impl<'a> HostInterface for MockHost<'a> {
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+    log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
+
+    // don't go too deep!
+    if msg.depth > 10 {
+      return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None);
+    }
+
     // check programs list first
     if let Some(code) = self.programs.get(&msg.recipient).cloned() {
       // create an owned, cloned copy of VM before taking the host from self
@@ -410,7 +421,12 @@ impl<'a> HostInterface for MockHost<'a> {
       // HostProvider requires an owned instance, so we need to take it from self
       let provider = HostProvider::new(std::mem::take(self));
       let host = Arc::new(RefCell::new(provider));
-      let res = vm.execute(host.clone(), AthenaRevision::AthenaFrontier, msg, code);
+      let res = vm.expect("missing VM instance").execute(
+        host.clone(),
+        AthenaRevision::AthenaFrontier,
+        msg,
+        code,
+      );
 
       // Restore self
       *self = Arc::try_unwrap(host)
@@ -466,85 +482,9 @@ pub trait VmInterface<T: HostInterface> {
   ) -> ExecutionResult;
 }
 
-// a very simple mock VM implementation
-#[derive(Clone)]
-struct MockVm {}
-
-impl MockVm {
-  fn new() -> Self {
-    MockVm {}
-  }
-}
-
-impl<T> VmInterface<T> for MockVm
-where
-  T: HostInterface,
-{
-  fn get_capabilities(&self) -> Vec<AthenaCapability> {
-    vec![]
-  }
-
-  fn set_option(&self, _option: AthenaOption, _value: &str) -> Result<(), SetOptionError> {
-    Err(SetOptionError::InvalidKey)
-  }
-
-  fn execute(
-    &self,
-    host: Arc<RefCell<HostProvider<T>>>,
-    _rev: AthenaRevision,
-    msg: AthenaMessage,
-    _code: &[u8],
-  ) -> ExecutionResult {
-    // process a few basic messages
-
-    // save context and perform a call
-
-    // restore context
-
-    // get block hash
-    let output = host.borrow().get_block_hash(0);
-
-    ExecutionResult::new(
-      StatusCode::Success,
-      msg.gas - 1,
-      Some(output.to_vec()),
-      None,
-    )
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::{cell::RefCell, sync::Arc};
-
-  #[test]
-  fn test_mock_vm() {
-    // construct a mock host
-    let host = MockHost::new();
-    let host_provider = HostProvider::new(host);
-    let host_interface = Arc::new(RefCell::new(host_provider));
-
-    // construct a mock vm
-    let vm = MockVm::new();
-
-    // test execution
-    vm.execute(
-      host_interface,
-      AthenaRevision::AthenaFrontier,
-      AthenaMessage::new(
-        MessageKind::Call,
-        0,
-        1000,
-        Address::default(),
-        Address::default(),
-        None,
-        Balance::default(),
-        vec![],
-      ),
-      &[],
-    );
-  }
 
   #[test]
   fn test_get_storage() {
