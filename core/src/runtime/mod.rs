@@ -896,7 +896,7 @@ pub mod tests {
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
     // we need a new host provider for each test to reset state
-    fn get_provider() -> Arc<RefCell<HostProvider<MockHost>>> {
+    fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
       Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
     }
 

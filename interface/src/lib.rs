@@ -398,7 +398,7 @@ impl<'a> HostInterface for MockHost<'a> {
   }
 
   fn get_block_hash(&self, _block_height: i64) -> Bytes32 {
-    unimplemented!()
+    Bytes32::default()
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
@@ -554,7 +554,7 @@ mod tests {
     let value = [2; 32];
     assert_eq!(
       host.set_storage(&address, &key, &value),
-      StorageStatus::StorageAssigned
+      StorageStatus::StorageAdded
     );
     let retrieved_value = host.get_storage(&address, &key);
     assert_eq!(retrieved_value, value);
