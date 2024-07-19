@@ -9,19 +9,16 @@
 athena_vm::entrypoint!(main);
 
 pub fn main() {
-    // Read an input to the program.
-    //
-    // Behind the scenes, this compiles down to a custom system call which handles reading inputs.
-    let n = 10;
-    // Compute the n'th fibonacci number, using normal Rust code.
-    let mut a = 0;
-    let mut b = 1;
-    for _ in 0..n {
-        let mut c = a + b;
-        c %= 7919; // Modulus to prevent overflow.
-        a = b;
-        b = c;
-    }
-    athena_vm::io::write(&a);
-    athena_vm::io::write(&b);
+  let n = 10;
+  // Compute the n'th fibonacci number, using normal Rust code.
+  let mut a = 0;
+  let mut b = 1;
+  for _ in 0..n {
+    let mut c = a + b;
+    c %= 7919; // Modulus to prevent overflow.
+    a = b;
+    b = c;
+  }
+  athena_vm::io::write(&a);
+  athena_vm::io::write(&b);
 }
