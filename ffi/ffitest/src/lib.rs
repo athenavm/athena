@@ -5,14 +5,19 @@
 mod ffi_tests {
   use std::collections::BTreeMap;
 
-  use athcon_client::create;
   use athcon_client::host::HostContext as HostInterface;
   use athcon_client::types::{
     Address, Bytes, Bytes32, MessageKind, Revision, StatusCode, StorageStatus, ADDRESS_LENGTH,
     BYTES32_LENGTH,
   };
+  use athcon_client::{create, AthconVm};
   use athcon_sys as ffi;
+  use athena_interface::ADDRESS_ALICE;
   use athena_vmlib;
+
+  const CONTRACT_CODE: &[u8] =
+    include_bytes!("../../../tests/recursive_call/elf/recursive-call-test");
+  const EMPTY_ADDRESS: Address = [0u8; ADDRESS_LENGTH];
 
   // Declare the external functions you want to test
   extern "C" {
@@ -31,17 +36,20 @@ mod ffi_tests {
 
   struct HostContext {
     storage: BTreeMap<Bytes32, Bytes32>,
+    vm: AthconVm,
   }
 
   impl HostContext {
-    fn new() -> HostContext {
+    fn new(vm: AthconVm) -> HostContext {
       HostContext {
         storage: BTreeMap::new(),
+        vm,
       }
     }
   }
 
-  // test all of the host functions the VM can handle
+  // An extremely simplistic host implementation. Note that we cannot use the MockHost
+  // from athena-interface because we need to work with FFI types here.
   impl HostInterface for HostContext {
     fn account_exists(&self, _addr: &Address) -> bool {
       println!("Host: account_exists");
@@ -76,7 +84,7 @@ mod ffi_tests {
       println!("Host: get_tx_context");
       return (
         [0u8; BYTES32_LENGTH],
-        [0u8; ADDRESS_LENGTH],
+        EMPTY_ADDRESS,
         0,
         0,
         0,
@@ -91,21 +99,52 @@ mod ffi_tests {
 
     fn call(
       &mut self,
-      _kind: MessageKind,
-      _destination: &Address,
-      _sender: &Address,
-      _value: &Bytes32,
-      _input: &Bytes,
-      _gas: i64,
-      _depth: i32,
+      kind: MessageKind,
+      destination: &Address,
+      sender: &Address,
+      value: &Bytes32,
+      input: &Bytes,
+      gas: i64,
+      depth: i32,
     ) -> (Vec<u8>, i64, Address, StatusCode) {
       println!("Host: call");
-      return (
-        vec![0u8; BYTES32_LENGTH],
-        _gas,
-        [0u8; ADDRESS_LENGTH],
-        StatusCode::ATHCON_SUCCESS,
+      // check depth
+      if depth > 10 {
+        return (
+          vec![0u8; BYTES32_LENGTH],
+          0,
+          EMPTY_ADDRESS,
+          StatusCode::ATHCON_CALL_DEPTH_EXCEEDED,
+        );
+      }
+
+      // we recognize one destination address
+      if destination != &ADDRESS_ALICE {
+        return (
+          vec![0u8; BYTES32_LENGTH],
+          0,
+          EMPTY_ADDRESS,
+          StatusCode::ATHCON_CONTRACT_VALIDATION_FAILURE,
+        );
+      }
+
+      // Create an owned copy of VM here to avoid borrow issues when passing self into execute
+      // Note: this clone duplicates the FFI handles, but we don't attempt to destroy them here.
+      // That'll be done using the original handles.
+      let vm = self.vm.clone();
+      let res = vm.execute(
+        self,
+        Revision::ATHCON_FRONTIER,
+        kind,
+        depth + 1,
+        gas,
+        destination,
+        sender,
+        input,
+        value,
+        CONTRACT_CODE,
       );
+      return (res.0.to_vec(), res.1, EMPTY_ADDRESS, res.2);
     }
   }
 
@@ -123,26 +162,30 @@ mod ffi_tests {
   /// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
   #[test]
   fn test_rust_host() {
-    let code = include_bytes!("../../../examples/hello_world/program/elf/hello-world-program");
     let vm = create();
     println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
-    let mut host = HostContext::new();
+
+    // Same proviso as above: we're cloning the pointers here, which is fine as long as we
+    // don't attempt to destroy them twice, or use the clone after we destroy the original.
+    let mut host = HostContext::new(vm.clone());
     let (output, gas_left, status_code) = vm.execute(
       &mut host,
       Revision::ATHCON_FRONTIER,
       MessageKind::ATHCON_CALL,
-      123,
+      0,
       50000000,
-      &[32u8; ADDRESS_LENGTH],
+      &ADDRESS_ALICE,
       &[128u8; ADDRESS_LENGTH],
-      &[0u8; 0],
+      // the value 3 as little-endian u32
+      3u32.to_le_bytes().to_vec().as_slice(),
       &[0u8; BYTES32_LENGTH],
-      &code[..],
+      CONTRACT_CODE,
     );
     println!("Output:  {:?}", hex::encode(output));
     println!("GasLeft: {:?}", gas_left);
     println!("Status:  {:?}", status_code);
     assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
+    assert_eq!(output, 2u32.to_le_bytes().to_vec().as_slice());
     vm.destroy();
   }
 }

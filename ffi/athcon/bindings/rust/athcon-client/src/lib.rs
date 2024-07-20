@@ -9,6 +9,9 @@ extern "C" {
   fn athcon_create_athenavmwrapper() -> *mut ffi::athcon_vm;
 }
 
+// In principle it's safe to clone these handles, but the caller needs to be very careful to
+// ensure the memory is freed properly, isn't double-freed, etc.
+#[derive(Clone)]
 pub struct AthconVm {
   handle: *mut ffi::athcon_vm,
   host_interface: *mut ffi::athcon_host_interface,

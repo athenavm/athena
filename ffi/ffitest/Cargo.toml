@@ -11,6 +11,7 @@ edition.workspace = true
 
 [dev-dependencies]
 athcon-client = { path = "../athcon/bindings/rust/athcon-client" }
+athena-interface = { path = "../../interface" }
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
 athena-vmlib = { path = "../vmlib" }
 hex = "0.4"
