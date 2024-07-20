@@ -7,6 +7,7 @@ default-run = "fibonacci-script"
 [dependencies]
 itertools = "0.12.1"
 athena-sdk = { path = "../../../sdk" }
+athena-interface = { path = "../../../interface" }
 sha2 = "0.10.8"
 
 [build-dependencies]

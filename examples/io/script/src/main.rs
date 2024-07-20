@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use athena_sdk::{utils, ExecutionClient, AthenaStdin};
+use athena_sdk::{utils, ExecutionClient, AthenaStdin, AthenaPublicValues};
+use athena_interface::MockHost;
 
 /// The ELF we want to execute inside the zkVM.
 const ELF: &[u8] = include_bytes!("../../program/elf/io-program");
@@ -32,7 +33,7 @@ fn main() {
 
     // Run the given program.
     let client = ExecutionClient::new();
-    let mut output = client.execute(ELF, stdin).unwrap();
+    let (mut output, _opt): (AthenaPublicValues, Option<u32>) = client.execute::<MockHost>(ELF, stdin, None, None, None).expect("execution failed");
 
     // Read the output.
     let r = output.read::<MyPointUnaligned>();
