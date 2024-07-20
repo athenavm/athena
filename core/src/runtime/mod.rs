@@ -34,8 +34,7 @@ use athena_interface::{AthenaContext, HostInterface, HostProvider, StatusCode};
 
 /// An implementation of a runtime for the Athena RISC-V VM.
 ///
-/// The runtime is responsible for executing a user program and tracing important events which occur
-/// during execution (i.e., memory reads, alu operations, etc).
+/// The runtime is responsible for executing a user program.
 ///
 /// For more information on the RV32IM instruction set, see the following:
 /// https://www.cs.sfu.ca/~ashriram/Courses/CS295/assets/notebooks/RISCV/RISCV_CARD.pdf
@@ -67,7 +66,7 @@ pub struct Runtime<T: HostInterface> {
   /// the unconstrained block. The only thing preserved is writes to the input stream.
   pub unconstrained: bool,
 
-  /// Max gas for the runtime. If gas is set to 0, the runtime will not meter gas.
+  /// Max gas for the runtime.
   pub max_gas: Option<u32>,
 
   pub(crate) unconstrained_state: ForkState,
@@ -831,6 +830,7 @@ pub mod tests {
     },
   };
 
+  use super::syscall::SyscallCode;
   use super::{Instruction, Opcode, Program, Runtime};
 
   pub fn simple_program() -> Program {
@@ -900,7 +900,7 @@ pub mod tests {
       Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
     }
 
-    // program should cost 4332 gas units
+    // program should cost 11237 gas units
 
     // failure
     let mut runtime = Runtime::<MockHost>::new(
@@ -957,8 +957,15 @@ pub mod tests {
       // X12 is arg3 (input len)
       // no input
       Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
-      // X5 is syscall ID: 0xA2 (HOST_CALL)
-      Instruction::new(Opcode::ADD, Register::X5 as u32, 0, 0xA2, false, true),
+      // X5 is syscall ID
+      Instruction::new(
+        Opcode::ADD,
+        Register::X5 as u32,
+        0,
+        SyscallCode::HOST_CALL as u32,
+        false,
+        true,
+      ),
       Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
     ];
     let program = Program::new(instructions, 0, 0);
