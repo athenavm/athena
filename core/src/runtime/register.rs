@@ -1,5 +1,25 @@
 /// A register stores a 32-bit value used by operations.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg(feature = "rv32e")]
+pub enum Register {
+    X0 = 0,
+    X1 = 1,
+    X2 = 2,
+    X3 = 3,
+    X4 = 4,
+    X5 = 5,
+    X6 = 6,
+    X7 = 7,
+    X8 = 8,
+    X9 = 9,
+    X10 = 10,
+    X11 = 11,
+    X12 = 12,
+    X13 = 13,
+    X14 = 14,
+    X15 = 15,
+}
+#[cfg(not(feature = "rv32e"))]
 pub enum Register {
     X0 = 0,
     X1 = 1,
@@ -38,6 +58,27 @@ pub enum Register {
 impl Register {
     #[inline(always)]
     pub fn from_u32(value: u32) -> Self {
+        #[cfg(feature = "rv32e")]
+        match value {
+            0 => Register::X0,
+            1 => Register::X1,
+            2 => Register::X2,
+            3 => Register::X3,
+            4 => Register::X4,
+            5 => Register::X5,
+            6 => Register::X6,
+            7 => Register::X7,
+            8 => Register::X8,
+            9 => Register::X9,
+            10 => Register::X10,
+            11 => Register::X11,
+            12 => Register::X12,
+            13 => Register::X13,
+            14 => Register::X14,
+            15 => Register::X15,
+            _ => panic!("invalid register {}", value),
+        }
+        #[cfg(not(feature = "rv32e"))]
         match value {
             0 => Register::X0,
             1 => Register::X1,
