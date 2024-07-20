@@ -1,0 +1,8 @@
+[workspace]
+[package]
+name = "recursive-call-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }

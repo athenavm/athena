@@ -8,10 +8,10 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, HostProvider,
-  MessageKind, StatusCode, StorageStatus, TransactionContext,
+  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, ExecutionResult, HostInterface,
+  HostProvider, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
-use athena_runner::{AthenaVm, Bytes32AsU64, VmInterface};
+use athena_runner::{AthenaVm, Bytes32AsU64};
 
 #[athcon_declare_vm("Athena", "athena1", "0.1.0")]
 pub struct AthenaVMWrapper {
@@ -60,8 +60,21 @@ impl AthconVm for AthenaVMWrapper {
     let host = Arc::new(RefCell::new(provider));
 
     // Execute the code and proxy the result back to the caller
-    let execution_result = self.athena_vm.execute(host, rev as u32, athena_msg.0, code);
+    let execution_result =
+      self
+        .athena_vm
+        .execute(host, RevisionWrapper::from(rev).0, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
+  }
+}
+
+struct RevisionWrapper(AthenaRevision);
+
+impl From<Revision> for RevisionWrapper {
+  fn from(rev: Revision) -> Self {
+    match rev {
+      Revision::ATHCON_FRONTIER => RevisionWrapper(AthenaRevision::AthenaFrontier),
+    }
   }
 }
 
@@ -143,7 +156,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     let byteswrapper: Bytes32Wrapper = item.value.into();
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
-      depth: item.depth,
+      depth: u32::try_from(item.depth).expect("Depth value out of range"),
       gas: u32::try_from(item.gas).expect("Gas value out of range"),
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
@@ -169,7 +182,7 @@ impl From<AthenaMessageWrapper> for ffi::athcon_message {
     let value: Bytes32AsU64 = item.0.value.into();
     ffi::athcon_message {
       kind,
-      depth: item.0.depth,
+      depth: item.0.depth as i32,
       gas: item.0.gas as i64,
       recipient: AddressWrapper(item.0.recipient).into(),
       sender: AddressWrapper(item.0.sender).into(),
@@ -195,7 +208,7 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
     let byteswrapper = Bytes32Wrapper::from(*item.value());
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
-      depth: item.depth(),
+      depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
       recipient: AddressWrapper::from(*item.recipient()).into(),
       sender: AddressWrapper::from(*item.sender()).into(),

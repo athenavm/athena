@@ -85,7 +85,7 @@ pub mod tests {
   fn test_io_run() {
     setup_logger();
     let program = Program::from(IO_ELF);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default());
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     let points = points();
     runtime.write_stdin(&points.0);
     runtime.write_stdin(&points.1);

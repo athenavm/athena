@@ -5,7 +5,8 @@ use strum_macros::EnumIter;
 
 use crate::runtime::{Register, Runtime};
 use crate::syscall::{
-  SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostRead, SyscallHostWrite, SyscallWrite,
+  SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostCall, SyscallHostRead, SyscallHostWrite,
+  SyscallWrite,
 };
 use crate::{runtime::MemoryReadRecord, runtime::MemoryWriteRecord};
 
@@ -29,6 +30,7 @@ pub enum SyscallCode {
   /// Host functions
   HOST_READ = 0x00_00_00_A0,
   HOST_WRITE = 0x00_00_00_A1,
+  HOST_CALL = 0x00_00_00_A2,
 
   /// Executes the `HINT_LEN` precompile.
   HINT_LEN = 0x00_00_00_F0,
@@ -45,6 +47,7 @@ impl SyscallCode {
       0x00_00_00_02 => SyscallCode::WRITE,
       0x00_00_00_A0 => SyscallCode::HOST_READ,
       0x00_00_00_A1 => SyscallCode::HOST_WRITE,
+      0x00_00_00_A2 => SyscallCode::HOST_CALL,
       0x00_00_00_F0 => SyscallCode::HINT_LEN,
       0x00_00_00_F1 => SyscallCode::HINT_READ,
       _ => panic!("invalid syscall number: {}", value),
@@ -169,6 +172,7 @@ pub fn default_syscall_map<T: HostInterface>() -> HashMap<SyscallCode, Arc<dyn S
   syscall_map.insert(SyscallCode::WRITE, Arc::new(SyscallWrite::new()));
   syscall_map.insert(SyscallCode::HOST_READ, Arc::new(SyscallHostRead::new()));
   syscall_map.insert(SyscallCode::HOST_WRITE, Arc::new(SyscallHostWrite::new()));
+  syscall_map.insert(SyscallCode::HOST_CALL, Arc::new(SyscallHostCall::new()));
   syscall_map.insert(SyscallCode::HINT_LEN, Arc::new(SyscallHintLen::new()));
   syscall_map.insert(SyscallCode::HINT_READ, Arc::new(SyscallHintRead::new()));
 
@@ -213,6 +217,7 @@ mod tests {
         SyscallCode::WRITE => assert_eq!(code as u32, athena_vm::syscalls::WRITE),
         SyscallCode::HOST_READ => assert_eq!(code as u32, athena_vm::syscalls::HOST_READ),
         SyscallCode::HOST_WRITE => assert_eq!(code as u32, athena_vm::syscalls::HOST_WRITE),
+        SyscallCode::HOST_CALL => assert_eq!(code as u32, athena_vm::syscalls::HOST_CALL),
         SyscallCode::HINT_LEN => assert_eq!(code as u32, athena_vm::syscalls::HINT_LEN),
         SyscallCode::HINT_READ => assert_eq!(code as u32, athena_vm::syscalls::HINT_READ),
       }

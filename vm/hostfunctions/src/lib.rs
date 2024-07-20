@@ -1,4 +1,5 @@
 extern "C" {
-  pub fn host_read_storage(key: *mut u32, address: *const u32);
-  pub fn host_write_storage(key: *mut u32, address: *const u32, value: *const u32);
+  pub fn call(address: *const u32, input: *const u32, len: usize);
+  pub fn read_storage(key: *mut u32, address: *const u32);
+  pub fn write_storage(key: *mut u32, address: *const u32, value: *const u32);
 }

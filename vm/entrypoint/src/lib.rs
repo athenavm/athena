@@ -1,4 +1,5 @@
 pub mod heap;
+pub mod helpers;
 pub mod syscalls;
 pub mod host {
   pub use athena_hostfunctions::*;
@@ -8,6 +9,9 @@ pub mod io {
 }
 pub mod precompiles {
   pub use athena_precompiles::*;
+}
+pub mod types {
+  pub use athena_interface::*;
 }
 
 extern crate alloc;

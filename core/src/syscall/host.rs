@@ -1,6 +1,7 @@
 use crate::runtime::{Register, Syscall, SyscallContext};
 use athena_interface::{
-  AddressWrapper, Bytes32Wrapper, HostInterface, ADDRESS_LENGTH, BYTES32_LENGTH,
+  AddressWrapper, AthenaMessage, Bytes32Wrapper, HostInterface, MessageKind, ADDRESS_LENGTH,
+  BYTES32_LENGTH,
 };
 
 pub struct SyscallHostRead;
@@ -72,5 +73,93 @@ where
     status_word[0] = status_code as u32;
     ctx.mw_slice(arg1, &status_word);
     None
+  }
+}
+
+pub struct SyscallHostCall;
+
+impl SyscallHostCall {
+  pub const fn new() -> Self {
+    Self
+  }
+}
+
+impl<T> Syscall<T> for SyscallHostCall
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+    // make sure we have a runtime context
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
+    let mut host = ctx
+      .rt
+      .host
+      .as_ref()
+      .expect("Missing host interface")
+      .borrow_mut();
+
+    // get remaining gas
+    // note: this does not factor in the cost of the current instruction
+    let gas_left: u32 = ctx
+      .rt
+      .gas_left()
+      .expect("Missing gas information")
+      .try_into()
+      .expect("gas arithmetic error");
+
+    // note: the host is responsible for checking stack depth, not us
+
+    // marshal inputs
+    let address_words = ADDRESS_LENGTH / 4;
+    let address = ctx.slice_unsafe(arg1, address_words);
+    let address = AddressWrapper::from(address);
+
+    // we need to read the input length from the next register
+    let a2 = Register::X12;
+    let len = ctx.rt.register(a2) as usize;
+
+    // check byte alignment
+    assert!(len % 4 == 0, "input is not byte-aligned");
+
+    // `len` is denominated in number of bytes; we read words in chunks of four bytes
+    // then convert into a standard bytearray.
+    let input = if len > 0 {
+      let input_slice = ctx.slice_unsafe(arg2, len / 4);
+      Some(
+        input_slice
+          .iter()
+          .flat_map(|&num| num.to_le_bytes().to_vec())
+          .collect(),
+      )
+    } else {
+      None
+    };
+
+    // construct the outbound message
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      athena_ctx.depth() + 1,
+      u32::try_from(gas_left).expect("Invalid gas left"),
+      address.into(),
+      athena_ctx.address().clone(),
+      input,
+      0,
+      Vec::new(),
+    );
+    let res = host.call(msg);
+
+    // calculate gas spent
+    // TODO: should this be a panic or should it just return an out of gas error?
+    // for now, it's a panic, since this should not happen.
+    let gas_spent = gas_left
+      .checked_sub(res.gas_left)
+      .expect("host call spent more than available gas");
+    ctx.rt.state.clk += gas_spent;
+
+    Some(res.status_code as u32)
   }
 }

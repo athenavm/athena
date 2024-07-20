@@ -2,9 +2,16 @@
 //!
 //! A library with no external dependencies that includes core types and traits.
 
+mod context;
+pub use context::*;
+
 use std::{
+  cell::RefCell,
+  collections::BTreeMap,
+  convert::TryFrom,
   fmt,
   ops::{Deref, DerefMut},
+  sync::Arc,
 };
 
 pub const ADDRESS_LENGTH: usize = 24;
@@ -67,6 +74,16 @@ impl From<Bytes32Wrapper> for Bytes32 {
   }
 }
 
+impl From<Address> for Bytes32Wrapper {
+  fn from(value: Address) -> Bytes32Wrapper {
+    let mut bytes = [0u8; 32];
+    bytes[..24].copy_from_slice(&value);
+    Bytes32Wrapper(bytes)
+  }
+}
+
+// This is based on EIP-2200.
+// See https://evmc.ethereum.org/storagestatus.html.
 #[derive(Debug, PartialEq)]
 #[repr(u32)]
 pub enum StorageStatus {
@@ -115,19 +132,22 @@ pub enum MessageKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AthenaMessage {
   pub kind: MessageKind,
-  pub depth: i32,
+  pub depth: u32,
   pub gas: u32,
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
   pub value: Balance,
+  // code is currently unused, and it seems redundant.
+  // it's not in the yellow paper.
+  // TODO: remove me?
   pub code: Vec<u8>,
 }
 
 impl AthenaMessage {
   pub fn new(
     kind: MessageKind,
-    depth: i32,
+    depth: u32,
     gas: u32,
     recipient: Address,
     sender: Address,
@@ -149,6 +169,7 @@ impl AthenaMessage {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u32)]
 pub enum StatusCode {
   Success,
   Failure,
@@ -164,6 +185,32 @@ pub enum StatusCode {
   InternalError,
   Rejected,
   OutOfMemory,
+}
+
+impl TryFrom<u32> for StatusCode {
+  type Error = &'static str;
+
+  fn try_from(value: u32) -> Result<Self, Self::Error> {
+    match value {
+      x if x == StatusCode::Success as u32 => Ok(StatusCode::Success),
+      x if x == StatusCode::Failure as u32 => Ok(StatusCode::Failure),
+      x if x == StatusCode::Revert as u32 => Ok(StatusCode::Revert),
+      x if x == StatusCode::OutOfGas as u32 => Ok(StatusCode::OutOfGas),
+      x if x == StatusCode::UndefinedInstruction as u32 => Ok(StatusCode::UndefinedInstruction),
+      x if x == StatusCode::InvalidMemoryAccess as u32 => Ok(StatusCode::InvalidMemoryAccess),
+      x if x == StatusCode::CallDepthExceeded as u32 => Ok(StatusCode::CallDepthExceeded),
+      x if x == StatusCode::PrecompileFailure as u32 => Ok(StatusCode::PrecompileFailure),
+      x if x == StatusCode::ContractValidationFailure as u32 => {
+        Ok(StatusCode::ContractValidationFailure)
+      }
+      x if x == StatusCode::ArgumentOutOfRange as u32 => Ok(StatusCode::ArgumentOutOfRange),
+      x if x == StatusCode::InsufficientBalance as u32 => Ok(StatusCode::InsufficientBalance),
+      x if x == StatusCode::InternalError as u32 => Ok(StatusCode::InternalError),
+      x if x == StatusCode::Rejected as u32 => Ok(StatusCode::Rejected),
+      x if x == StatusCode::OutOfMemory as u32 => Ok(StatusCode::OutOfMemory),
+      _ => Err("Invalid StatusCode"),
+    }
+  }
 }
 
 impl fmt::Display for StatusCode {
@@ -261,30 +308,93 @@ where
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
-pub struct MockHost;
+pub struct MockHost<'a> {
+  // VM instance
+  vm: Option<&'a dyn VmInterface<MockHost<'a>>>,
 
-impl MockHost {
+  // stores state keyed by address and key
+  storage: BTreeMap<(Address, Bytes32), Bytes32>,
+
+  // stores balance keyed by address
+  balance: BTreeMap<Address, Balance>,
+
+  // stores contract code
+  programs: BTreeMap<Address, &'a [u8]>,
+}
+
+impl<'a> MockHost<'a> {
   pub fn new() -> Self {
-    MockHost {}
+    MockHost::default()
+  }
+
+  pub fn new_with_vm(vm: &'a dyn VmInterface<MockHost<'a>>) -> Self {
+    MockHost {
+      vm: Some(vm),
+      ..MockHost::default()
+    }
+  }
+
+  pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
+    self.programs.insert(address, code);
   }
 }
 
-impl HostInterface for MockHost {
+pub const ADDRESS_ALICE: Address = [1u8; ADDRESS_LENGTH];
+pub const ADDRESS_BOB: Address = [2u8; ADDRESS_LENGTH];
+pub const ADDRESS_CHARLIE: Address = [3u8; ADDRESS_LENGTH];
+pub const SOME_COINS: Balance = 1000000;
+// "sentinel value" useful for testing: 0xc0ffee
+// also useful as a morning wake up!
+pub const HELLO_WORLD: Bytes32 = [
+  0xc0, 0xff, 0xee, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+impl<'a> Default for MockHost<'a> {
+  fn default() -> Self {
+    // init
+    let mut storage = BTreeMap::new();
+    let mut balance = BTreeMap::new();
+    let programs = BTreeMap::new();
+
+    // pre-populate some balances, values, and code for testing
+    balance.insert(ADDRESS_ALICE, SOME_COINS);
+    balance.insert(ADDRESS_BOB, SOME_COINS);
+    balance.insert(ADDRESS_CHARLIE, SOME_COINS);
+    storage.insert((ADDRESS_ALICE, HELLO_WORLD), HELLO_WORLD);
+
+    Self {
+      vm: None,
+      storage,
+      balance,
+      programs,
+    }
+  }
+}
+
+impl<'a> HostInterface for MockHost<'a> {
   fn account_exists(&self, _addr: &Address) -> bool {
-    true
+    self.balance.contains_key(_addr)
   }
 
   fn get_storage(&self, _addr: &Address, _key: &Bytes32) -> Bytes32 {
-    // return all 1's
-    [1u8; BYTES32_LENGTH]
+    self
+      .storage
+      .get(&(*_addr, *_key))
+      .copied()
+      .unwrap_or(Bytes32::default())
   }
 
   fn set_storage(&mut self, _addr: &Address, _key: &Bytes32, _value: &Bytes32) -> StorageStatus {
-    StorageStatus::StorageAssigned
+    // this is a very simplistic implementation and does NOT handle all possible cases correctly
+    match self.storage.insert((*_addr, *_key), *_value) {
+      None => StorageStatus::StorageAdded,
+      Some(_) => StorageStatus::StorageModified,
+    }
   }
 
   fn get_balance(&self, _addr: &Address) -> u64 {
-    0
+    self.balance.get(_addr).copied().unwrap_or(0)
   }
 
   fn get_tx_context(&self) -> TransactionContext {
@@ -292,10 +402,109 @@ impl HostInterface for MockHost {
   }
 
   fn get_block_hash(&self, _block_height: i64) -> Bytes32 {
-    unimplemented!()
+    Bytes32::default()
   }
 
-  fn call(&mut self, _msg: AthenaMessage) -> ExecutionResult {
-    unimplemented!()
+  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+    log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
+
+    // don't go too deep!
+    if msg.depth > 10 {
+      return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None);
+    }
+
+    // check programs list first
+    if let Some(code) = self.programs.get(&msg.recipient).cloned() {
+      // create an owned, cloned copy of VM before taking the host from self
+      let vm = self.vm.clone();
+
+      // HostProvider requires an owned instance, so we need to take it from self
+      let provider = HostProvider::new(std::mem::take(self));
+      let host = Arc::new(RefCell::new(provider));
+      let res = vm.expect("missing VM instance").execute(
+        host.clone(),
+        AthenaRevision::AthenaFrontier,
+        msg,
+        code,
+      );
+
+      // Restore self
+      *self = Arc::try_unwrap(host)
+        .unwrap_or_else(|_| panic!("Arc still has multiple strong references"))
+        .into_inner()
+        .host;
+      return res;
+    }
+
+    // otherwise, pass a call to Charlie, fail all other calls
+    let status_code = if msg.recipient == ADDRESS_CHARLIE {
+      // calling charlie works
+      StatusCode::Success
+    } else {
+      // no one else picks up the phone
+      StatusCode::Failure
+    };
+
+    let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
+
+    return ExecutionResult::new(status_code, gas_left, None, None);
+  }
+}
+
+// currently unused
+#[derive(Debug, Clone, Copy)]
+pub enum AthenaCapability {}
+
+// currently unused
+#[derive(Debug, Clone)]
+pub enum AthenaOption {}
+
+#[derive(Debug)]
+pub enum SetOptionError {
+  InvalidKey,
+  InvalidValue,
+}
+
+#[derive(Debug)]
+pub enum AthenaRevision {
+  AthenaFrontier,
+}
+
+pub trait VmInterface<T: HostInterface> {
+  fn get_capabilities(&self) -> Vec<AthenaCapability>;
+  fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
+  fn execute(
+    &self,
+    host: Arc<RefCell<HostProvider<T>>>,
+    rev: AthenaRevision,
+    msg: AthenaMessage,
+    code: &[u8],
+  ) -> ExecutionResult;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_get_storage() {
+    let mut host = MockHost::new();
+    let address = [8; 24];
+    let key = [1; 32];
+    let value = [2; 32];
+    assert_eq!(
+      host.set_storage(&address, &key, &value),
+      StorageStatus::StorageAdded
+    );
+    let retrieved_value = host.get_storage(&address, &key);
+    assert_eq!(retrieved_value, value);
+  }
+
+  #[test]
+  fn test_get_balance() {
+    let host = MockHost::new();
+    let address = [8; 24];
+    let balance = host.get_balance(&address);
+    assert_eq!(balance, 0);
   }
 }
