@@ -19,7 +19,7 @@ fn return_value(value: u32) {
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
   let val: [u32; 8] = [value, 0, 0, 0, 0, 0, 0, 0];
   let address = address_to_32bit_words(ADDRESS_ALICE);
-  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), address.as_ptr(), val.as_ptr()) };
+  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), val.as_ptr()) };
   assert!(
     key == STORAGE_ADDED || key == STORAGE_MODIFIED,
     "write_storage failed"
@@ -35,7 +35,7 @@ fn recursive_call(value: u32) -> u32 {
 
   // read the return value
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
-  unsafe { athena_vm::host::read_storage(key.as_mut_ptr(), address.as_ptr()) };
+  unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
   return key[0];
 }
 

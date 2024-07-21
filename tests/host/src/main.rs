@@ -23,34 +23,32 @@ pub fn main() {
   // note: for all of these calls, the result is written to the first argument, hence as_mut_ptr()
 
   // Alice already has a storage item
-  unsafe { athena_vm::host::read_storage(key.as_mut_ptr(), address_alice.as_ptr()) };
+  unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
   assert_eq!(value, key, "read_storage failed");
 
   // Modify it
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
-  unsafe {
-    athena_vm::host::write_storage(key.as_mut_ptr(), address_alice.as_ptr(), value2.as_ptr())
-  };
+  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), value2.as_ptr()) };
   assert_eq!(key, STORAGE_MODIFIED, "write_storage failed");
 
   // Read the modified value
   let mut key = bytes32_to_32bit_words(HELLO_WORLD);
-  unsafe { athena_vm::host::read_storage(key.as_mut_ptr(), address_alice.as_ptr()) };
+  unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
   assert_eq!(value2, key, "read_storage failed");
 
-  // Bob has no storage item
-  let mut key = bytes32_to_32bit_words(HELLO_WORLD);
-  unsafe { athena_vm::host::read_storage(key.as_mut_ptr(), address_bob.as_ptr()) };
+  // Try an empty key
+  let mut key = bytes32_to_32bit_words(HELLO_WORLD + 1);
+  unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
   assert_eq!(value_unset, key, "read_storage failed");
 
-  // Write to Bob's storage
-  let mut key = bytes32_to_32bit_words(HELLO_WORLD);
-  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), address_bob.as_ptr(), value.as_ptr()) };
+  // Write to the new key
+  let mut key = bytes32_to_32bit_words(HELLO_WORLD + 1);
+  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), value.as_ptr()) };
   assert_eq!(key, STORAGE_ADDED, "write_storage failed");
 
   // Read the new value
-  let mut key = bytes32_to_32bit_words(HELLO_WORLD);
-  unsafe { athena_vm::host::read_storage(key.as_mut_ptr(), address_bob.as_ptr()) };
+  let mut key = bytes32_to_32bit_words(HELLO_WORLD + 1);
+  unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
   assert_eq!(value, key, "read_storage failed");
 
   // Alice does not accept calls
