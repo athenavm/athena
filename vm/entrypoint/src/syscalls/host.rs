@@ -65,3 +65,22 @@ pub extern "C" fn write_storage(key: *mut u32, value: *const u32) {
   #[cfg(not(target_os = "zkvm"))]
   unreachable!()
 }
+
+/// Get the current account balance
+///
+/// The result status code is stored in the `result` pointer.
+#[allow(unused_variables)]
+#[no_mangle]
+pub extern "C" fn get_balance(value: *mut u32) {
+  #[cfg(target_os = "zkvm")]
+  unsafe {
+    asm!(
+        "ecall",
+        in("t0") crate::syscalls::HOST_GETBALANCE,
+        in("a0") value,
+    )
+  }
+
+  #[cfg(not(target_os = "zkvm"))]
+  unreachable!()
+}

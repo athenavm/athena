@@ -58,5 +58,15 @@ pub fn main() {
   // It either works, or it panics
   unsafe { athena_vm::host::call(address_charlie.as_ptr(), std::ptr::null(), 0) };
 
+  // Check balance
+  let mut value: [u32; 2] = [0, 0];
+  unsafe { athena_vm::host::get_balance(value.as_mut_ptr()) };
+  // value is returned as a pointer to two 32-bit values. reconstruct the u64 value.
+  assert_eq!(
+    SOME_COINS,
+    u64::from(value[0]) | (u64::from(value[1]) << 32),
+    "get_balance failed"
+  );
+
   println!("success");
 }
