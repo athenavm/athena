@@ -824,7 +824,6 @@ pub mod tests {
   use athena_interface::{
     Address, AthenaContext, HostProvider, MockHost, ADDRESS_ALICE, SOME_COINS,
   };
-  use athena_vm::helpers::address_to_32bit_words;
 
   use crate::{
     runtime::Register,
@@ -999,34 +998,13 @@ pub mod tests {
   fn test_get_balance() {
     utils::setup_logger();
 
-    // get address in the right format
-    let address = address_to_32bit_words(ADDRESS_ALICE);
-    // arbitrary (but legal) memory location
-    let memloc: u32 = 0x12345678;
+    // arbitrary memory location
+    let memloc = 0x12345678;
 
-    let mut instructions = vec![
+    let instructions = vec![
       // X10 is arg1 (ptr to address)
-      // store address memory location here
+      // store result here
       Instruction::new(Opcode::ADD, Register::X10 as u32, 0, memloc, false, true),
-    ];
-
-    // now write the address to memory, one chunk at a time
-    for (i, part) in (0u32..).zip(address.iter()) {
-      instructions.push(
-        // store chunk in register
-        Instruction::new(Opcode::ADD, Register::X16 as u32, 0, *part, false, true),
-      );
-      // write this to memory
-      instructions.push(Instruction::new(
-        Opcode::SW,
-        Register::X16 as u32,
-        0,
-        memloc + i * 4,
-        false,
-        true,
-      ));
-    }
-    instructions.push(
       // X5 is syscall ID
       Instruction::new(
         Opcode::ADD,
@@ -1036,13 +1014,13 @@ pub mod tests {
         false,
         true,
       ),
-    );
-    instructions.push(Instruction::new(Opcode::ECALL, 0, 0, 0, false, false));
+      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+    ];
     let program = Program::new(instructions, 0, 0);
 
     let host = MockHost::new();
     let provider = HostProvider::new(host);
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut runtime = Runtime::<MockHost>::new(
       program,
@@ -1053,22 +1031,13 @@ pub mod tests {
     let gas_left = runtime.execute().expect("execution failed");
     assert!(gas_left.is_some());
 
-    // check result
-    let mut values = Vec::new();
-    for i in 0u32..address.len() as u32 {
-      // note: we don't care about the timestamp here. we need to remove this completely.
-      let value = runtime.mr_cpu(memloc + i * 4, MemoryAccessPosition::Memory);
-      values.push(value);
-    }
-
-    // there's probably a cleaner way to do this math, but this works.
-    // we expect the value SOME_COINS, which is small enough to fit into the first two words
-    // (that's 8 bytes or 64 bits), so it fits into u64.
+    // check result: we expect the u64 value to be split into two 32-bit words
+    let value_low = runtime.mr_cpu(memloc, MemoryAccessPosition::Memory);
+    let value_high = runtime.mr_cpu(memloc + 4, MemoryAccessPosition::Memory);
     assert_eq!(
-      u64::from(values[0]) << 32 | u64::from(values[1]),
+      u64::from(value_high) << 32 | u64::from(value_low),
       SOME_COINS
     );
-    assert_eq!(values[2..], [0, 0, 0, 0]);
   }
 
   #[test]
