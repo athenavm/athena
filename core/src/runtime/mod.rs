@@ -820,7 +820,7 @@ pub mod tests {
     runtime::ExecutionError,
     utils::{self, with_max_gas},
   };
-  use athena_interface::{Address, AthenaContext, HostProvider, MockHost};
+  use athena_interface::{Address, AthenaContext, HostProvider, MockHost, ADDRESS_ALICE};
 
   use crate::{
     runtime::Register,
@@ -876,7 +876,7 @@ pub mod tests {
     let program = host_program();
     let host = MockHost::new();
     let provider = HostProvider::new(host);
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut runtime = Runtime::<MockHost>::new(
       program,
@@ -893,7 +893,7 @@ pub mod tests {
   #[test]
   fn test_host_gas() {
     let program = host_program();
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
 
     // we need a new host provider for each test to reset state
     fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
@@ -906,7 +906,7 @@ pub mod tests {
     let mut runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(11236)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(9884)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
@@ -916,7 +916,7 @@ pub mod tests {
       program.clone(),
       Some(get_provider()),
       // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(11237)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(9885)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -927,7 +927,7 @@ pub mod tests {
       program.clone(),
       Some(get_provider()),
       // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(11238)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(9886)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();

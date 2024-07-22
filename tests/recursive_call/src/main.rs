@@ -3,7 +3,7 @@ athena_vm::entrypoint!(main);
 
 use athena_vm::helpers::{address_to_32bit_words, bytes32_to_32bit_words};
 use athena_vm::types::{
-  StorageStatus::StorageAdded, StorageStatus::StorageModified, ADDRESS_ALICE, HELLO_WORLD,
+  StorageStatus::StorageAdded, StorageStatus::StorageModified, ADDRESS_ALICE, STORAGE_KEY,
 };
 
 // Note: the test harness installs this contract code at ADDRESS_ALICE
@@ -16,7 +16,7 @@ const STORAGE_MODIFIED: [u32; 8] = [StorageModified as u32, 0, 0, 0, 0, 0, 0, 0]
 // Athena doesn't support return values yet.
 fn return_value(value: u32) {
   println!("Returning {}", value);
-  let mut key = bytes32_to_32bit_words(HELLO_WORLD);
+  let mut key = bytes32_to_32bit_words(STORAGE_KEY);
   let val: [u32; 8] = [value, 0, 0, 0, 0, 0, 0, 0];
   let address = address_to_32bit_words(ADDRESS_ALICE);
   unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), val.as_ptr()) };
@@ -34,7 +34,7 @@ fn recursive_call(value: u32) -> u32 {
   unsafe { athena_vm::host::call(address.as_ptr(), val.as_ptr(), 4) };
 
   // read the return value
-  let mut key = bytes32_to_32bit_words(HELLO_WORLD);
+  let mut key = bytes32_to_32bit_words(STORAGE_KEY);
   unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
   return key[0];
 }
