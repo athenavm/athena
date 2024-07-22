@@ -3,99 +3,90 @@ use serde::{Deserialize, Serialize};
 /// An record of a write to a memory address.
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct MemoryRecord {
-    /// The value at the memory address.
-    pub value: u32,
+  /// The value at the memory address.
+  pub value: u32,
 
-    /// The timestamp at which the memory address was last written to.
-    pub timestamp: u32,
+  /// The timestamp at which the memory address was last written to.
+  pub timestamp: u32,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum MemoryAccessPosition {
-    Memory = 0,
-    // Note that these AccessPositions mean that when when read/writing registers, they must be
-    // read/written in the following order: C, B, A.
-    C = 1,
-    B = 2,
-    A = 3,
+  Memory = 0,
+  // Note that these AccessPositions mean that when when read/writing registers, they must be
+  // read/written in the following order: C, B, A.
+  C = 1,
+  B = 2,
+  A = 3,
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum MemoryRecordEnum {
-    Read(MemoryReadRecord),
-    Write(MemoryWriteRecord),
+  Read(MemoryReadRecord),
+  Write(MemoryWriteRecord),
 }
 
 #[allow(clippy::manual_non_exhaustive)]
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct MemoryReadRecord {
-    pub value: u32,
-    pub timestamp: u32,
-    pub prev_timestamp: u32,
-    _private: (),
+  pub value: u32,
+  pub timestamp: u32,
+  pub prev_timestamp: u32,
+  _private: (),
 }
 
 #[allow(clippy::manual_non_exhaustive)]
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct MemoryWriteRecord {
-    pub value: u32,
-    pub timestamp: u32,
-    pub prev_value: u32,
-    pub prev_timestamp: u32,
-    _private: (),
+  pub value: u32,
+  pub timestamp: u32,
+  pub prev_value: u32,
+  pub prev_timestamp: u32,
+  _private: (),
 }
 
 impl MemoryRecordEnum {
-    pub const fn value(&self) -> u32 {
-        match self {
-            MemoryRecordEnum::Read(record) => record.value,
-            MemoryRecordEnum::Write(record) => record.value,
-        }
+  pub const fn value(&self) -> u32 {
+    match self {
+      MemoryRecordEnum::Read(record) => record.value,
+      MemoryRecordEnum::Write(record) => record.value,
     }
+  }
 }
 
 impl From<MemoryReadRecord> for MemoryRecordEnum {
-    fn from(read_record: MemoryReadRecord) -> Self {
-        MemoryRecordEnum::Read(read_record)
-    }
+  fn from(read_record: MemoryReadRecord) -> Self {
+    MemoryRecordEnum::Read(read_record)
+  }
 }
 
 impl From<MemoryWriteRecord> for MemoryRecordEnum {
-    fn from(write_record: MemoryWriteRecord) -> Self {
-        MemoryRecordEnum::Write(write_record)
-    }
+  fn from(write_record: MemoryWriteRecord) -> Self {
+    MemoryRecordEnum::Write(write_record)
+  }
 }
 
 impl MemoryReadRecord {
-    pub const fn new(
-        value: u32,
-        timestamp: u32,
-        prev_timestamp: u32,
-    ) -> Self {
-        assert!(timestamp > prev_timestamp);
-        Self {
-            value,
-            timestamp,
-            prev_timestamp,
-            _private: (),
-        }
+  pub const fn new(value: u32, timestamp: u32, prev_timestamp: u32) -> Self {
+    assert!(timestamp > prev_timestamp);
+    Self {
+      value,
+      timestamp,
+      prev_timestamp,
+      _private: (),
     }
+  }
 }
 
 impl MemoryWriteRecord {
-    pub const fn new(
-        value: u32,
-        timestamp: u32,
-        prev_value: u32,
-        prev_timestamp: u32,
-    ) -> Self {
-        assert!(timestamp > prev_timestamp);
-        Self {
-            value,
-            timestamp,
-            prev_value,
-            prev_timestamp,
-            _private: (),
-        }
+  pub const fn new(value: u32, timestamp: u32, prev_value: u32, prev_timestamp: u32) -> Self {
+    assert!(timestamp > prev_timestamp);
+    Self {
+      value,
+      timestamp,
+      prev_value,
+      prev_timestamp,
+      _private: (),
     }
+  }
 }

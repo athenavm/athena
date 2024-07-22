@@ -16,18 +16,21 @@ impl<T> Syscall<T> for SyscallHostRead
 where
   T: HostInterface,
 {
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
+
     // marshal inputs
-    let address_words = ADDRESS_LENGTH / 4;
     let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
-    let address = ctx.slice_unsafe(arg2, address_words);
 
     // read value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    let value = host.borrow().get_storage(
-      &AddressWrapper::from(address).into(),
-      &Bytes32Wrapper::from(key).into(),
-    );
+    let value = host
+      .borrow()
+      .get_storage(athena_ctx.address(), &Bytes32Wrapper::from(key).into());
 
     // set return value
     let value_vec: Vec<u32> = Bytes32Wrapper::new(value).into();
@@ -49,21 +52,20 @@ where
   T: HostInterface,
 {
   fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
-    // marshal inputs
-    let address_words = ADDRESS_LENGTH / 4;
-    let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
-    let address = ctx.slice_unsafe(arg2, address_words);
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
 
-    // we need to read the value to write from the next register
-    let a2 = Register::X12;
-    let rt = &mut ctx.rt;
-    let value_ptr = rt.register(a2);
-    let value = ctx.slice_unsafe(value_ptr, BYTES32_LENGTH / 4);
+    // marshal inputs
+    let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
+    let value = ctx.slice_unsafe(arg2, BYTES32_LENGTH / 4);
 
     // write value to host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
     let status_code = host.borrow_mut().set_storage(
-      &AddressWrapper::from(address).into(),
+      athena_ctx.address(),
       &Bytes32Wrapper::from(key).into(),
       &Bytes32Wrapper::from(value).into(),
     );
