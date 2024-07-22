@@ -23,56 +23,59 @@ pub type Revision = ffi::athcon_revision;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+  use super::*;
 
-    // These tests check for Default, PartialEq and Clone traits.
-    #[test]
-    fn address_smoke_test() {
-        let a = ffi::athcon_address::default();
-        let b = Address::default();
-        assert_eq!(a.clone(), b.clone());
-    }
+  // These tests check for Default, PartialEq and Clone traits.
+  #[test]
+  fn address_smoke_test() {
+    let a = ffi::athcon_address::default();
+    let b = Address::default();
+    assert_eq!(a.clone(), b.clone());
+  }
 
-    #[test]
-    fn bytes32_smoke_test() {
-        let a = ffi::athcon_bytes32::default();
-        let b = Bytes32::default();
-        assert_eq!(a.clone(), b.clone());
-    }
+  #[test]
+  fn bytes32_smoke_test() {
+    let a = ffi::athcon_bytes32::default();
+    let b = Bytes32::default();
+    assert_eq!(a.clone(), b.clone());
+  }
 
-    #[test]
-    fn uint26be_smoke_test() {
-        let a = ffi::athcon_uint256be::default();
-        let b = Uint256::default();
-        assert_eq!(a.clone(), b.clone());
-    }
+  #[test]
+  fn uint26be_smoke_test() {
+    let a = ffi::athcon_uint256be::default();
+    let b = Uint256::default();
+    assert_eq!(a.clone(), b.clone());
+  }
 
-    #[test]
-    fn status_code() {
-        assert_eq!(
-            StatusCode::ATHCON_SUCCESS,
-            ffi::athcon_status_code::ATHCON_SUCCESS
-        );
-        assert_eq!(
-            StatusCode::ATHCON_FAILURE,
-            ffi::athcon_status_code::ATHCON_FAILURE
-        );
-    }
+  #[test]
+  fn status_code() {
+    assert_eq!(
+      StatusCode::ATHCON_SUCCESS,
+      ffi::athcon_status_code::ATHCON_SUCCESS
+    );
+    assert_eq!(
+      StatusCode::ATHCON_FAILURE,
+      ffi::athcon_status_code::ATHCON_FAILURE
+    );
+  }
 
-    #[test]
-    fn storage_status() {
-        assert_eq!(
-            StorageStatus::ATHCON_STORAGE_ASSIGNED,
-            ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED
-        );
-        assert_eq!(
-            StorageStatus::ATHCON_STORAGE_MODIFIED,
-            ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED
-        );
-    }
+  #[test]
+  fn storage_status() {
+    assert_eq!(
+      StorageStatus::ATHCON_STORAGE_ASSIGNED,
+      ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED
+    );
+    assert_eq!(
+      StorageStatus::ATHCON_STORAGE_MODIFIED,
+      ffi::athcon_storage_status::ATHCON_STORAGE_MODIFIED
+    );
+  }
 
-    #[test]
-    fn revision() {
-        assert_eq!(Revision::ATHCON_FRONTIER, ffi::athcon_revision::ATHCON_FRONTIER);
-    }
+  #[test]
+  fn revision() {
+    assert_eq!(
+      Revision::ATHCON_FRONTIER,
+      ffi::athcon_revision::ATHCON_FRONTIER
+    );
+  }
 }

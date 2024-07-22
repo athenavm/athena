@@ -12,27 +12,27 @@ pub type athcon_host_context = ::std::os::raw::c_void;
 // TODO: add `.derive_default(true)` to bindgen instead?
 
 impl Default for athcon_address {
-    fn default() -> Self {
-        athcon_address { bytes: [0u8; 24] }
-    }
+  fn default() -> Self {
+    athcon_address { bytes: [0u8; 24] }
+  }
 }
 
 impl Default for athcon_bytes32 {
-    fn default() -> Self {
-        athcon_bytes32 { bytes: [0u8; 32] }
-    }
+  fn default() -> Self {
+    athcon_bytes32 { bytes: [0u8; 32] }
+  }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::mem::size_of;
+  use std::mem::size_of;
 
-    use super::*;
+  use super::*;
 
-    #[test]
-    fn container_new() {
-        assert_eq!(size_of::<athcon_bytes32>(), 32);
-        assert_eq!(size_of::<athcon_address>(), 24);
-        assert!(size_of::<athcon_vm>() <= 64);
-    }
+  #[test]
+  fn container_new() {
+    assert_eq!(size_of::<athcon_bytes32>(), 32);
+    assert_eq!(size_of::<athcon_address>(), 24);
+    assert!(size_of::<athcon_vm>() <= 64);
+  }
 }

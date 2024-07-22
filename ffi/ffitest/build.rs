@@ -1,6 +1,6 @@
 use std::env;
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
   // Define the path to the library's source code
@@ -17,6 +17,9 @@ fn main() {
     .expect("Failed to compile the library");
 
   // Tell cargo to link the compiled library
-  println!("cargo:rustc-link-search=native={}", out_dir.join("release").display());
+  println!(
+    "cargo:rustc-link-search=native={}",
+    out_dir.join("release").display()
+  );
   println!("cargo:rustc-link-lib=dylib=athena_vmlib"); // Adjust the library name as necessary
 }
