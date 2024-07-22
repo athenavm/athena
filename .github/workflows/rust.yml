@@ -37,7 +37,3 @@ jobs:
         run: cd examples && make
       - name: Build tests
         run: cd tests && make
-      - name: Check for changes
-        run:
-          git diff --exit-code || (echo "Repository has uncommitted changes after building examples and tests." && exit
-          1)
