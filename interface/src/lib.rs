@@ -290,11 +290,9 @@ impl ExecutionResult {
 }
 
 pub trait HostInterface {
-  fn account_exists(&self, addr: &Address) -> bool;
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
-  fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
 }
 
@@ -407,10 +405,6 @@ impl<'a> Default for MockHost<'a> {
 }
 
 impl<'a> HostInterface for MockHost<'a> {
-  fn account_exists(&self, _addr: &Address) -> bool {
-    self.balance.contains_key(_addr)
-  }
-
   fn get_storage(&self, _addr: &Address, _key: &Bytes32) -> Bytes32 {
     self
       .storage
@@ -429,10 +423,6 @@ impl<'a> HostInterface for MockHost<'a> {
 
   fn get_balance(&self, _addr: &Address) -> u64 {
     self.balance.get(_addr).copied().unwrap_or(0)
-  }
-
-  fn get_block_hash(&self, _block_height: i64) -> Bytes32 {
-    Bytes32::default()
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
