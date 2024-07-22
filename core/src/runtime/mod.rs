@@ -894,22 +894,20 @@ pub mod tests {
   }
 
   #[test]
-  fn test_host_gas() {
-    let program = host_program();
-    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+  fn test_gas() {
+    let program = fibonacci_program();
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
     // we need a new host provider for each test to reset state
     fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
       Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
     }
 
-    // program should cost 11237 gas units
-
     // failure
     let mut runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(9884)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(539)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
@@ -918,8 +916,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(9885)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(540)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -929,8 +926,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(9886)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(541)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
