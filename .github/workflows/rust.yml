@@ -27,6 +27,7 @@ jobs:
       - name: Test cargo-athena
         working-directory: ${{ runner.temp }}
         run: |
+          ${{ github.workspace }}/target/debug/cargo-athena athena install-toolchain
           ${{ github.workspace }}/target/debug/cargo-athena athena new test
           cd test/program
           ${{ github.workspace }}/target/debug/cargo-athena athena build
