@@ -294,7 +294,6 @@ pub trait HostInterface {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
-  fn get_tx_context(&self) -> TransactionContext;
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
 }
@@ -430,10 +429,6 @@ impl<'a> HostInterface for MockHost<'a> {
 
   fn get_balance(&self, _addr: &Address) -> u64 {
     self.balance.get(_addr).copied().unwrap_or(0)
-  }
-
-  fn get_tx_context(&self) -> TransactionContext {
-    unimplemented!()
   }
 
   fn get_block_hash(&self, _block_height: i64) -> Bytes32 {

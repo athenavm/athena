@@ -448,9 +448,6 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
     let balance = self.context.get_balance(&AddressWrapper(*addr).into());
     Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
   }
-  fn get_tx_context(&self) -> TransactionContext {
-    TransactionContextWrapper(*self.context.get_tx_context()).into()
-  }
   fn get_block_hash(&self, number: i64) -> Bytes32 {
     Bytes32Wrapper::from(self.context.get_block_hash(number)).into()
   }
