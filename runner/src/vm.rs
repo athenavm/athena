@@ -36,7 +36,7 @@ where
     host: Arc<RefCell<HostProvider<T>>>,
     _rev: AthenaRevision,
     msg: AthenaMessage,
-    // note: ignore _msg.code, should only be used on deploy
+    // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
     // construct context object
