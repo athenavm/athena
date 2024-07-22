@@ -165,3 +165,35 @@ where
     Some(res.status_code as u32)
   }
 }
+
+pub struct SyscallHostGetBalance;
+
+impl SyscallHostGetBalance {
+  pub const fn new() -> Self {
+    Self
+  }
+}
+
+impl<T> Syscall<T> for SyscallHostGetBalance
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
+
+    // get value from host
+    let host = ctx.rt.host.as_mut().expect("Missing host interface");
+    let balance = host.borrow_mut().get_balance(athena_ctx.address());
+    let balance_high = (balance >> 32) as u32;
+    let balance_low = balance as u32;
+    let balance_slice = [balance_low, balance_high];
+
+    // return to caller
+    ctx.mw_slice(arg1, &balance_slice);
+    None
+  }
+}

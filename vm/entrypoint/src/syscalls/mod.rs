@@ -29,3 +29,4 @@ pub const HINT_READ: u32 = 0x00_00_00_F1;
 pub const HOST_READ: u32 = 0x00_00_00_A0;
 pub const HOST_WRITE: u32 = 0x00_00_00_A1;
 pub const HOST_CALL: u32 = 0x00_00_00_A2;
+pub const HOST_GETBALANCE: u32 = 0x00_00_00_A3;
