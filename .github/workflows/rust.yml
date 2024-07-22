@@ -24,13 +24,15 @@ jobs:
         run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose --all-features
+      - name: Update path
+        run: echo "${{ github.workspace }}/target/debug" >> $GITHUB_PATH
       - name: Test cargo-athena
         working-directory: ${{ runner.temp }}
         run: |
-          ${{ github.workspace }}/target/debug/cargo-athena athena install-toolchain
-          ${{ github.workspace }}/target/debug/cargo-athena athena new test
+          cargo athena install-toolchain
+          cargo athena new test
           cd test/program
-          ${{ github.workspace }}/target/debug/cargo-athena athena build
+          cargo athena build
       - name: Build examples
         run: cd examples && make
       - name: Build tests
