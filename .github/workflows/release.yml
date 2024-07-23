@@ -158,7 +158,7 @@ jobs:
             bin=./target/$target/release/$name$exe
             file "$bin" || true
             ldd "$bin" || true
-            $bin --version || true
+            $bin athena --version || true
           done
 
           libs=(libathena_vmlib)
@@ -179,24 +179,24 @@ jobs:
         run: |
           if [ "$PLATFORM_NAME" == "linux" ]; then
             tar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
-            echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
             tar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.so
-            echo "file_name=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
             # We need to use gtar here otherwise the archive is corrupt.
             # See: https://github.com/actions/virtual-environments/issues/2619
             gtar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
-            echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
             gtar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.dylib
-            echo "file_name=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           else
             cd ./target/${TARGET}/release
             7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-athena.exe
             mv "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
-            echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
+            echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
             7z a -tzip "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" libathena_vmlib.dll
             mv "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
-            echo "file_name=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
+            echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
           fi
 
       # Creates the release for this specific version
@@ -208,7 +208,8 @@ jobs:
           prerelease: ${{ env.IS_NIGHTLY }}
           body: ${{ needs.prepare.outputs.changelog }}
           files: |
-            ${{ steps.artifacts.outputs.file_name }}
+            ${{ steps.artifacts.outputs.file_name_1 }}
+            ${{ steps.artifacts.outputs.file_name_2 }}
 
       # If this is a nightly release, it also updates the release
       # tagged `nightly` for compatibility with `foundryup`
@@ -221,7 +222,8 @@ jobs:
           prerelease: true
           body: ${{ needs.prepare.outputs.changelog }}
           files: |
-            ${{ steps.artifacts.outputs.file_name }}
+            ${{ steps.artifacts.outputs.file_name_1 }}
+            ${{ steps.artifacts.outputs.file_name_2 }}
 
   cleanup:
     name: Release cleanup
