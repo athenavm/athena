@@ -1,5 +1,5 @@
 [package]
-name = "athena-precompiles"
+name = "athena-lib"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true

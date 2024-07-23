@@ -1,20 +1,22 @@
+extern crate alloc;
+
 pub mod heap;
 pub mod helpers;
 pub mod syscalls;
 pub mod host {
   pub use athena_hostfunctions::*;
 }
+#[cfg(feature = "lib")]
 pub mod io {
-  pub use athena_precompiles::io::*;
+  pub use athena_lib::io::*;
 }
-pub mod precompiles {
-  pub use athena_precompiles::*;
+#[cfg(feature = "lib")]
+pub mod lib {
+  pub use athena_lib::*;
 }
 pub mod types {
   pub use athena_interface::*;
 }
-
-extern crate alloc;
 
 #[macro_export]
 macro_rules! entrypoint {
