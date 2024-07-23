@@ -70,7 +70,7 @@ fn execute_build_cmd(
     )
   };
   if let Err(err) = path_output {
-    panic!("Failed to build ATHENA program: {}.", err);
+    panic!("Failed to build Athena program: {}.", err);
   }
 
   Ok(ExitStatus::default())

@@ -69,10 +69,13 @@ pub struct Runtime<T: HostInterface> {
   /// Max gas for the runtime.
   pub max_gas: Option<u32>,
 
+  /// The state of the runtime when in unconstrained mode.
   pub(crate) unconstrained_state: ForkState,
 
+  /// The mapping between syscall codes and their implementations.
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
 
+  /// The maximum number of cycles for a syscall.
   pub max_syscall_cycles: u32,
 }
 
