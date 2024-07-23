@@ -48,12 +48,12 @@ pub fn build_program(path: &str) {
   }
 }
 
-/// Executes the `cargo athena build` command in the program directory
+/// Executes the `cargo prove build` command in the program directory
 fn execute_build_cmd(
   program_dir: &impl AsRef<std::path::Path>,
 ) -> Result<std::process::ExitStatus, std::io::Error> {
   // Check if RUSTC_WORKSPACE_WRAPPER is set to clippy-driver (i.e. if `cargo clippy` is the current
-  // compiler). If so, don't execute `cargo athena build` because it breaks rust-analyzer's `cargo clippy` feature.
+  // compiler). If so, don't execute `cargo prove build` because it breaks rust-analyzer's `cargo clippy` feature.
   let is_clippy_driver = std::env::var("RUSTC_WORKSPACE_WRAPPER")
     .map(|val| val.contains("clippy-driver"))
     .unwrap_or(false);
@@ -65,7 +65,7 @@ fn execute_build_cmd(
   let mut cmd = Command::new("cargo");
   cmd
     .current_dir(program_dir)
-    .args(["athena", "build"])
+    .args(["prove", "build"])
     .env_remove("RUSTC")
     .stdout(Stdio::piped())
     .stderr(Stdio::piped());
@@ -74,14 +74,14 @@ fn execute_build_cmd(
   let stdout = BufReader::new(child.stdout.take().unwrap());
   let stderr = BufReader::new(child.stderr.take().unwrap());
 
-  // Pipe stdout and stderr to the parent process with [athena] prefix
+  // Pipe stdout and stderr to the parent process with [sp1] prefix
   let stdout_handle = thread::spawn(move || {
     stdout.lines().for_each(|line| {
-      println!("[athena] {}", line.unwrap());
+      println!("[sp1] {}", line.unwrap());
     });
   });
   stderr.lines().for_each(|line| {
-    eprintln!("[athena] {}", line.unwrap());
+    eprintln!("[sp1] {}", line.unwrap());
   });
 
   stdout_handle.join().unwrap();
