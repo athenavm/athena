@@ -34,7 +34,7 @@ impl AthenaStdin {
   }
 
   /// Read a value from the buffer.
-  pub fn read<T: Serialize>(&mut self) -> T {
+  pub fn read<T: DeserializeOwned>(&mut self) -> T {
     let result: T = bincode::deserialize(&self.buffer[self.ptr]).expect("failed to deserialize");
     self.ptr += 1;
     result
@@ -71,7 +71,7 @@ impl AthenaPublicValues {
     }
   }
 
-  pub fn bytes(&self) -> String {
+  pub fn raw(&self) -> String {
     format!("0x{}", hex::encode(self.buffer.data.clone()))
   }
 
