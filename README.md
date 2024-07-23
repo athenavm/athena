@@ -29,7 +29,7 @@ Athena is currently in a prototype stage. The goal of this stage of the project 
 | ----- | ----------- | ------ | ------ |
 | 0. Initial R&D | Study the status quo, finalize prototype design | ✅ | [read][13] |
 | 1. Prototype VM | Build a VM that can compile and run RISC-V code | ✅ | [read][14] |
-| 2. Blockchain integration | Add FFI and support for host functions, gas metering, etc. | 🚧 | coming soon |
+| 2. Blockchain integration | Add FFI and support for host functions, gas metering, etc. | 🚧 | [read][15] |
 | 3. go-spacemesh integration | Prototype integration into the go-spacemesh full node | ⛔ | |
 | 4. Testnet launch | Launch a testnet where Athena smart contracts can be tested | ⛔ | |
 | 5. Mechanism/rollup design | Turn Athena into an optimistic rollup with incentives, punishments, etc. | ⛔ | |
@@ -58,3 +58,4 @@ This project is dual-licensed under both the Apache and MIT Licenses, at your op
 [12]: https://github.com/athenavm/athena/projects?query=is%3Aopen
 [13]: https://www.athenavm.org/athena/update/2024/05/09/project-update.html
 [14]: https://www.athenavm.org/athena/update/2024/06/14/june-project-update.html
+[15]: https://www.athenavm.org/athena/update/2024/07/20/july-project-update.html
