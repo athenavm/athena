@@ -113,6 +113,7 @@ jobs:
     name: Examples
     runs-on: ubuntu-latest
     env:
+      ATHENA_DIR: "${{ github.workspace }}/.athena"
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
       - name: Checkout sources
@@ -124,15 +125,15 @@ jobs:
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
-          ~/.athena/bin/athup
-          ~/.athena/bin/cargo-athena athena --version
+          $ATHENA_DIR/bin/athup
+          $ATHENA_DIR/bin/cargo-athena athena --version
+          echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
 
       - name: Install Athena CLI
         run: |
           cd cli
           cargo install --force --locked --path .
-          ~/.athena/bin/cargo-athena athena install-toolchain
-          # cd ~
+          cargo athena install-toolchain
 
       - name: Run cargo check
         run: |
@@ -165,9 +166,9 @@ jobs:
           cargo install --force --locked --path .
           cargo athena install-toolchain
 
-      - name: Run cargo prove new
+      - name: Run cargo athena new
         run: |
-          cargo athena new fibonacci --version dev
+          cargo athena new fibonacci
 
       - name: Build program and run script
         run: |
