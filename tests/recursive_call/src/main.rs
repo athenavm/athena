@@ -18,7 +18,6 @@ fn return_value(value: u32) {
   println!("Returning {}", value);
   let mut key = bytes32_to_32bit_words(STORAGE_KEY);
   let val: [u32; 8] = [value, 0, 0, 0, 0, 0, 0, 0];
-  let address = address_to_32bit_words(ADDRESS_ALICE);
   unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), val.as_ptr()) };
   assert!(
     key == STORAGE_ADDED || key == STORAGE_MODIFIED,
@@ -30,8 +29,12 @@ fn return_value(value: u32) {
 fn recursive_call(value: u32) -> u32 {
   // we need a pointer to the value as an array
   let val: [u32; 4] = [value, 0, 0, 0];
+
+  // same for amount to send
+  let amount: [u32; 2] = [0, 0];
+
   let address = address_to_32bit_words(ADDRESS_ALICE);
-  unsafe { athena_vm::host::call(address.as_ptr(), val.as_ptr(), 4) };
+  unsafe { athena_vm::host::call(address.as_ptr(), val.as_ptr(), 4, amount.as_ptr()) };
 
   // read the return value
   let mut key = bytes32_to_32bit_words(STORAGE_KEY);

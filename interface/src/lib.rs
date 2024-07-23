@@ -420,17 +420,17 @@ impl<'a> Default for MockHost<'a> {
 }
 
 impl<'a> HostInterface for MockHost<'a> {
-  fn get_storage(&self, _addr: &Address, _key: &Bytes32) -> Bytes32 {
+  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     self
       .storage
-      .get(&(*_addr, *_key))
+      .get(&(*addr, *key))
       .copied()
       .unwrap_or(Bytes32::default())
   }
 
-  fn set_storage(&mut self, _addr: &Address, _key: &Bytes32, _value: &Bytes32) -> StorageStatus {
+  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     // this is a very simplistic implementation and does NOT handle all possible cases correctly
-    match self.storage.insert((*_addr, *_key), *_value) {
+    match self.storage.insert((*addr, *key), *value) {
       None => StorageStatus::StorageAdded,
       Some(_) => StorageStatus::StorageModified,
     }
@@ -647,7 +647,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::InsufficientBalance);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS-100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
 
     // bob is not callable (which means coins also cannot be sent, even if we have them)
@@ -663,7 +663,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Failure);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS-100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
     assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
   }
 }

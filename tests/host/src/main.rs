@@ -56,7 +56,15 @@ pub fn main() {
   // Charlie does accept calls
   // Note: there is no way to check the result of a call
   // It either works, or it panics
-  unsafe { athena_vm::host::call(address_charlie.as_ptr(), std::ptr::null(), 0) };
+  let value: [u32; 2] = [0, 0];
+  unsafe {
+    athena_vm::host::call(
+      address_charlie.as_ptr(),
+      std::ptr::null(),
+      0,
+      value.as_ptr(),
+    )
+  };
 
   // Check balance
   let mut value: [u32; 2] = [0, 0];

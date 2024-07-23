@@ -9,5 +9,6 @@ use athena_vm::types::ADDRESS_ALICE;
 pub fn main() {
   // recurse forever
   let address = address_to_32bit_words(ADDRESS_ALICE);
-  unsafe { athena_vm::host::call(address.as_ptr(), std::ptr::null(), 0) };
+  let value: [u32; 2] = [0, 0];
+  unsafe { athena_vm::host::call(address.as_ptr(), std::ptr::null(), 0, value.as_ptr()) };
 }
