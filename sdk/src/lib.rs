@@ -2,9 +2,6 @@
 //!
 //! A library for interacting with the Athena RISC-V VM.
 
-#![allow(incomplete_features)]
-#![feature(generic_const_exprs)]
-
 pub mod utils {
   pub use athena_core::utils::setup_logger;
 }
