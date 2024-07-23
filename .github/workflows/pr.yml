@@ -124,14 +124,14 @@ jobs:
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
-          ~/.athena/bin/sp1up
+          ~/.athena/bin/athup
           ~/.athena/bin/cargo-athena athena --version
 
       - name: Install Athena CLI
         run: |
           cd cli
           cargo install --force --locked --path .
-          ~/.sp1/bin/cargo-athena athena install-toolchain
+          ~/.athena/bin/cargo-athena athena install-toolchain
           # cd ~
 
       - name: Run cargo check
@@ -154,14 +154,14 @@ jobs:
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
-          ~/.athena/bin/sp1up
+          ~/.athena/bin/athup
           ~/.athena/bin/cargo-athena athena --version
 
       - name: Install Athena CLI
         run: |
           cd cli
           cargo install --force --locked --path .
-          ~/.sp1/bin/cargo-athena athena install-toolchain
+          ~/.athena/bin/cargo-athena athena install-toolchain
           # cd ~
 
       - name: Run cargo prove new
