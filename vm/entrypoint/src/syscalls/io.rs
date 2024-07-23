@@ -9,7 +9,6 @@ cfg_if::cfg_if! {
 pub extern "C" fn syscall_write(fd: u32, write_buf: *const u8, nbytes: usize) {
   cfg_if::cfg_if! {
     if #[cfg(target_os = "zkvm")] {
-      const FD_PUBLIC_VALUES: u32 = 3;
       unsafe {
           asm!(
               "ecall",

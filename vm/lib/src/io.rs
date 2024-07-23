@@ -157,14 +157,3 @@ pub fn hint_slice(buf: &[u8]) {
   let mut my_reader = SyscallWriter { fd: FD_HINT };
   my_reader.write_all(buf).unwrap();
 }
-
-/// Write the data `buf` to the file descriptor `fd`.
-///
-/// ### Examples
-/// ```ignore
-/// let data = vec![1, 2, 3, 4];
-/// athena_vm::io::write(3, &data);
-/// ```
-pub fn write(fd: u32, buf: &[u8]) {
-  SyscallWriter { fd }.write_all(buf).unwrap();
-}

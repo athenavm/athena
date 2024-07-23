@@ -909,7 +909,7 @@ pub mod tests {
     let mut runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(539)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(543)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
@@ -918,7 +918,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(540)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -928,7 +928,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(541)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
