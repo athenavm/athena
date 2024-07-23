@@ -125,7 +125,7 @@ jobs:
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
-          $ATHENA_DIR/bin/athup
+          $ATHENA_DIR/bin/athup --path $GITHUB_WORKSPACE
           $ATHENA_DIR/bin/cargo-athena athena --version
           echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
 
@@ -156,7 +156,7 @@ jobs:
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
-          $ATHENA_DIR/bin/athup
+          $ATHENA_DIR/bin/athup --path $GITHUB_WORKSPACE
           $ATHENA_DIR/bin/cargo-athena athena --version
           echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
 
