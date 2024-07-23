@@ -120,7 +120,7 @@ where
     let address = ctx.slice_unsafe(arg1, address_words);
     let address = AddressWrapper::from(address);
 
-    // we need to read the input length from the next register
+    // read the input length from the next register
     let a2 = Register::X12;
     let len = ctx.rt.register(a2) as usize;
 
@@ -141,6 +141,14 @@ where
       None
     };
 
+    // read the amount pointer from the next register as little-endian
+    let a3 = Register::X13;
+    let amount_ptr = ctx.rt.register(a3);
+    let amount_slice = ctx.slice_unsafe(amount_ptr, 2);
+    let amount = u64::from(amount_slice[0]) | (u64::from(amount_slice[1]) << 32);
+
+    // note: host is responsible for checking balance and stack depth
+
     // construct the outbound message
     let msg = AthenaMessage::new(
       MessageKind::Call,
@@ -149,7 +157,7 @@ where
       address.into(),
       athena_ctx.address().clone(),
       input,
-      0,
+      amount,
       Vec::new(),
     );
     let res = host.call(msg);
@@ -163,5 +171,37 @@ where
     ctx.rt.state.clk += gas_spent;
 
     Some(res.status_code as u32)
+  }
+}
+
+pub struct SyscallHostGetBalance;
+
+impl SyscallHostGetBalance {
+  pub const fn new() -> Self {
+    Self
+  }
+}
+
+impl<T> Syscall<T> for SyscallHostGetBalance
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
+
+    // get value from host
+    let host = ctx.rt.host.as_mut().expect("Missing host interface");
+    let balance = host.borrow_mut().get_balance(athena_ctx.address());
+    let balance_high = (balance >> 32) as u32;
+    let balance_low = balance as u32;
+    let balance_slice = [balance_low, balance_high];
+
+    // return to caller
+    ctx.mw_slice(arg1, &balance_slice);
+    None
   }
 }

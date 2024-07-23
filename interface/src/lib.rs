@@ -290,12 +290,9 @@ impl ExecutionResult {
 }
 
 pub trait HostInterface {
-  fn account_exists(&self, addr: &Address) -> bool;
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
-  fn get_tx_context(&self) -> TransactionContext;
-  fn get_block_hash(&self, number: i64) -> Bytes32;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
 }
 
@@ -368,6 +365,22 @@ impl<'a> MockHost<'a> {
   pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
     self.programs.insert(address, code);
   }
+
+  fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
+    let balance_from = self.get_balance(from);
+    let balance_to = self.get_balance(to);
+    if value > balance_from {
+      return StatusCode::InsufficientBalance;
+    }
+    self.balance.insert(*from, balance_from - value);
+    match balance_to.checked_add(value) {
+      Some(new_balance) => {
+        self.balance.insert(*to, new_balance);
+        StatusCode::Success
+      }
+      None => StatusCode::InternalError,
+    }
+  }
 }
 
 pub const ADDRESS_ALICE: Address = [1u8; ADDRESS_LENGTH];
@@ -394,8 +407,7 @@ impl<'a> Default for MockHost<'a> {
 
     // pre-populate some balances, values, and code for testing
     balance.insert(ADDRESS_ALICE, SOME_COINS);
-    balance.insert(ADDRESS_BOB, SOME_COINS);
-    balance.insert(ADDRESS_CHARLIE, SOME_COINS);
+    // balance.insert(ADDRESS_BOB, SOME_COINS);
     storage.insert((ADDRESS_ALICE, STORAGE_KEY), STORAGE_VALUE);
 
     Self {
@@ -408,39 +420,28 @@ impl<'a> Default for MockHost<'a> {
 }
 
 impl<'a> HostInterface for MockHost<'a> {
-  fn account_exists(&self, _addr: &Address) -> bool {
-    self.balance.contains_key(_addr)
-  }
-
-  fn get_storage(&self, _addr: &Address, _key: &Bytes32) -> Bytes32 {
+  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     self
       .storage
-      .get(&(*_addr, *_key))
+      .get(&(*addr, *key))
       .copied()
       .unwrap_or(Bytes32::default())
   }
 
-  fn set_storage(&mut self, _addr: &Address, _key: &Bytes32, _value: &Bytes32) -> StorageStatus {
+  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     // this is a very simplistic implementation and does NOT handle all possible cases correctly
-    match self.storage.insert((*_addr, *_key), *_value) {
+    match self.storage.insert((*addr, *key), *value) {
       None => StorageStatus::StorageAdded,
       Some(_) => StorageStatus::StorageModified,
     }
   }
 
-  fn get_balance(&self, _addr: &Address) -> u64 {
-    self.balance.get(_addr).copied().unwrap_or(0)
-  }
-
-  fn get_tx_context(&self) -> TransactionContext {
-    unimplemented!()
-  }
-
-  fn get_block_hash(&self, _block_height: i64) -> Bytes32 {
-    Bytes32::default()
+  fn get_balance(&self, addr: &Address) -> u64 {
+    self.balance.get(addr).copied().unwrap_or(0)
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+    let depth = msg.depth;
     log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
 
     // don't go too deep!
@@ -448,8 +449,31 @@ impl<'a> HostInterface for MockHost<'a> {
       return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None);
     }
 
+    // take snapshots of the state in case we need to roll back
+    // this is relatively expensive and we'd want to do something more sophisticated in production
+    // (journaling? CoW?) but it's fine for testing.
+    log::info!(
+      "MockHost::call:depth {} before backup storage item is :: {:?}",
+      depth,
+      self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+    );
+    let backup_storage = self.storage.clone();
+    let backup_balance = self.balance.clone();
+    let backup_programs = self.programs.clone();
+
+    // transfer balance
+    // note: the host should have already subtracted an amount from the sender
+    // equal to the maximum amount of gas that could be paid, so this should
+    // not allow an out of gas error.
+    match self.transfer_balance(&msg.sender, &msg.recipient, msg.value) {
+      StatusCode::Success => {}
+      status => {
+        return ExecutionResult::new(status, 0, None, None);
+      }
+    }
+
     // check programs list first
-    if let Some(code) = self.programs.get(&msg.recipient).cloned() {
+    let res = if let Some(code) = self.programs.get(&msg.recipient).cloned() {
       // create an owned, cloned copy of VM before taking the host from self
       let vm = self.vm.clone();
 
@@ -468,21 +492,38 @@ impl<'a> HostInterface for MockHost<'a> {
         .unwrap_or_else(|_| panic!("Arc still has multiple strong references"))
         .into_inner()
         .host;
-      return res;
-    }
-
-    // otherwise, pass a call to Charlie, fail all other calls
-    let status_code = if msg.recipient == ADDRESS_CHARLIE {
-      // calling charlie works
-      StatusCode::Success
+      res
     } else {
-      // no one else picks up the phone
-      StatusCode::Failure
+      // otherwise, pass a call to Charlie, fail all other calls
+      let status_code = if msg.recipient == ADDRESS_CHARLIE {
+        // calling charlie works
+        StatusCode::Success
+      } else {
+        // no one else picks up the phone
+        StatusCode::Failure
+      };
+
+      let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
+      ExecutionResult::new(status_code, gas_left, None, None)
     };
 
-    let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
-
-    return ExecutionResult::new(status_code, gas_left, None, None);
+    if res.status_code != StatusCode::Success {
+      log::info!(
+        "MockHost::call:depth {} before restore storage item is :: {:?}",
+        depth,
+        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+      );
+      // rollback state
+      self.storage = backup_storage;
+      self.balance = backup_balance;
+      self.programs = backup_programs;
+      log::info!(
+        "MockHost::call:depth {} after restore storage item is :: {:?}",
+        depth,
+        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+      );
+    }
+    res
   }
 }
 
@@ -541,5 +582,104 @@ mod tests {
     let address = [8; 24];
     let balance = host.get_balance(&address);
     assert_eq!(balance, 0);
+  }
+
+  #[test]
+  fn test_transfer_balance() {
+    let mut host = MockHost::new();
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(
+      host.transfer_balance(&ADDRESS_ALICE, &ADDRESS_CHARLIE, 1000),
+      StatusCode::Success
+    );
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 1000);
+    assert_eq!(
+      host.transfer_balance(&ADDRESS_CHARLIE, &ADDRESS_ALICE, 1001),
+      StatusCode::InsufficientBalance
+    );
+    assert_eq!(
+      host.transfer_balance(&ADDRESS_CHARLIE, &ADDRESS_ALICE, 1000),
+      StatusCode::Success
+    );
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+
+    // test overflow
+    host.balance.insert(ADDRESS_CHARLIE, u64::MAX);
+    assert_eq!(
+      host.transfer_balance(&ADDRESS_ALICE, &ADDRESS_CHARLIE, 1),
+      StatusCode::InternalError
+    );
+  }
+
+  #[test]
+  fn test_send_coins() {
+    let mut host = MockHost::new();
+
+    // send zero balance
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      0,
+      1000,
+      ADDRESS_CHARLIE,
+      ADDRESS_ALICE,
+      None,
+      0,
+      vec![],
+    );
+    let res = host.call(msg);
+    assert_eq!(res.status_code, StatusCode::Success);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+
+    // send some balance
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      0,
+      1000,
+      ADDRESS_CHARLIE,
+      ADDRESS_ALICE,
+      None,
+      100,
+      vec![],
+    );
+    let res = host.call(msg);
+    assert_eq!(res.status_code, StatusCode::Success);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
+
+    // try to send more than the sender has
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      0,
+      1000,
+      ADDRESS_CHARLIE,
+      ADDRESS_ALICE,
+      None,
+      SOME_COINS,
+      vec![],
+    );
+    let res = host.call(msg);
+    assert_eq!(res.status_code, StatusCode::InsufficientBalance);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
+
+    // bob is not callable (which means coins also cannot be sent, even if we have them)
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      0,
+      1000,
+      ADDRESS_BOB,
+      ADDRESS_ALICE,
+      None,
+      100,
+      vec![],
+    );
+    let res = host.call(msg);
+    assert_eq!(res.status_code, StatusCode::Failure);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
   }
 }

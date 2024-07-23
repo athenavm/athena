@@ -36,7 +36,7 @@ where
     host: Arc<RefCell<HostProvider<T>>>,
     _rev: AthenaRevision,
     msg: AthenaMessage,
-    // note: ignore _msg.code, should only be used on deploy
+    // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
     // construct context object
@@ -77,6 +77,7 @@ mod tests {
   use super::*;
   use athena_interface::{
     Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
+    STORAGE_KEY, STORAGE_VALUE,
   };
   use athena_sdk::utils;
 
@@ -119,6 +120,10 @@ mod tests {
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
     host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    assert_eq!(
+      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      STORAGE_VALUE
+    );
     let (mut output, _) = client
       .execute::<MockHost>(
         elf,
@@ -131,14 +136,29 @@ mod tests {
     let result = output.read::<u32>();
     assert_eq!(result, 21, "got wrong fibonacci value");
 
+    // expect storage value to also have been updated
+    assert_eq!(
+      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      [
+        21u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0
+      ]
+    );
+
     // trying to go any higher should result in an out-of-gas error
+    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let mut stdin = AthenaStdin::new();
     stdin.write::<u32>(&9);
+    assert_eq!(
+      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      STORAGE_VALUE
+    );
     let res = client.execute::<MockHost>(
       elf,
       stdin,
       Some(host.clone()),
-      Some(1_000_000),
+      Some(100_000),
       Some(ctx.clone()),
     );
     match res {
@@ -146,6 +166,12 @@ mod tests {
       Err(ExecutionError::HostCallFailed(StatusCode::OutOfGas)) => (),
       Err(_) => panic!("expected out-of-gas error"),
     }
+
+    // expect storage value changes to have been reverted
+    assert_eq!(
+      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      STORAGE_VALUE
+    );
   }
 
   #[test]

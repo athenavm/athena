@@ -427,9 +427,6 @@ impl<'a> WrappedHostInterface<'a> {
 }
 
 impl<'a> HostInterface for WrappedHostInterface<'a> {
-  fn account_exists(&self, addr: &Address) -> bool {
-    self.context.account_exists(&AddressWrapper(*addr).into())
-  }
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     let value_wrapper: Bytes32Wrapper = self
       .context
@@ -447,12 +444,6 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
   fn get_balance(&self, addr: &Address) -> Balance {
     let balance = self.context.get_balance(&AddressWrapper(*addr).into());
     Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
-  }
-  fn get_tx_context(&self) -> TransactionContext {
-    TransactionContextWrapper(*self.context.get_tx_context()).into()
-  }
-  fn get_block_hash(&self, number: i64) -> Bytes32 {
-    Bytes32Wrapper::from(self.context.get_block_hash(number)).into()
   }
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
     let execmsg = AthconExecutionMessage::from(AthenaMessageWrapper(msg));

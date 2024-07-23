@@ -818,9 +818,14 @@ pub mod tests {
 
   use crate::{
     runtime::ExecutionError,
+    runtime::MemoryAccessPosition,
     utils::{self, with_max_gas},
   };
-  use athena_interface::{Address, AthenaContext, HostProvider, MockHost, ADDRESS_ALICE};
+  use athena_interface::{
+    Address, AthenaContext, HostInterface, HostProvider, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE,
+    SOME_COINS,
+  };
+  use athena_vm::helpers::address_to_32bit_words;
 
   use crate::{
     runtime::Register,
@@ -891,22 +896,20 @@ pub mod tests {
   }
 
   #[test]
-  fn test_host_gas() {
-    let program = host_program();
-    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+  fn test_gas() {
+    let program = fibonacci_program();
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
     // we need a new host provider for each test to reset state
     fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
       Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
     }
 
-    // program should cost 11237 gas units
-
     // failure
     let mut runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(9884)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(539)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
@@ -915,8 +918,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(9885)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(540)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -926,12 +928,140 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      // program should cost 4332 gas units
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(9886)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(541)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
     assert_eq!(gas_left, Some(1));
+  }
+
+  #[test]
+  fn test_call_send() {
+    utils::setup_logger();
+
+    // recipient address
+    let address_words = address_to_32bit_words(ADDRESS_CHARLIE);
+
+    let amount_to_send = 1000;
+
+    // arbitrary memory locations
+    let memloc: u32 = 0x12345678;
+    let memloc2 = memloc.wrapping_add(address_words.len() as u32 * 4);
+
+    let mut instructions = vec![];
+
+    // write address to memory
+    for (i, word) in (0u32..).zip(address_words.iter()) {
+      instructions.push(Instruction::new(
+        Opcode::ADD,
+        Register::X16 as u32,
+        0,
+        *word,
+        false,
+        true,
+      ));
+      instructions.push(Instruction::new(
+        Opcode::SW,
+        Register::X16 as u32,
+        0,
+        memloc + i * 4,
+        false,
+        true,
+      ));
+    }
+
+    // write value to memory
+    instructions.push(Instruction::new(
+      Opcode::ADD,
+      Register::X16 as u32,
+      0,
+      amount_to_send,
+      false,
+      true,
+    ));
+    instructions.push(Instruction::new(
+      Opcode::SW,
+      Register::X16 as u32,
+      0,
+      memloc2,
+      false,
+      true,
+    ));
+    instructions.push(Instruction::new(
+      Opcode::ADD,
+      Register::X16 as u32,
+      0,
+      0,
+      false,
+      true,
+    ));
+    instructions.push(Instruction::new(
+      Opcode::SW,
+      Register::X16 as u32,
+      0,
+      memloc2 + 4,
+      false,
+      true,
+    ));
+
+    // X10 is arg1 (ptr to address)
+    instructions.push(Instruction::new(
+      Opcode::ADD,
+      Register::X10 as u32,
+      0,
+      memloc,
+      false,
+      true,
+    ));
+    instructions.push(
+      // X11 is arg2 (ptr to input)
+      // zero pointer
+      Instruction::new(Opcode::ADD, Register::X11 as u32, 0, 0, false, true),
+    );
+    instructions.push(
+      // X12 is arg3 (input len)
+      // no input
+      Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
+    );
+    instructions.push(
+      // X13 is arg4 (value ptr)
+      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, memloc2, false, true),
+    );
+    instructions.push(
+      // X5 is syscall ID
+      Instruction::new(
+        Opcode::ADD,
+        Register::X5 as u32,
+        0,
+        SyscallCode::HOST_CALL as u32,
+        false,
+        true,
+      ),
+    );
+    instructions.push(Instruction::new(Opcode::ECALL, 0, 0, 0, false, false));
+    let program = Program::new(instructions, 0, 0);
+
+    let host = MockHost::new();
+    let provider = Arc::new(RefCell::new(HostProvider::new(host)));
+    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    let mut runtime = Runtime::<MockHost>::new(program, Some(provider.clone()), opts, Some(ctx));
+
+    // balances before execution
+    assert_eq!(provider.borrow().get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(provider.borrow().get_balance(&ADDRESS_CHARLIE), 0);
+
+    assert!(runtime.execute().unwrap().is_some());
+
+    // balances after execution
+    assert_eq!(
+      provider.borrow().get_balance(&ADDRESS_ALICE),
+      SOME_COINS - amount_to_send as u64
+    );
+    assert_eq!(
+      provider.borrow().get_balance(&ADDRESS_CHARLIE),
+      amount_to_send as u64
+    );
   }
 
   #[test]
@@ -989,6 +1119,52 @@ pub mod tests {
       },
       Ok(_) => panic!("expected error, got Ok"),
     }
+  }
+
+  #[test]
+  fn test_get_balance() {
+    utils::setup_logger();
+
+    // arbitrary memory location
+    let memloc = 0x12345678;
+
+    let instructions = vec![
+      // X10 is arg1 (ptr to address)
+      // store result here
+      Instruction::new(Opcode::ADD, Register::X10 as u32, 0, memloc, false, true),
+      // X5 is syscall ID
+      Instruction::new(
+        Opcode::ADD,
+        Register::X5 as u32,
+        0,
+        SyscallCode::HOST_GETBALANCE as u32,
+        false,
+        true,
+      ),
+      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+    ];
+    let program = Program::new(instructions, 0, 0);
+
+    let host = MockHost::new();
+    let provider = HostProvider::new(host);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    let mut runtime = Runtime::<MockHost>::new(
+      program,
+      Some(Arc::new(RefCell::new(provider))),
+      opts,
+      Some(ctx),
+    );
+    let gas_left = runtime.execute().expect("execution failed");
+    assert!(gas_left.is_some());
+
+    // check result: we expect the u64 value to be split into two 32-bit words
+    let value_low = runtime.mr_cpu(memloc, MemoryAccessPosition::Memory);
+    let value_high = runtime.mr_cpu(memloc + 4, MemoryAccessPosition::Memory);
+    assert_eq!(
+      u64::from(value_high) << 32 | u64::from(value_low),
+      SOME_COINS
+    );
   }
 
   #[test]
