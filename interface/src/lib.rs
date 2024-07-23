@@ -453,7 +453,8 @@ impl<'a> HostInterface for MockHost<'a> {
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
     log::info!(
-      "MockHost::call:depth {} before backup storage item is :: {:?}",
+      "MockHost::call:id {:?} depth {} before backup storage item is :: {:?}",
+      self as *const Self as usize,
       depth,
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
@@ -507,18 +508,20 @@ impl<'a> HostInterface for MockHost<'a> {
       ExecutionResult::new(status_code, gas_left, None, None)
     };
 
+    log::info!(
+      "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
+      self as *const Self as usize,
+      depth,
+      self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+    );
     if res.status_code != StatusCode::Success {
-      log::info!(
-        "MockHost::call:depth {} before restore storage item is :: {:?}",
-        depth,
-        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
-      );
       // rollback state
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.programs = backup_programs;
       log::info!(
-        "MockHost::call:depth {} after restore storage item is :: {:?}",
+        "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
+        self as *const Self as usize,
         depth,
         self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
       );
