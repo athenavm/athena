@@ -25,6 +25,7 @@ jobs:
   test-x86:
     name: Test (x86-64)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
