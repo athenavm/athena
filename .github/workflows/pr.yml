@@ -154,6 +154,8 @@ jobs:
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
+          echo athup is ~/.athena/bin/athup
+          ls -laR ~/.athena
           ~/.athena/bin/athup
           ~/.athena/bin/cargo-athena athena --version
 
