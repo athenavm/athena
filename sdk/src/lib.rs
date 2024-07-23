@@ -111,6 +111,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
+    #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     client

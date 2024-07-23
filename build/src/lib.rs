@@ -136,7 +136,7 @@ fn create_local_command(args: &BuildArgs, program_dir: &Utf8PathBuf) -> Command 
     .current_dir(canonicalized_program_dir)
     .env("RUSTUP_TOOLCHAIN", "athena")
     .env("CARGO_ENCODED_RUSTFLAGS", get_rust_compiler_flags())
-    .args(&get_program_build_args(args));
+    .args(get_program_build_args(args));
   command
 }
 

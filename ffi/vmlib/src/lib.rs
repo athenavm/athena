@@ -36,7 +36,7 @@ impl AthconVm for AthenaVMWrapper {
   /// Note that we have to pass in raw `host` and `context` pointers here. If we wrap them into the
   /// `AthenaExecutionContext` object inside the top-level FFI function and pass it in here, it causes
   /// lifetime issues.
-  fn execute<'a>(
+  unsafe fn execute<'a>(
     &self,
     rev: Revision,
     code: &[u8],
@@ -58,6 +58,7 @@ impl AthconVm for AthenaVMWrapper {
     let execution_context = AthconExecutionContext::new(host_interface, context);
     let host = WrappedHostInterface::new(execution_context);
     let provider = HostProvider::new(host);
+    #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(provider));
 
     // Execute the code and proxy the result back to the caller
@@ -209,7 +210,7 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
     };
     let value: Bytes32AsU64 = item.0.value.into();
-    let code = if item.0.code.len() > 0 {
+    let code = if !item.0.code.is_empty() {
       Some(item.0.code.as_slice())
     } else {
       None
@@ -484,21 +485,22 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
 
 // This code is shared with the external FFI tests
 // These are raw tests, where the host context is null.
-pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
+#[allow(clippy::missing_safety_doc)]
+pub unsafe fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
   unsafe {
     // Ensure the returned pointer is not null
     assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
 
     // Perform additional checks on the returned VM instance
     let vm = &*vm_ptr;
-    assert_eq!((*vm).abi_version, 0, "ABI version mismatch");
+    assert_eq!(vm.abi_version, 0, "ABI version mismatch");
     assert_eq!(
-      std::ffi::CStr::from_ptr((*vm).name).to_str().unwrap(),
+      std::ffi::CStr::from_ptr(vm.name).to_str().unwrap(),
       "Athena",
       "VM name mismatch"
     );
     assert_eq!(
-      std::ffi::CStr::from_ptr((*vm).version).to_str().unwrap(),
+      std::ffi::CStr::from_ptr(vm.version).to_str().unwrap(),
       "0.1.0",
       "Version mismatch"
     );
@@ -507,7 +509,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
 
     // Test the FFI functions
     assert_eq!(
-      (*vm).set_option.unwrap()(
+      vm.set_option.unwrap()(
         vm_ptr,
         "foo\0".as_ptr() as *const i8,
         "bar\0".as_ptr() as *const i8
@@ -515,7 +517,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
     assert_eq!(
-      (*vm).get_capabilities.unwrap()(vm_ptr),
+      vm.get_capabilities.unwrap()(vm_ptr),
       ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
     );
 
@@ -556,7 +558,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
 
     // fail due to null host pointer
     assert_eq!(
-      (*vm).execute.unwrap()(
+      vm.execute.unwrap()(
         vm_ptr,
         // host can be null
         std::ptr::null(),
@@ -574,7 +576,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
 
     // fail due to empty code
     assert_eq!(
-      (*vm).execute.unwrap()(
+      vm.execute.unwrap()(
         vm_ptr,
         &host_interface,
         // host_context is an opaque pointer
@@ -592,7 +594,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     // fail due to bad message
     // fails an assertion inside the VM macro code
     let result = panic::catch_unwind(|| {
-      (*vm).execute.unwrap()(
+      vm.execute.unwrap()(
         vm_ptr,
         &host_interface,
         // host_context is an opaque pointer
@@ -609,7 +611,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     // note that host needs to be non-null, but the host context can be null.
     // the VM is unopinionated about it and doesn't rely on it directly.
     assert_eq!(
-      (*vm).execute.unwrap()(
+      vm.execute.unwrap()(
         vm_ptr,
         &host_interface,
         // host_context is unused and opaque
@@ -655,7 +657,7 @@ pub fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     );
 
     // Cleanup: Destroy the VM instance to prevent memory leaks
-    (*vm).destroy.unwrap()(vm_ptr);
+    vm.destroy.unwrap()(vm_ptr);
   }
 }
 
@@ -665,6 +667,6 @@ mod tests {
 
   #[test]
   fn test_athcon_create() {
-    vm_tests(athcon_create_athenavmwrapper());
+    unsafe { vm_tests(athcon_create_athenavmwrapper()) };
   }
 }

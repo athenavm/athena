@@ -11,7 +11,7 @@ fn main() {
 
   // Compile the library
   Command::new("cargo")
-    .args(&["build", "--release"])
+    .args(["build", "--release"])
     .current_dir(lib_src_path)
     .status()
     .expect("Failed to compile the library");

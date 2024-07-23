@@ -153,9 +153,9 @@ where
     let msg = AthenaMessage::new(
       MessageKind::Call,
       athena_ctx.depth() + 1,
-      u32::try_from(gas_left).expect("Invalid gas left"),
+      gas_left,
       address.into(),
-      athena_ctx.address().clone(),
+      *athena_ctx.address(),
       input,
       amount,
       Vec::new(),

@@ -430,9 +430,9 @@ fn build_execute_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
               ::athcon_vm::AthconContainer::<#type_name_ident>::from_ffi_pointer(instance)
           };
 
-          let result = ::std::panic::catch_unwind(|| {
+          let result = unsafe {::std::panic::catch_unwind(|| {
               container.execute(revision, code_ref, &execution_message, host, context)
-          });
+          })};
 
           let result = if result.is_err() {
               // Consider a panic an internal error.

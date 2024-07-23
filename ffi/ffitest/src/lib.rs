@@ -13,7 +13,6 @@ mod ffi_tests {
   use athcon_client::{create, AthconVm};
   use athcon_sys as ffi;
   use athena_interface::ADDRESS_ALICE;
-  use athena_vmlib;
 
   const CONTRACT_CODE: &[u8] =
     include_bytes!("../../../tests/recursive_call/elf/recursive-call-test");
@@ -53,48 +52,47 @@ mod ffi_tests {
   impl HostInterface for HostContext {
     fn account_exists(&self, _addr: &Address) -> bool {
       println!("Host: account_exists");
-      return true;
+      true
     }
 
     fn get_storage(&self, _addr: &Address, key: &Bytes32) -> Bytes32 {
       println!("Host: get_storage");
       let value = self.storage.get(key);
-      let ret: Bytes32;
-      match value {
-        Some(value) => ret = value.to_owned(),
-        None => ret = [0u8; BYTES32_LENGTH],
-      }
+      let ret: Bytes32 = match value {
+        Some(value) => value.to_owned(),
+        None => [0u8; BYTES32_LENGTH],
+      };
       println!("{:?} -> {:?}", hex::encode(key), hex::encode(ret));
-      return ret;
+      ret
     }
 
     fn set_storage(&mut self, _addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
       println!("Host: set_storage");
       println!("{:?} -> {:?}", hex::encode(key), hex::encode(value));
       self.storage.insert(key.to_owned(), value.to_owned());
-      return StorageStatus::ATHCON_STORAGE_MODIFIED;
+      StorageStatus::ATHCON_STORAGE_MODIFIED
     }
 
     fn get_balance(&self, _addr: &Address) -> Bytes32 {
       println!("Host: get_balance");
-      return [0u8; BYTES32_LENGTH];
+      [0u8; BYTES32_LENGTH]
     }
 
     fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32) {
       println!("Host: get_tx_context");
-      return (
+      (
         [0u8; BYTES32_LENGTH],
         EMPTY_ADDRESS,
         0,
         0,
         0,
         [0u8; BYTES32_LENGTH],
-      );
+      )
     }
 
     fn get_block_hash(&self, _number: i64) -> Bytes32 {
       println!("Host: get_block_hash");
-      return [0u8; BYTES32_LENGTH];
+      [0u8; BYTES32_LENGTH]
     }
 
     fn call(
@@ -144,7 +142,7 @@ mod ffi_tests {
         value,
         CONTRACT_CODE,
       );
-      return (res.0.to_vec(), res.1, EMPTY_ADDRESS, res.2);
+      (res.0.to_vec(), res.1, EMPTY_ADDRESS, res.2)
     }
   }
 

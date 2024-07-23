@@ -16,7 +16,8 @@ use athena_interface::HostInterface;
 /// The syscall number is a 32-bit integer, with the following layout (in little-endian format)
 /// - The first byte is the syscall id.
 /// - The second byte is 0/1 depending on whether the syscall has a separate table. This is used
-/// in the CPU table to determine whether to lookup the syscall using the syscall interaction.
+///
+/// In the CPU table to determine whether to lookup the syscall using the syscall interaction.
 /// - The third byte is the number of additional cycles the syscall uses.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter)]
 #[allow(non_camel_case_types)]

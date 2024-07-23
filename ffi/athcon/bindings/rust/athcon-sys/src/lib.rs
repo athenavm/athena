@@ -11,12 +11,14 @@ pub type athcon_host_context = ::std::os::raw::c_void;
 
 // TODO: add `.derive_default(true)` to bindgen instead?
 
+#[allow(clippy::derivable_impls)]
 impl Default for athcon_address {
   fn default() -> Self {
     athcon_address { bytes: [0u8; 24] }
   }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for athcon_bytes32 {
   fn default() -> Self {
     athcon_bytes32 { bytes: [0u8; 32] }

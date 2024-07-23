@@ -14,8 +14,14 @@ pub struct AthenaVm {
 impl AthenaVm {
   pub fn new() -> Self {
     AthenaVm {
-      client: ExecutionClient::default(),
+      client: ExecutionClient,
     }
+  }
+}
+
+impl Default for AthenaVm {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
@@ -51,7 +57,7 @@ where
 
     match self
       .client
-      .execute(&code, stdin, Some(host), Some(msg.gas), Some(context))
+      .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
     {
       Ok((public_values, gas_left)) => ExecutionResult::new(
         StatusCode::Success,
@@ -87,6 +93,7 @@ mod tests {
     // construct a mock host
     let host = MockHost::new();
     let host_provider = HostProvider::new(host);
+    #[allow(clippy::arc_with_non_send_sync)]
     let host_interface = Arc::new(RefCell::new(host_provider));
 
     // construct a vm
@@ -117,6 +124,7 @@ mod tests {
     let mut stdin = AthenaStdin::new();
     stdin.write::<u32>(&7);
     let vm = AthenaVm::new();
+    #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
     host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
@@ -194,6 +202,7 @@ mod tests {
     let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
+    #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
     host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);

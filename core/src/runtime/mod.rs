@@ -734,9 +734,9 @@ where
 
   pub(crate) fn gas_left(&self) -> Option<i64> {
     // gas left can be negative, if we spent too much on the last instruction
-    return self
+    self
       .max_gas
-      .map(|max_gas| max_gas as i64 - self.state.clk as i64);
+      .map(|max_gas| max_gas as i64 - self.state.clk as i64)
   }
 
   fn initialize(&mut self) {
@@ -886,6 +886,7 @@ pub mod tests {
     let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),
@@ -905,6 +906,7 @@ pub mod tests {
 
     // we need a new host provider for each test to reset state
     fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
+      #[allow(clippy::arc_with_non_send_sync)]
       Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
     }
 
@@ -1045,6 +1047,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let host = MockHost::new();
+    #[allow(clippy::arc_with_non_send_sync)]
     let provider = Arc::new(RefCell::new(HostProvider::new(host)));
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
@@ -1107,6 +1110,7 @@ pub mod tests {
     let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),
@@ -1152,6 +1156,7 @@ pub mod tests {
     let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),
