@@ -140,8 +140,10 @@ mod tests {
     assert_eq!(
       host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       [
-        21u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0
+        21u8, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0
       ]
     );
 
@@ -158,7 +160,7 @@ mod tests {
       elf,
       stdin,
       Some(host.clone()),
-      Some(1_000_000),
+      Some(100_000),
       Some(ctx.clone()),
     );
     match res {

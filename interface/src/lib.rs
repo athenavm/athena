@@ -441,6 +441,7 @@ impl<'a> HostInterface for MockHost<'a> {
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
+    let depth = msg.depth;
     log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
 
     // don't go too deep!
@@ -451,6 +452,11 @@ impl<'a> HostInterface for MockHost<'a> {
     // take snapshots of the state in case we need to roll back
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
+    log::info!(
+      "MockHost::call:depth {} before backup storage item is :: {:?}",
+      depth,
+      self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+    );
     let backup_storage = self.storage.clone();
     let backup_balance = self.balance.clone();
     let backup_programs = self.programs.clone();
@@ -502,10 +508,20 @@ impl<'a> HostInterface for MockHost<'a> {
     };
 
     if res.status_code != StatusCode::Success {
+      log::info!(
+        "MockHost::call:depth {} before restore storage item is :: {:?}",
+        depth,
+        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+      );
       // rollback state
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.programs = backup_programs;
+      log::info!(
+        "MockHost::call:depth {} after restore storage item is :: {:?}",
+        depth,
+        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+      );
     }
     res
   }
