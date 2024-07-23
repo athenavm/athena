@@ -17,7 +17,7 @@
 //!       ExampleVM {}
 //!     }
 //!
-//!     fn execute(
+//!     unsafe fn execute(
 //!       &self,
 //!       revision: athcon_vm::ffi::athcon_revision,
 //!       code: &[u8],
