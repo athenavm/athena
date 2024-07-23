@@ -120,31 +120,10 @@ jobs:
 
       - name: Install nightly toolchain
         id: rustc-toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-04-17
-          profile: minimal
-          override: true
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-          cache-on-failure: true
-
-      - name: Install go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '^1.22.1'
-
-      - name: Check go installation
-        run: |
-          go version
-
-      - name: Set up git private repo access
-        run: |
-          git config --global url."https://${{ secrets.PRIVATE_PULL_TOKEN }}@github.com/".insteadOf ssh://git@github.com
-          git config --global url."https://${{ secrets.PRIVATE_PULL_TOKEN }}@github.com".insteadOf https://github.com
+          toolchain: nightly-2024-05-29
+          target: ${{ matrix.target }}
 
       - name: Apple M1 setup
         if: matrix.target == 'aarch64-apple-darwin'
@@ -166,11 +145,13 @@ jobs:
         run: |
           set -eo pipefail
           target="${{ matrix.target }}"
-          flags=()
 
           [[ "$target" == *windows* ]] && exe=".exe"
+          [[ "$target" == *windows* ]] && libext=".dll"
+          [[ "$target" == *linux* ]] && libext=".so"
+          [[ "$target" == *apple* ]] && libext=".dylib"
 
-          RUSTFLAGS='-C target-feature=+crt-static' cargo build --release -p athena-cli --target "$target" "${flags[@]}"
+          cargo build --release -p athena-cli -p athena-vmlib --target "$target"
 
           bins=(cargo-athena)
           for name in "${bins[@]}"; do
@@ -178,6 +159,13 @@ jobs:
             file "$bin" || true
             ldd "$bin" || true
             $bin --version || true
+          done
+
+          libs=(libathena_vmlib)
+          for name in "${libs[@]}"; do
+            lib=./target/$target/release/$name$libext
+            file "$lib" || true
+            ldd "$lib" || true
           done
 
       - name: Archive binaries
@@ -192,16 +180,23 @@ jobs:
           if [ "$PLATFORM_NAME" == "linux" ]; then
             tar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
             echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            tar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.so
+            echo "file_name=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
             # We need to use gtar here otherwise the archive is corrupt.
             # See: https://github.com/actions/virtual-environments/issues/2619
             gtar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
             echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+            gtar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.dylib
+            echo "file_name=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           else
             cd ./target/${TARGET}/release
             7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-athena.exe
             mv "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
             echo "file_name=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
+            7z a -tzip "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" libathena_vmlib.dll
+            mv "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
+            echo "file_name=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
           fi
 
       # Creates the release for this specific version
