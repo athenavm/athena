@@ -372,9 +372,9 @@ impl<'a> MockHost<'a> {
     if value > balance_from {
       return StatusCode::InsufficientBalance;
     }
-    self.balance.insert(*from, balance_from - value);
     match balance_to.checked_add(value) {
       Some(new_balance) => {
+        self.balance.insert(*from, balance_from - value);
         self.balance.insert(*to, new_balance);
         StatusCode::Success
       }
