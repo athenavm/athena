@@ -33,6 +33,8 @@ jobs:
           cargo athena new test
           cd test/program
           cargo athena build
+      - name: List Cargo.lock files
+        run: find . -name Cargo.lock
       - name: Build examples
         run: cd examples && make
       - name: Build tests
