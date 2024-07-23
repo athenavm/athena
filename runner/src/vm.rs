@@ -115,7 +115,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
-    stdin.write::<u32>(&8);
+    stdin.write::<u32>(&7);
     let vm = AthenaVm::new();
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
     host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
@@ -129,47 +129,60 @@ mod tests {
         elf,
         stdin,
         Some(host.clone()),
-        Some(1_000_000),
+        Some(150_000),
         Some(ctx.clone()),
       )
       .unwrap();
     let result = output.read::<u32>();
-    assert_eq!(result, 21, "got wrong fibonacci value");
+    assert_eq!(result, 13, "got wrong fibonacci value");
 
     // expect storage value to also have been updated
     assert_eq!(
       host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       [
-        21u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        13u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0
       ]
     );
+  }
+
+  #[test]
+  fn test_recursive_call_fail() {
+    utils::setup_logger();
+    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
+    let vm = AthenaVm::new();
+
+    // if we go any higher than in the previous test, we should run out of gas.
+    // run the program entirely through the host this time. that will allow us to check storage reversion.
+    // when the program fails (runs out of gas), the storage changes should be reverted.
 
     // trying to go any higher should result in an out-of-gas error
-    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
-    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
-    let mut stdin = AthenaStdin::new();
-    stdin.write::<u32>(&9);
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf);
     assert_eq!(
-      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
-    let res = client.execute::<MockHost>(
-      elf,
-      stdin,
-      Some(host.clone()),
-      Some(100_000),
-      Some(ctx.clone()),
+    let msg = AthenaMessage::new(
+      MessageKind::Call,
+      0,
+      150_000,
+      ADDRESS_ALICE,
+      ADDRESS_ALICE,
+      Some(vec![8u8, 0, 0, 0]),
+      0,
+      vec![],
     );
-    match res {
-      Ok(_) => panic!("expected out-of-gas error"),
-      Err(ExecutionError::HostCallFailed(StatusCode::OutOfGas)) => (),
-      Err(_) => panic!("expected out-of-gas error"),
-    }
+    let res = host.call(msg);
+    assert_eq!(
+      res.status_code,
+      StatusCode::OutOfGas,
+      "expected out of gas error"
+    );
 
     // expect storage value changes to have been reverted
     assert_eq!(
-      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
   }
