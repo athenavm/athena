@@ -1,4 +1,4 @@
-//go:generate g++ -shared ../../../examples/example_vm/example_vm.cpp -I../../../include -o example_vm.so
+//go:generate cargo build --release --manifest-path ../../../vmlib/Cargo.toml
 
 package athcon
 
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-var modulePath = "./example_vm.so"
+var modulePath = "../../../../target/release/libathena_vmlib.so"
 
 func TestLoad(t *testing.T) {
 	i, err := Load(modulePath)
