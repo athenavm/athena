@@ -9,15 +9,18 @@ edition.workspace = true
 
 [build-dependencies]
 anyhow = { version = "1.0.83", features = ["backtrace"] }
-vergen-git2 = { version = "1.0.0", default-features = false, features = [ "build" ] }
+vergen-git2 = { version = "1.0.0", default-features = false, features = [
+  "build",
+] }
 
 [dependencies]
 anyhow = { version = "1.0.83", features = ["backtrace"] }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
 athena-core = { path = "../core" }
+athena-build = { path = "../build" }
 cargo_metadata = "0.18.1"
-clap = { version = "4.5.4", features = ["derive", "env"] }
+clap = { version = "4.5.8", features = ["derive", "env"] }
 futures = "0.3.30"
 reqwest = { version = "0.12.4", features = [
   "stream",
@@ -30,7 +33,7 @@ tokio = { version = "1", features = ["full"] }
 dirs = "5.0"
 serde = { version = "1", features = ["derive"] }
 rand = "0.8"
-serde_json = "1.0.117"
+serde_json = "1.0.120"
 yansi = "1.0.1"
 hex = "0.4.3"
 anstyle = "1.0.7"

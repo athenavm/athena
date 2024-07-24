@@ -175,6 +175,7 @@ pub struct AthenaMessage {
   pub code: Vec<u8>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl AthenaMessage {
   pub fn new(
     kind: MessageKind,
@@ -475,11 +476,12 @@ impl<'a> HostInterface for MockHost<'a> {
 
     // check programs list first
     let res = if let Some(code) = self.programs.get(&msg.recipient).cloned() {
-      // create an owned, cloned copy of VM before taking the host from self
-      let vm = self.vm.clone();
+      // create an owned copy of VM before taking the host from self
+      let vm = self.vm;
 
       // HostProvider requires an owned instance, so we need to take it from self
       let provider = HostProvider::new(std::mem::take(self));
+      #[allow(clippy::arc_with_non_send_sync)]
       let host = Arc::new(RefCell::new(provider));
       let res = vm.expect("missing VM instance").execute(
         host.clone(),

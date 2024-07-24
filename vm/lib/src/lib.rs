@@ -1,3 +1,5 @@
+//! System calls for the Athena VM.
+
 pub mod io;
 pub mod utils;
 

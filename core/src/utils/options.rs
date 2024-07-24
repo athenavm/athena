@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AthenaCoreOpts {
   max_gas: Option<u32>,
 }
@@ -18,12 +18,6 @@ impl AthenaCoreOpts {
 
   pub fn max_gas(&self) -> Option<u32> {
     self.max_gas
-  }
-}
-
-impl Default for AthenaCoreOpts {
-  fn default() -> Self {
-    Self { max_gas: None }
   }
 }
 

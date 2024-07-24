@@ -18,7 +18,11 @@ pub trait AthconVm {
   }
 
   /// This is called for every incoming message.
-  fn execute<'a>(
+  ///
+  /// # Safety
+  ///
+  /// The caller must ensure the `host` pointer is valid.
+  unsafe fn execute<'a>(
     &self,
     revision: Revision,
     code: &'a [u8],
@@ -186,8 +190,8 @@ impl<'a> ExecutionContext<'a> {
     _context: *mut ffi::athcon_host_context,
   ) -> Self {
     let _tx_context = unsafe {
-      assert!((*host).get_tx_context.is_some());
-      (*host).get_tx_context.unwrap()(_context)
+      assert!(host.get_tx_context.is_some());
+      host.get_tx_context.unwrap()(_context)
     };
 
     ExecutionContext {
@@ -205,16 +209,16 @@ impl<'a> ExecutionContext<'a> {
   /// Check if an account exists.
   pub fn account_exists(&self, address: &Address) -> bool {
     unsafe {
-      assert!((*self.host).account_exists.is_some());
-      (*self.host).account_exists.unwrap()(self.context, address as *const Address)
+      assert!(self.host.account_exists.is_some());
+      self.host.account_exists.unwrap()(self.context, address as *const Address)
     }
   }
 
   /// Read from a storage key.
   pub fn get_storage(&self, address: &Address, key: &Bytes32) -> Bytes32 {
     unsafe {
-      assert!((*self.host).get_storage.is_some());
-      (*self.host).get_storage.unwrap()(
+      assert!(self.host.get_storage.is_some());
+      self.host.get_storage.unwrap()(
         self.context,
         address as *const Address,
         key as *const Bytes32,
@@ -230,8 +234,8 @@ impl<'a> ExecutionContext<'a> {
     value: &Bytes32,
   ) -> StorageStatus {
     unsafe {
-      assert!((*self.host).set_storage.is_some());
-      (*self.host).set_storage.unwrap()(
+      assert!(self.host.set_storage.is_some());
+      self.host.set_storage.unwrap()(
         self.context,
         address as *const Address,
         key as *const Bytes32,
@@ -243,8 +247,8 @@ impl<'a> ExecutionContext<'a> {
   /// Get balance of an account.
   pub fn get_balance(&self, address: &Address) -> Uint256 {
     unsafe {
-      assert!((*self.host).get_balance.is_some());
-      (*self.host).get_balance.unwrap()(self.context, address as *const Address)
+      assert!(self.host.get_balance.is_some());
+      self.host.get_balance.unwrap()(self.context, address as *const Address)
     }
   }
 
@@ -261,14 +265,14 @@ impl<'a> ExecutionContext<'a> {
     let input_data = if let Some(input) = input {
       input.as_ptr()
     } else {
-      std::ptr::null() as *const u8
+      std::ptr::null()
     };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
     let code_data = if let Some(code) = code {
       code.as_ptr()
     } else {
-      std::ptr::null() as *const u8
+      std::ptr::null()
     };
     // Cannot use a nice from trait here because that complicates memory management,
     // athcon_message doesn't have a release() method we could abstract it with.
@@ -285,16 +289,16 @@ impl<'a> ExecutionContext<'a> {
       code_size,
     };
     unsafe {
-      assert!((*self.host).call.is_some());
-      (*self.host).call.unwrap()(self.context, &message as *const ffi::athcon_message).into()
+      assert!(self.host.call.is_some());
+      self.host.call.unwrap()(self.context, &message as *const ffi::athcon_message).into()
     }
   }
 
   /// Get block hash of an account.
   pub fn get_block_hash(&self, num: i64) -> Bytes32 {
     unsafe {
-      assert!((*self.host).get_block_hash.is_some());
-      (*self.host).get_block_hash.unwrap()(self.context, num)
+      assert!(self.host.get_block_hash.is_some());
+      self.host.get_block_hash.unwrap()(self.context, num)
     }
   }
 }

@@ -1,5 +1,6 @@
 use anstyle::*;
 use anyhow::Result;
+use athena_build::{build_program, BuildArgs};
 use athena_core::io::AthenaStdin;
 use athena_core::utils::{setup_logger, setup_tracer};
 use athena_interface::MockHost;
@@ -8,10 +9,7 @@ use clap::Parser;
 use std::time::Instant;
 use std::{env, fs::File, io::Read, path::PathBuf, str::FromStr};
 
-use crate::{
-  build::{build_program, BuildArgs},
-  util::{elapsed, write_status},
-};
+use crate::util::{elapsed, write_status};
 
 #[derive(Debug, Clone)]
 enum Input {
@@ -73,7 +71,7 @@ pub struct ExecuteCmd {
 
 impl ExecuteCmd {
   pub fn run(&self) -> Result<()> {
-    let elf_path = build_program(&self.build_args)?;
+    let elf_path = build_program(&self.build_args, None)?;
 
     if !self.profile {
       match env::var("RUST_LOG") {

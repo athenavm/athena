@@ -43,6 +43,7 @@ impl AthconVm {
     unsafe { ((*self.handle).destroy.unwrap())(self.handle) }
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub fn execute(
     &self,
     ctx: &mut dyn host::HostContext,
@@ -59,9 +60,9 @@ impl AthconVm {
     let ext_ctx = host::ExtendedContext { hctx: ctx };
     let athcon_message = Box::into_raw(Box::new({
       ffi::athcon_message {
-        kind: kind,
-        depth: depth,
-        gas: gas,
+        kind,
+        depth,
+        gas,
         recipient: ffi::athcon_address {
           bytes: *destination,
         },

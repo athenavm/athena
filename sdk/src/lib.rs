@@ -2,9 +2,6 @@
 //!
 //! A library for interacting with the Athena RISC-V VM.
 
-#![allow(incomplete_features)]
-#![feature(generic_const_exprs)]
-
 pub mod utils {
   pub use athena_core::utils::setup_logger;
 }
@@ -114,6 +111,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
+    #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     client
