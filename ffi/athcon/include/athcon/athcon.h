@@ -208,8 +208,18 @@ extern "C"
     /** The execution has run out of gas. */
     ATHCON_OUT_OF_GAS = 3,
 
+    /** Execution encountered an invalid instruction. */
+    ATHCON_INVALID_INSTRUCTION = 4,
+
     /** An undefined instruction has been encountered. */
     ATHCON_UNDEFINED_INSTRUCTION = 5,
+
+    /** Stack over/underflow. */
+    ATHCON_STACK_OVERFLOW = 6,
+    ATHCON_STACK_UNDERFLOW = 7,
+
+    /** Bad jump destination. */
+    ATHCON_BAD_JUMP_DESTINATION = 8,
 
     /**
      * Tried to read outside memory bounds.
@@ -220,6 +230,9 @@ extern "C"
 
     /** Call depth has exceeded the limit (if any) */
     ATHCON_CALL_DEPTH_EXCEEDED = 10,
+
+    /** Static mode violation (currently unsupported) */
+    ATHCON_STATIC_MODE_VIOLATION = 11,
 
     /**
      * A call to a precompiled or system contract has ended with a failure.
@@ -238,6 +251,12 @@ extern "C"
      * accepted range of values.
      */
     ATHCON_ARGUMENT_OUT_OF_RANGE = 14,
+
+    /** Unreachable instruction. */
+    ATHCON_UNREACHABLE_INSTRUCTION = 15,
+
+    /** Trap encountered. */
+    ATHCON_TRAP = 16,
 
     /** The caller does not have enough funds for value transfer. */
     ATHCON_INSUFFICIENT_BALANCE = 17,
