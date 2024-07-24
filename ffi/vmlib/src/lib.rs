@@ -260,14 +260,29 @@ impl From<ffi::athcon_status_code> for StatusCodeWrapper {
       ffi::athcon_status_code::ATHCON_FAILURE => StatusCodeWrapper(StatusCode::Failure),
       ffi::athcon_status_code::ATHCON_REVERT => StatusCodeWrapper(StatusCode::Revert),
       ffi::athcon_status_code::ATHCON_OUT_OF_GAS => StatusCodeWrapper(StatusCode::OutOfGas),
+      ffi::athcon_status_code::ATHCON_INVALID_INSTRUCTION => {
+        StatusCodeWrapper(StatusCode::InvalidInstruction)
+      }
       ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION => {
         StatusCodeWrapper(StatusCode::UndefinedInstruction)
+      }
+      ffi::athcon_status_code::ATHCON_STACK_OVERFLOW => {
+        StatusCodeWrapper(StatusCode::StackOverflow)
+      }
+      ffi::athcon_status_code::ATHCON_STACK_UNDERFLOW => {
+        StatusCodeWrapper(StatusCode::StackUnderflow)
+      }
+      ffi::athcon_status_code::ATHCON_BAD_JUMP_DESTINATION => {
+        StatusCodeWrapper(StatusCode::BadJumpDestination)
       }
       ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS => {
         StatusCodeWrapper(StatusCode::InvalidMemoryAccess)
       }
       ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED => {
         StatusCodeWrapper(StatusCode::CallDepthExceeded)
+      }
+      ffi::athcon_status_code::ATHCON_STATIC_MODE_VIOLATION => {
+        StatusCodeWrapper(StatusCode::StaticModeViolation)
       }
       ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE => {
         StatusCodeWrapper(StatusCode::PrecompileFailure)
@@ -278,6 +293,10 @@ impl From<ffi::athcon_status_code> for StatusCodeWrapper {
       ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE => {
         StatusCodeWrapper(StatusCode::ArgumentOutOfRange)
       }
+      ffi::athcon_status_code::ATHCON_UNREACHABLE_INSTRUCTION => {
+        StatusCodeWrapper(StatusCode::UnreachableInstruction)
+      }
+      ffi::athcon_status_code::ATHCON_TRAP => StatusCodeWrapper(StatusCode::Trap),
       ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE => {
         StatusCodeWrapper(StatusCode::InsufficientBalance)
       }
@@ -297,14 +316,21 @@ impl From<StatusCodeWrapper> for ffi::athcon_status_code {
       StatusCode::Failure => ffi::athcon_status_code::ATHCON_FAILURE,
       StatusCode::Revert => ffi::athcon_status_code::ATHCON_REVERT,
       StatusCode::OutOfGas => ffi::athcon_status_code::ATHCON_OUT_OF_GAS,
+      StatusCode::InvalidInstruction => ffi::athcon_status_code::ATHCON_INVALID_INSTRUCTION,
       StatusCode::UndefinedInstruction => ffi::athcon_status_code::ATHCON_UNDEFINED_INSTRUCTION,
+      StatusCode::StackOverflow => ffi::athcon_status_code::ATHCON_STACK_OVERFLOW,
+      StatusCode::StackUnderflow => ffi::athcon_status_code::ATHCON_STACK_UNDERFLOW,
+      StatusCode::BadJumpDestination => ffi::athcon_status_code::ATHCON_BAD_JUMP_DESTINATION,
       StatusCode::InvalidMemoryAccess => ffi::athcon_status_code::ATHCON_INVALID_MEMORY_ACCESS,
       StatusCode::CallDepthExceeded => ffi::athcon_status_code::ATHCON_CALL_DEPTH_EXCEEDED,
+      StatusCode::StaticModeViolation => ffi::athcon_status_code::ATHCON_STATIC_MODE_VIOLATION,
       StatusCode::PrecompileFailure => ffi::athcon_status_code::ATHCON_PRECOMPILE_FAILURE,
       StatusCode::ContractValidationFailure => {
         ffi::athcon_status_code::ATHCON_CONTRACT_VALIDATION_FAILURE
       }
       StatusCode::ArgumentOutOfRange => ffi::athcon_status_code::ATHCON_ARGUMENT_OUT_OF_RANGE,
+      StatusCode::UnreachableInstruction => ffi::athcon_status_code::ATHCON_UNREACHABLE_INSTRUCTION,
+      StatusCode::Trap => ffi::athcon_status_code::ATHCON_TRAP,
       StatusCode::InsufficientBalance => ffi::athcon_status_code::ATHCON_INSUFFICIENT_BALANCE,
       StatusCode::InternalError => ffi::athcon_status_code::ATHCON_INTERNAL_ERROR,
       StatusCode::Rejected => ffi::athcon_status_code::ATHCON_REJECTED,
