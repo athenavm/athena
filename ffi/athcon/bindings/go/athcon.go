@@ -1,7 +1,7 @@
 package athcon
 
 /*
-#include "../../athcon.h"
+#include "../../include/athcon/athcon.h"
 */
 import "C"
 

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 fn gen_bindings() {
   let bindings = bindgen::Builder::default()
-    .header("../../../athcon.h")
+    .header("../../../include/athcon/athcon.h")
     // See https://github.com/rust-lang-nursery/rust-bindgen/issues/947
     .trust_clang_mangling(false)
     .generate_comments(true)
