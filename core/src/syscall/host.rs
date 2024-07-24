@@ -24,7 +24,7 @@ where
       .expect("Missing Athena runtime context");
 
     // marshal inputs
-    let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
+    let key = ctx.slice(arg1, BYTES32_LENGTH / 4);
 
     // read value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
@@ -59,8 +59,8 @@ where
       .expect("Missing Athena runtime context");
 
     // marshal inputs
-    let key = ctx.slice_unsafe(arg1, BYTES32_LENGTH / 4);
-    let value = ctx.slice_unsafe(arg2, BYTES32_LENGTH / 4);
+    let key = ctx.slice(arg1, BYTES32_LENGTH / 4);
+    let value = ctx.slice(arg2, BYTES32_LENGTH / 4);
 
     // write value to host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
@@ -117,7 +117,7 @@ where
 
     // marshal inputs
     let address_words = ADDRESS_LENGTH / 4;
-    let address = ctx.slice_unsafe(arg1, address_words);
+    let address = ctx.slice(arg1, address_words);
     let address = AddressWrapper::from(address);
 
     // read the input length from the next register
@@ -130,7 +130,7 @@ where
     // `len` is denominated in number of bytes; we read words in chunks of four bytes
     // then convert into a standard bytearray.
     let input = if len > 0 {
-      let input_slice = ctx.slice_unsafe(arg2, len / 4);
+      let input_slice = ctx.slice(arg2, len / 4);
       Some(
         input_slice
           .iter()
@@ -144,7 +144,7 @@ where
     // read the amount pointer from the next register as little-endian
     let a3 = Register::X13;
     let amount_ptr = ctx.rt.register(a3);
-    let amount_slice = ctx.slice_unsafe(amount_ptr, 2);
+    let amount_slice = ctx.slice(amount_ptr, 2);
     let amount = u64::from(amount_slice[0]) | (u64::from(amount_slice[1]) << 32);
 
     // note: host is responsible for checking balance and stack depth

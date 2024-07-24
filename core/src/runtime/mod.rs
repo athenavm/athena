@@ -1,6 +1,5 @@
 mod instruction;
 mod io;
-mod memory;
 mod opcode;
 mod program;
 mod register;
@@ -10,7 +9,6 @@ mod syscall;
 mod utils;
 
 pub use instruction::*;
-pub use memory::*;
 pub use opcode::*;
 pub use program::*;
 pub use register::*;
@@ -69,14 +67,22 @@ pub struct Runtime<T: HostInterface> {
   /// Max gas for the runtime.
   pub max_gas: Option<u32>,
 
-  /// The state of the runtime when in unconstrained mode.
-  pub(crate) unconstrained_state: ForkState,
-
   /// The mapping between syscall codes and their implementations.
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
 
   /// The maximum number of cycles for a syscall.
   pub max_syscall_cycles: u32,
+}
+
+/// An record of a write to a memory address.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum MemoryAccessPosition {
+  Memory = 0,
+  // Note that these AccessPositions mean that when when read/writing registers, they must be
+  // read/written in the following order: C, B, A.
+  C = 1,
+  B = 2,
+  A = 3,
 }
 
 #[derive(Error, Debug)]
@@ -137,7 +143,6 @@ where
       trace_buf,
       unconstrained: false,
       max_gas: opts.max_gas(),
-      unconstrained_state: ForkState::default(),
       syscall_map,
       max_syscall_cycles,
     }
@@ -156,7 +161,7 @@ where
     for i in 0..32 {
       let addr = Register::from_u32(i as u32) as u32;
       registers[i] = match self.state.memory.get(&addr) {
-        Some(record) => record.value,
+        Some(record) => *record,
         None => 0,
       };
     }
@@ -167,7 +172,7 @@ where
   pub fn register(&self, register: Register) -> u32 {
     let addr = register as u32;
     match self.state.memory.get(&addr) {
-      Some(record) => record.value,
+      Some(record) => *record,
       None => 0,
     }
   }
@@ -175,7 +180,7 @@ where
   /// Get the current value of a word.
   pub fn word(&self, addr: u32) -> u32 {
     match self.state.memory.get(&addr) {
-      Some(record) => record.value,
+      Some(record) => *record,
       None => 0,
     }
   }
@@ -186,90 +191,37 @@ where
     (word >> ((addr % 4) * 8)) as u8
   }
 
-  /// Get the current timestamp for a given memory access position.
-  pub const fn timestamp(&self, position: &MemoryAccessPosition) -> u32 {
-    self.state.clk + *position as u32
-  }
-
-  /// Read a word from memory and create an access record.
-  pub fn mr(&mut self, addr: u32, timestamp: u32) -> MemoryReadRecord {
-    // Get the memory record entry.
+  /// Read a word from memory.
+  pub fn mr(&mut self, addr: u32) -> u32 {
+    // Get the memory entry.
     let entry = self.state.memory.entry(addr);
 
-    // If we're in unconstrained mode, we don't want to modify state, so we'll save the
-    // original state if it's the first time modifying it.
-    if self.unconstrained {
-      let record = match entry {
-        Entry::Occupied(ref entry) => Some(entry.get()),
-        Entry::Vacant(_) => None,
-      };
-      self
-        .unconstrained_state
-        .memory_diff
-        .entry(addr)
-        .or_insert(record.copied());
-    }
-
     // If it's the first time accessing this address, initialize previous values.
-    let record: &mut MemoryRecord = match entry {
-      Entry::Occupied(entry) => entry.into_mut(),
+    match entry {
+      Entry::Occupied(entry) => *entry.get(),
       Entry::Vacant(entry) => {
         // If addr has a specific value to be initialized with, use that, otherwise 0.
         let value = self.state.uninitialized_memory.remove(&addr).unwrap_or(0);
-
-        entry.insert(MemoryRecord {
-          value,
-          timestamp: 0,
-        })
+        *entry.insert(value)
       }
-    };
-    let value = record.value;
-    let prev_timestamp = record.timestamp;
-    record.timestamp = timestamp;
-
-    // Construct the memory read record.
-    MemoryReadRecord::new(value, timestamp, prev_timestamp)
+    }
   }
 
-  /// Write a word to memory and create an access record.
-  pub fn mw(&mut self, addr: u32, value: u32, timestamp: u32) -> MemoryWriteRecord {
+  /// Write a word to memory.
+  pub fn mw(&mut self, addr: u32, value: u32) {
     // Get the memory record entry.
     let entry = self.state.memory.entry(addr);
 
-    // If we're in unconstrained mode, we don't want to modify state, so we'll save the
-    // original state if it's the first time modifying it.
-    if self.unconstrained {
-      let record = match entry {
-        Entry::Occupied(ref entry) => Some(entry.get()),
-        Entry::Vacant(_) => None,
-      };
-      self
-        .unconstrained_state
-        .memory_diff
-        .entry(addr)
-        .or_insert(record.copied());
-    }
-
-    // If it's the first time accessing this address, initialize previous values.
-    let record: &mut MemoryRecord = match entry {
-      Entry::Occupied(entry) => entry.into_mut(),
+    match entry {
+      Entry::Occupied(mut entry) => {
+        entry.insert(value);
+      }
       Entry::Vacant(entry) => {
         // If addr has a specific value to be initialized with, use that, otherwise 0.
-        let value = self.state.uninitialized_memory.remove(&addr).unwrap_or(0);
-
-        entry.insert(MemoryRecord {
-          value,
-          timestamp: 0,
-        })
+        self.state.uninitialized_memory.remove(&addr);
+        entry.insert(value);
       }
     };
-    let prev_value = record.value;
-    let prev_timestamp = record.timestamp;
-    record.value = value;
-    record.timestamp = timestamp;
-
-    // Construct the memory write record.
-    MemoryWriteRecord::new(value, timestamp, prev_value, prev_timestamp)
   }
 
   /// Read from memory, assuming that all addresses are aligned.
@@ -278,9 +230,7 @@ where
     assert_valid_memory_access!(addr, position);
 
     // Read the address from memory and create a memory read record.
-    let record = self.mr(addr, self.timestamp(&position));
-
-    record.value
+    self.mr(addr)
   }
 
   /// Write to memory.
@@ -289,7 +239,7 @@ where
     assert_valid_memory_access!(addr, position);
 
     // Read the address from memory and create a memory read record.
-    let _ = self.mw(addr, value, self.timestamp(&position));
+    self.mw(addr, value);
   }
 
   /// Read from a register.
@@ -744,13 +694,7 @@ where
 
     tracing::info!("loading memory image");
     for (addr, value) in self.program.memory_image.iter() {
-      self.state.memory.insert(
-        *addr,
-        MemoryRecord {
-          value: *value,
-          timestamp: 0,
-        },
-      );
+      self.state.memory.insert(*addr, *value);
     }
 
     tracing::info!("starting execution");

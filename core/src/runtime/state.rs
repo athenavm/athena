@@ -4,8 +4,6 @@ use nohash_hasher::BuildNoHashHasher;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-use super::MemoryRecord;
-
 /// Holds data describing the current state of a program's execution.
 #[serde_as]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -21,7 +19,7 @@ pub struct ExecutionState {
   pub pc: u32,
 
   /// The memory which instructions operate over.
-  pub memory: HashMap<u32, MemoryRecord, BuildNoHashHasher<u32>>,
+  pub memory: HashMap<u32, u32, BuildNoHashHasher<u32>>,
 
   /// Uninitialized memory addresses that have a specific value they should be initialized with.
   /// SyscallHintRead uses this to write hint data into uninitialized memory.
@@ -54,11 +52,4 @@ impl ExecutionState {
       public_values_stream_ptr: 0,
     }
   }
-}
-
-/// Holds data to track changes made to the runtime since a fork point.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct ForkState {
-  /// Only contains the original memory values for addresses that have been modified
-  pub(crate) memory_diff: HashMap<u32, Option<MemoryRecord>, BuildNoHashHasher<u32>>,
 }
