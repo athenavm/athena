@@ -1,5 +1,5 @@
 use anyhow::Result;
-use athena_build::{build_program, BuildArgs};
+use athena_builder::{build_program, BuildArgs};
 use clap::Parser;
 
 #[derive(Parser)]

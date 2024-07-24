@@ -1,5 +1,5 @@
 [package]
-name = "athena-build"
+name = "athena-builder"
 description = "Build an Athena program."
 version = { workspace = true }
 edition = { workspace = true }

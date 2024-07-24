@@ -18,7 +18,7 @@ anyhow = { version = "1.0.83", features = ["backtrace"] }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
 athena-core = { path = "../core" }
-athena-build = { path = "../build" }
+athena-builder = { path = "../builder" }
 cargo_metadata = "0.18.1"
 clap = { version = "4.5.8", features = ["derive", "env"] }
 futures = "0.3.30"

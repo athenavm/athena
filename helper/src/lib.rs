@@ -1,4 +1,4 @@
-pub use athena_build::BuildArgs;
+pub use athena_builder::BuildArgs;
 use cargo_metadata::Metadata;
 use chrono::Local;
 use std::{path::Path, process::ExitStatus};
@@ -62,9 +62,9 @@ fn execute_build_cmd(
 
   // Build the program with the given arguments.
   let path_output = if let Some(args) = args {
-    athena_build::build_program(&args, Some(program_dir.as_ref().to_path_buf()))
+    athena_builder::build_program(&args, Some(program_dir.as_ref().to_path_buf()))
   } else {
-    athena_build::build_program(
+    athena_builder::build_program(
       &BuildArgs::default(),
       Some(program_dir.as_ref().to_path_buf()),
     )
