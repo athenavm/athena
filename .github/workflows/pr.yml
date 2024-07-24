@@ -177,6 +177,6 @@ jobs:
           cargo add athena-vm --path $GITHUB_WORKSPACE/vm/entrypoint
           cargo athena build
           cd ../script
-          cargo remove athena-sdk
+          cargo add athena-interface --path $GITHUB_WORKSPACE/sdk
           cargo add athena-sdk --path $GITHUB_WORKSPACE/sdk
           RUST_LOG=info cargo run --release
