@@ -67,9 +67,6 @@ pub struct Runtime<T: HostInterface> {
   /// Max gas for the runtime.
   pub max_gas: Option<u32>,
 
-  /// The state of the runtime when in unconstrained mode.
-  pub(crate) unconstrained_state: ForkState,
-
   /// The mapping between syscall codes and their implementations.
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
 
@@ -146,7 +143,6 @@ where
       trace_buf,
       unconstrained: false,
       max_gas: opts.max_gas(),
-      unconstrained_state: ForkState::default(),
       syscall_map,
       max_syscall_cycles,
     }
@@ -195,24 +191,10 @@ where
     (word >> ((addr % 4) * 8)) as u8
   }
 
-  /// Read a word from memory and create an access record.
+  /// Read a word from memory.
   pub fn mr(&mut self, addr: u32) -> u32 {
     // Get the memory entry.
     let entry = self.state.memory.entry(addr);
-
-    // If we're in unconstrained mode, we don't want to modify state, so we'll save the
-    // original state if it's the first time modifying it.
-    if self.unconstrained {
-      let record = match entry {
-        Entry::Occupied(ref entry) => Some(entry.get()),
-        Entry::Vacant(_) => None,
-      };
-      self
-        .unconstrained_state
-        .memory_diff
-        .entry(addr)
-        .or_insert(record.copied());
-    }
 
     // If it's the first time accessing this address, initialize previous values.
     match entry {
@@ -225,24 +207,11 @@ where
     }
   }
 
-  /// Write a word to memory and create an access record.
+  /// Write a word to memory.
   pub fn mw(&mut self, addr: u32, value: u32) {
     // Get the memory record entry.
     let entry = self.state.memory.entry(addr);
 
-    // If we're in unconstrained mode, we don't want to modify state, so we'll save the
-    // original state if it's the first time modifying it.
-    if self.unconstrained {
-      let record = match entry {
-        Entry::Occupied(ref entry) => Some(entry.get()),
-        Entry::Vacant(_) => None,
-      };
-      self
-        .unconstrained_state
-        .memory_diff
-        .entry(addr)
-        .or_insert(record.copied());
-    }
     match entry {
       Entry::Occupied(mut entry) => {
         entry.insert(value);

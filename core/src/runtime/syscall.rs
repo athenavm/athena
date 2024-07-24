@@ -108,19 +108,6 @@ where
     }
   }
 
-  pub fn mr(&mut self, addr: u32) -> u32 {
-    self.rt.mr(addr)
-  }
-
-  pub fn mr_slice(&mut self, addr: u32, len: usize) -> Vec<u32> {
-    let mut values = Vec::new();
-    for i in 0..len {
-      let value = self.mr(addr + i as u32 * 4);
-      values.push(value);
-    }
-    values
-  }
-
   pub fn mw(&mut self, addr: u32, value: u32) {
     self.rt.mw(addr, value);
   }
@@ -146,7 +133,7 @@ where
   pub fn slice(&self, addr: u32, len: usize) -> Vec<u32> {
     let mut values = Vec::new();
     for i in 0..len {
-      values.push(self.rt.word(addr + i as u32 * 4));
+      values.push(self.word(addr + i as u32 * 4));
     }
     values
   }

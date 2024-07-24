@@ -53,10 +53,3 @@ impl ExecutionState {
     }
   }
 }
-
-/// Holds data to track changes made to the runtime since a fork point.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct ForkState {
-  /// Only contains the original memory values for addresses that have been modified
-  pub(crate) memory_diff: HashMap<u32, Option<u32>, BuildNoHashHasher<u32>>,
-}
