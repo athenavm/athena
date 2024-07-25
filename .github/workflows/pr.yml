@@ -99,6 +99,7 @@ jobs:
       - name: Run go test
         run: |
           cd ffi/athcon/bindings/go
+          go generate
           go test -v ./...
 
   lint:
