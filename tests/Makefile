@@ -1,5 +1,6 @@
 # Find all subdirectories
-SUBDIRS := $(shell find . -mindepth 1 -maxdepth 1 -type d)
+# Except minimal test, which needs to be built separately
+SUBDIRS := $(shell find . -mindepth 1 -maxdepth 1 -type d -not -name minimal)
 
 all:
 	@for dir in $(SUBDIRS); do \
