@@ -89,7 +89,7 @@ mod tests {
   use super::*;
   use athena_interface::{
     Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
-    STORAGE_KEY, STORAGE_VALUE,
+    SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
   use athena_sdk::utils;
 
@@ -158,6 +158,30 @@ mod tests {
         0, 0, 0
       ]
     );
+  }
+
+  #[test]
+  fn test_minimal() {
+    utils::setup_logger();
+    let client = ExecutionClient::new();
+    let elf = include_bytes!("../../tests/minimal/getbalance.bin");
+    let stdin = AthenaStdin::new();
+    let vm = AthenaVm::new();
+    #[allow(clippy::arc_with_non_send_sync)]
+    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    // host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    let (mut output, _) = client
+      .execute::<MockHost>(
+        elf,
+        stdin,
+        Some(host.clone()),
+        Some(1000),
+        Some(ctx.clone()),
+      )
+      .unwrap();
+    let result = output.read::<Balance>();
+    assert_eq!(result, SOME_COINS+1, "got wrong output value");
   }
 
   #[test]
