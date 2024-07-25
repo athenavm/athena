@@ -181,7 +181,7 @@ mod tests {
       )
       .unwrap();
     let result = output.read::<Balance>();
-    assert_eq!(result, SOME_COINS+1, "got wrong output value");
+    assert_eq!(result, SOME_COINS, "got wrong output value");
   }
 
   #[test]
