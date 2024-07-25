@@ -100,8 +100,6 @@ jobs:
         run: |
           cd ffi/athcon/bindings/go
           go generate
-          ls -la ../../../../target/release/
-          ls -la .
           go test -v ./...
 
   lint:

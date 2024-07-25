@@ -27,22 +27,9 @@ runs:
       with:
         version: latest
 
-    # - name: rust-cache
-    #   uses: actions/cache@v4
-    #   with:
-    #     path: |
-    #       ~/.cargo/bin/
-    #       ~/.cargo/registry/index/
-    #       ~/.cargo/registry/cache/
-    #       ~/.cargo/git/db/
-    #       target/
-    #       ~/.rustup/
-    #     key: rust-nightly-2024-04-17-${{ hashFiles('**/Cargo.toml') }}
-    #     restore-keys: rust-nightly-2024-04-17-
-
     - name: Setup Rust toolchain
       id: rustc-toolchain
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
-        components: rustfmt
+        components: clippy, rustfmt
         toolchain: nightly-2024-04-17
