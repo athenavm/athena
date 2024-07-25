@@ -13,3 +13,4 @@ athcon-vm = { path = "../ffi/athcon/bindings/rust/athcon-vm" }
 athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
+log = "0.4.21"

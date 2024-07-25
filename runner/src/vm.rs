@@ -5,7 +5,7 @@ use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
   HostInterface, HostProvider, SetOptionError, StatusCode, VmInterface,
 };
-use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_sdk::{utils::setup_logger, AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
   client: ExecutionClient,
@@ -45,6 +45,8 @@ where
     // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
+    setup_logger();
+
     // construct context object
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
@@ -55,6 +57,7 @@ where
       stdin.write_vec(input_data);
     }
 
+    log::info!("Executing code with input data");
     match self
       .client
       .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
@@ -66,12 +69,15 @@ where
         None,
       ),
       // map error to execution result
-      Err(e) => match e {
-        ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
-        ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
-        // general error
-        _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
-      },
+      Err(e) => {
+        log::info!("Execution error: {:?}", e);
+        match e {
+          ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
+          ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
+          // general error
+          _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
+        }
+      }
     }
   }
 }

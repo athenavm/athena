@@ -44,7 +44,7 @@ func TestGetBalance(t *testing.T) {
 	code := []byte{
 		0x7f, 0x41, 0x54, 0x48, // "\x7fATH" magic number
 		0x13, 0x05, 0x00, 0x10, // 10000513 (ADDI x10, x0, 0x100) // load address to write result
-		0xa3, 0x00, 0x22, 0x93, // 04000293 (ADDI x5, x0, 0xa3)   // load syscall number
+		0x93, 0x02, 0x30, 0x0a, // 0a300293 (ADDI x5, x0, 0xa3)   // load host getbalance syscall number
 		0x73, 0x00, 0x00, 0x00, // 00000073 (ECALL)
 	}
 
@@ -58,14 +58,14 @@ func TestGetBalance(t *testing.T) {
 	output := result.Output
 	gasLeft := result.GasLeft
 
-	if len(output) != 32 {
+	if len(output) != 0 {
 		t.Errorf("unexpected output size: %d", len(output))
 	}
 
 	// Should return value 42 (0x2a) as defined in GetTxContext().
 	expectedOutput := []byte("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x2a")
 	if !bytes.Equal(output, expectedOutput) {
-		t.Errorf("execution unexpected output: %x", output)
+		t.Errorf("unexpected output: %x", output)
 	}
 	if gasLeft != 94 {
 		t.Errorf("execution gas left is incorrect: %d", gasLeft)

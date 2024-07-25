@@ -673,6 +673,8 @@ where
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
+    log::info!("Executing cycle with instruction: {:?}", instruction);
+
     // Log the current state of the runtime.
     self.log(&instruction);
 
@@ -718,6 +720,7 @@ where
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
+      log::info!("Initializing");
       self.initialize();
     }
 
@@ -727,6 +730,7 @@ where
         break;
       }
     }
+    log::info!("Execution finished");
 
     self.postprocess();
 
