@@ -180,7 +180,10 @@ jobs:
           if [ "$PLATFORM_NAME" == "linux" ]; then
             tar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-            tar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.so
+            tar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" \
+            -C ./target/${TARGET}/release libathena_vmlib.so \
+            -C ./ffi/athcon lib include \
+            --exclude='CMakeLists.txt'
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
             # We need to use gtar here otherwise the archive is corrupt.
