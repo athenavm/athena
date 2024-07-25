@@ -1,4 +1,5 @@
 //go:generate cargo build --release --manifest-path ../../../vmlib/Cargo.toml
+//go:generate cp ../../../../target/release/libathena_vmlib.so ./libathenavmwrapper.so
 
 package athcon
 
@@ -7,7 +8,7 @@ import (
 	"testing"
 )
 
-var modulePath = "../../../../target/release/libathena_vmlib.so"
+var modulePath = "libathenavmwrapper.so"
 
 func TestLoad(t *testing.T) {
 	i, err := Load(modulePath)
@@ -15,7 +16,7 @@ func TestLoad(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer i.Destroy()
-	if i.Name() != "example_vm" {
+	if i.Name() != "Athena" {
 		t.Fatalf("name is %s", i.Name())
 	}
 	if i.Version()[0] < '0' || i.Version()[0] > '9' {
@@ -29,7 +30,7 @@ func TestLoadConfigure(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer i.Destroy()
-	if i.Name() != "example_vm" {
+	if i.Name() != "Athena" {
 		t.Fatalf("name is %s", i.Name())
 	}
 	if i.Version()[0] < '0' || i.Version()[0] > '9' {
@@ -37,6 +38,7 @@ func TestLoadConfigure(t *testing.T) {
 	}
 }
 
+// Execute with no code is an error.
 func TestExecuteEmptyCode(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
@@ -48,11 +50,11 @@ func TestExecuteEmptyCode(t *testing.T) {
 	if !bytes.Equal(result.Output, []byte("")) {
 		t.Errorf("execution unexpected output: %x", result.Output)
 	}
-	if result.GasLeft != 999 {
+	if result.GasLeft != 0 {
 		t.Errorf("execution gas left is incorrect: %d", result.GasLeft)
 	}
-	if err != nil {
-		t.Errorf("execution returned unexpected error: %v", err)
+	if err == nil {
+		t.Errorf("expected execution error")
 	}
 }
 
@@ -66,7 +68,6 @@ func TestRevision(t *testing.T) {
 }
 
 func TestErrorMessage(t *testing.T) {
-
 	check := func(err Error, expectedMsg string) {
 		if err.Error() != expectedMsg {
 			t.Errorf("wrong error message: '%s', expected: '%s'", err.Error(), expectedMsg)
