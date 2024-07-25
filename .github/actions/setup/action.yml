@@ -40,8 +40,9 @@ runs:
     #     key: rust-nightly-2024-04-17-${{ hashFiles('**/Cargo.toml') }}
     #     restore-keys: rust-nightly-2024-04-17-
 
-    - name: Setup toolchain
+    - name: Setup Rust toolchain
       id: rustc-toolchain
-      shell: bash
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain nightly-2024-04-17 -y
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        components: rustfmt
+        toolchain: nightly-2024-04-17

@@ -5,10 +5,22 @@ package athcon
 
 import (
 	"bytes"
+	"log"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
-var modulePath = "libathenavmwrapper.so"
+var modulePath string
+
+func init() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get current working directory: %v", err)
+	}
+	modulePath = filepath.Join(cwd, "libathenavmwrapper.so")
+	log.Printf("modulePath: %s", modulePath)
+}
 
 func TestLoad(t *testing.T) {
 	i, err := Load(modulePath)
