@@ -42,7 +42,7 @@ runs:
 
     - name: Setup Rust toolchain
       id: rustc-toolchain
-    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         components: rustfmt
         toolchain: nightly-2024-04-17
