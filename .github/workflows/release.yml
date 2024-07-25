@@ -177,6 +177,9 @@ jobs:
           VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly') || needs.prepare.outputs.tag_name }}
         shell: bash
         run: |
+          pwd
+          ls -la
+          ls -la ./ffi
           if [ "$PLATFORM_NAME" == "linux" ]; then
             tar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
