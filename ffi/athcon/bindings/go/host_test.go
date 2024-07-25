@@ -40,6 +40,41 @@ func (host *testHostContext) Call(kind CallKind,
 	return output, gas, Address{}, nil
 }
 
+func TestGetBalance(t *testing.T) {
+	code := []byte{
+		0x7f, 0x41, 0x54, 0x48, // "\x7fATH" magic number
+		0x13, 0x05, 0x00, 0x10, // 10000513 (ADDI x10, x0, 0x100) // load address to write result
+		0xa3, 0x00, 0x22, 0x93, // 04000293 (ADDI x5, x0, 0xa3)   // load syscall number
+		0x73, 0x00, 0x00, 0x00, // 00000073 (ECALL)
+	}
+
+	vm, _ := Load(modulePath)
+	defer vm.Destroy()
+
+	host := &testHostContext{}
+	addr := Address{}
+	h := Bytes32{}
+	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, h, code)
+	output := result.Output
+	gasLeft := result.GasLeft
+
+	if len(output) != 32 {
+		t.Errorf("unexpected output size: %d", len(output))
+	}
+
+	// Should return value 42 (0x2a) as defined in GetTxContext().
+	expectedOutput := []byte("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x2a")
+	if !bytes.Equal(output, expectedOutput) {
+		t.Errorf("execution unexpected output: %x", output)
+	}
+	if gasLeft != 94 {
+		t.Errorf("execution gas left is incorrect: %d", gasLeft)
+	}
+	if err != nil {
+		t.Errorf("execution returned unexpected error: %v", err)
+	}
+}
+
 func TestGetBlockHeightFromTxContext(t *testing.T) {
 	// Yul: mstore(0, number()) return(0, msize())
 	code := []byte("\x43\x60\x00\x52\x59\x60\x00\xf3")
