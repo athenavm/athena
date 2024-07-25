@@ -81,6 +81,27 @@ jobs:
   #         RUSTFLAGS: -Copt-level=3 -Cdebug-assertions -Coverflow-checks=y -Cdebuginfo=0 -C target-cpu=native
   #         RUST_BACKTRACE: 1
 
+  test-go:
+    name: Test (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Setup CI
+        uses: ./.github/actions/setup
+
+      - name: Build
+        run: |
+          cmake -B build -S .
+          cmake --build build
+
+      - name: Run go test
+        run: |
+          cd ffi/athcon/bindings/go
+          go generate
+          go test -v ./...
+
   lint:
     name: Formatting & Clippy
     runs-on: ubuntu-latest

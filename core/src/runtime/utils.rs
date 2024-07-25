@@ -9,26 +9,6 @@ pub const fn align(addr: u32) -> u32 {
   addr - addr % 4
 }
 
-macro_rules! assert_valid_memory_access {
-  ($addr:expr, $position:expr) => {
-    #[cfg(debug_assertions)]
-    {
-      match $position {
-        MemoryAccessPosition::Memory => {
-          assert_eq!($addr % 4, 0, "addr is not aligned");
-          assert!($addr > 40);
-        }
-        _ => {
-          Register::from_u32($addr);
-        }
-      };
-    }
-
-    #[cfg(not(debug_assertions))]
-    {}
-  };
-}
-
 impl<T> Runtime<T>
 where
   T: HostInterface,

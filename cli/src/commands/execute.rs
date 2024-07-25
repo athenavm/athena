@@ -1,6 +1,6 @@
 use anstyle::*;
 use anyhow::Result;
-use athena_build::{build_program, BuildArgs};
+use athena_builder::{build_program, BuildArgs};
 use athena_core::io::AthenaStdin;
 use athena_core::utils::{setup_logger, setup_tracer};
 use athena_interface::MockHost;

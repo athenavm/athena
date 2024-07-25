@@ -1,4 +1,4 @@
-# athena-build
+# athena-builder
 
 Lightweight crate used to build Athena programs. Internal crate that is exposed to users via `athena-cli` and
 `athena-helper`.
@@ -9,7 +9,7 @@ specified parameters from `BuildArgs`.
 ## Usage
 
 ```rust
-use athena_build::build_program;
+use athena_builder::build_program;
 
 build_program(&BuildArgs::default(), Some(program_dir));
 ```

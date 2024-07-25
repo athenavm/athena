@@ -103,6 +103,20 @@ pub enum ExecutionError {
   Unimplemented(),
 }
 
+fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
+  {
+    match position {
+      MemoryAccessPosition::Memory => {
+        assert_eq!(addr % 4, 0, "addr is not aligned");
+        assert!(addr > 40);
+      }
+      _ => {
+        Register::from_u32(addr);
+      }
+    };
+  }
+}
+
 impl<T> Runtime<T>
 where
   T: HostInterface,
@@ -227,7 +241,7 @@ where
   /// Read from memory, assuming that all addresses are aligned.
   pub fn mr_cpu(&mut self, addr: u32, position: MemoryAccessPosition) -> u32 {
     // Assert that the address is aligned.
-    assert_valid_memory_access!(addr, position);
+    assert_valid_memory_access(addr, position);
 
     // Read the address from memory and create a memory read record.
     self.mr(addr)
@@ -236,7 +250,7 @@ where
   /// Write to memory.
   pub fn mw_cpu(&mut self, addr: u32, value: u32, position: MemoryAccessPosition) {
     // Assert that the address is aligned.
-    assert_valid_memory_access!(addr, position);
+    assert_valid_memory_access(addr, position);
 
     // Read the address from memory and create a memory read record.
     self.mw(addr, value);
@@ -659,6 +673,8 @@ where
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
+    log::info!("Executing cycle with instruction: {:?}", instruction);
+
     // Log the current state of the runtime.
     self.log(&instruction);
 
@@ -704,6 +720,7 @@ where
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
+      log::info!("Initializing");
       self.initialize();
     }
 
@@ -713,6 +730,7 @@ where
         break;
       }
     }
+    log::info!("Execution finished");
 
     self.postprocess();
 

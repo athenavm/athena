@@ -200,6 +200,8 @@ where
     let balance_low = balance as u32;
     let balance_slice = [balance_low, balance_high];
 
+    log::info!("Get balance syscall returning: {}", balance);
+
     // return to caller
     ctx.mw_slice(arg1, &balance_slice);
     None

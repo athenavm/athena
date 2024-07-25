@@ -5,7 +5,7 @@ use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
   HostInterface, HostProvider, SetOptionError, StatusCode, VmInterface,
 };
-use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_sdk::{utils::setup_logger, AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
   client: ExecutionClient,
@@ -45,6 +45,8 @@ where
     // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
+    setup_logger();
+
     // construct context object
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
@@ -55,6 +57,7 @@ where
       stdin.write_vec(input_data);
     }
 
+    log::info!("Executing code with input data");
     match self
       .client
       .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
@@ -66,12 +69,15 @@ where
         None,
       ),
       // map error to execution result
-      Err(e) => match e {
-        ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
-        ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
-        // general error
-        _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
-      },
+      Err(e) => {
+        log::info!("Execution error: {:?}", e);
+        match e {
+          ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
+          ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
+          // general error
+          _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
+        }
+      }
     }
   }
 }
@@ -83,7 +89,7 @@ mod tests {
   use super::*;
   use athena_interface::{
     Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
-    STORAGE_KEY, STORAGE_VALUE,
+    SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
   use athena_sdk::utils;
 
@@ -152,6 +158,30 @@ mod tests {
         0, 0, 0
       ]
     );
+  }
+
+  #[test]
+  fn test_minimal() {
+    utils::setup_logger();
+    let client = ExecutionClient::new();
+    let elf = include_bytes!("../../tests/minimal/getbalance.bin");
+    let stdin = AthenaStdin::new();
+    let vm = AthenaVm::new();
+    #[allow(clippy::arc_with_non_send_sync)]
+    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    // host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    let (mut output, _) = client
+      .execute::<MockHost>(
+        elf,
+        stdin,
+        Some(host.clone()),
+        Some(1000),
+        Some(ctx.clone()),
+      )
+      .unwrap();
+    let result = output.read::<Balance>();
+    assert_eq!(result, SOME_COINS, "got wrong output value");
   }
 
   #[test]
