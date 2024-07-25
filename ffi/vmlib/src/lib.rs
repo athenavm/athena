@@ -240,7 +240,7 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       sender: AddressWrapper::from(*item.sender()).into(),
       input_data: item.input().cloned(),
       value: Bytes32AsU64::new(byteswrapper.0).into(),
-      code: item.code().unwrap().clone(),
+      code: item.code().map_or(Vec::new(), |c| c.to_vec()),
     })
   }
 }
