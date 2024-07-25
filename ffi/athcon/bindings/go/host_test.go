@@ -2,6 +2,7 @@ package athcon
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 )
 
@@ -20,7 +21,9 @@ func (host *testHostContext) SetStorage(addr Address, key Bytes32, value Bytes32
 }
 
 func (host *testHostContext) GetBalance(addr Address) Bytes32 {
-	return Bytes32{}
+	var b Bytes32
+	binary.LittleEndian.PutUint32(b[:], 42)
+	return b
 }
 
 func (host *testHostContext) GetTxContext() TxContext {
@@ -46,6 +49,11 @@ func TestGetBalance(t *testing.T) {
 		0x13, 0x05, 0x00, 0x10, // 10000513 (ADDI x10, x0, 0x100) // load address to write result
 		0x93, 0x02, 0x30, 0x0a, // 0a300293 (ADDI x5, x0, 0xa3)   // load host getbalance syscall number
 		0x73, 0x00, 0x00, 0x00, // 00000073 (ECALL)
+		0x13, 0x05, 0x30, 0x00, // 00300513 (ADDI x10, x0, 0x03)  // load fd (3)
+		0x93, 0x05, 0x00, 0x10, // 10000593 (ADDI x11, x0, 0x100) // load writebuf address (result address)
+		0x13, 0x06, 0x00, 0x02, // 02000613 (ADDI x12, x0, 0x20)  // load nbytes (32)
+		0x93, 0x02, 0x20, 0x00, // 00200293 (ADDI x5, x0, 0x02)   // load write syscall number
+		0x73, 0x00, 0x00, 0x00, // 00000073 (ECALL)
 	}
 
 	vm, _ := Load(modulePath)
@@ -58,16 +66,18 @@ func TestGetBalance(t *testing.T) {
 	output := result.Output
 	gasLeft := result.GasLeft
 
-	if len(output) != 0 {
+	if len(output) != 32 {
 		t.Errorf("unexpected output size: %d", len(output))
 	}
 
 	// Should return value 42 (0x2a) as defined in GetTxContext().
-	expectedOutput := []byte("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x2a")
-	if !bytes.Equal(output, expectedOutput) {
+	var expectedOutput Bytes32
+	binary.LittleEndian.PutUint32(expectedOutput[:], 42)
+	if !bytes.Equal(output, expectedOutput[:]) {
+		t.Errorf("expected output: %x", expectedOutput)
 		t.Errorf("unexpected output: %x", output)
 	}
-	if gasLeft != 94 {
+	if gasLeft != 68 {
 		t.Errorf("execution gas left is incorrect: %d", gasLeft)
 	}
 	if err != nil {
