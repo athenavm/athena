@@ -410,7 +410,8 @@ pub fn transpile(instructions_u32: &[u32]) -> Vec<Instruction> {
   let mut instructions = Vec::new();
   let mut transpiler = InstructionTranspiler;
   for instruction_u32 in instructions_u32 {
-    let instruction = process_instruction(&mut transpiler, *instruction_u32).unwrap();
+    let instruction =
+      process_instruction(&mut transpiler, *instruction_u32).expect("malformed instruction");
     instructions.push(instruction);
   }
   instructions
