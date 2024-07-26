@@ -30,6 +30,7 @@ jobs:
           echo $(pwd)/mdbook-linkcheck >> $GITHUB_PATH
 
       - name: Run linkcheck
+        working-directory: book
         run: mdbook-linkcheck --standalone
 
   build:
@@ -56,13 +57,13 @@ jobs:
       - name: Archive artifact
         shell: sh
         run: |
-          chmod -c -R +rX "target/book" |
+          chmod -c -R +rX "book" |
           while read line; do
              echo "::warning title=Invalid file permissions automatically fixed::$line"
           done
           tar \
             --dereference --hard-dereference \
-            --directory "target/book" \
+            --directory "book" \
             -cvf "$RUNNER_TEMP/artifact.tar" \
             --exclude=.git \
             --exclude=.github \
