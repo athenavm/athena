@@ -1,26 +1,26 @@
 cfg_if::cfg_if! {
-    if #[cfg(target_os = "zkvm")] {
-        use core::arch::asm;
-    }
+  if #[cfg(target_os = "zkvm")] {
+    use core::arch::asm;
+  }
 }
 
 #[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn syscall_write(fd: u32, write_buf: *const u8, nbytes: usize) {
   cfg_if::cfg_if! {
-      if #[cfg(target_os = "zkvm")] {
-          unsafe {
-              asm!(
-                  "ecall",
-                  in("t0") crate::syscalls::WRITE,
-                  in("a0") fd,
-                  in("a1") write_buf,
-                  in("a2") nbytes,
-              );
-          }
-      } else {
-          unreachable!()
+    if #[cfg(target_os = "zkvm")] {
+      unsafe {
+          asm!(
+              "ecall",
+              in("t0") crate::syscalls::WRITE,
+              in("a0") fd,
+              in("a1") write_buf,
+              in("a2") nbytes,
+          );
       }
+    } else {
+      unreachable!()
+    }
   }
 }
 
@@ -31,9 +31,9 @@ pub extern "C" fn syscall_hint_len() -> usize {
   unsafe {
     let len;
     asm!(
-        "ecall",
-        in("t0") crate::syscalls::HINT_LEN,
-        lateout("t0") len,
+      "ecall",
+      in("t0") crate::syscalls::HINT_LEN,
+      lateout("t0") len,
     );
     len
   }
@@ -48,10 +48,10 @@ pub extern "C" fn syscall_hint_read(ptr: *mut u8, len: usize) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
-        "ecall",
-        in("t0") crate::syscalls::HINT_READ,
-        in("a0") ptr,
-        in("a1") len,
+      "ecall",
+      in("t0") crate::syscalls::HINT_READ,
+      in("a0") ptr,
+      in("a1") len,
     );
   }
 

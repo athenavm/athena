@@ -175,6 +175,7 @@ pub struct AthenaMessage {
   pub code: Vec<u8>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl AthenaMessage {
   pub fn new(
     kind: MessageKind,
@@ -206,12 +207,19 @@ pub enum StatusCode {
   Failure,
   Revert,
   OutOfGas,
+  InvalidInstruction,
   UndefinedInstruction,
+  StackOverflow,
+  StackUnderflow,
+  BadJumpDestination,
   InvalidMemoryAccess,
   CallDepthExceeded,
+  StaticModeViolation,
   PrecompileFailure,
   ContractValidationFailure,
   ArgumentOutOfRange,
+  UnreachableInstruction,
+  Trap,
   InsufficientBalance,
   InternalError,
   Rejected,
@@ -227,14 +235,21 @@ impl TryFrom<u32> for StatusCode {
       x if x == StatusCode::Failure as u32 => Ok(StatusCode::Failure),
       x if x == StatusCode::Revert as u32 => Ok(StatusCode::Revert),
       x if x == StatusCode::OutOfGas as u32 => Ok(StatusCode::OutOfGas),
+      x if x == StatusCode::InvalidInstruction as u32 => Ok(StatusCode::InvalidInstruction),
       x if x == StatusCode::UndefinedInstruction as u32 => Ok(StatusCode::UndefinedInstruction),
+      x if x == StatusCode::StackOverflow as u32 => Ok(StatusCode::StackOverflow),
+      x if x == StatusCode::StackUnderflow as u32 => Ok(StatusCode::StackUnderflow),
+      x if x == StatusCode::BadJumpDestination as u32 => Ok(StatusCode::BadJumpDestination),
       x if x == StatusCode::InvalidMemoryAccess as u32 => Ok(StatusCode::InvalidMemoryAccess),
       x if x == StatusCode::CallDepthExceeded as u32 => Ok(StatusCode::CallDepthExceeded),
+      x if x == StatusCode::StaticModeViolation as u32 => Ok(StatusCode::StaticModeViolation),
       x if x == StatusCode::PrecompileFailure as u32 => Ok(StatusCode::PrecompileFailure),
       x if x == StatusCode::ContractValidationFailure as u32 => {
         Ok(StatusCode::ContractValidationFailure)
       }
       x if x == StatusCode::ArgumentOutOfRange as u32 => Ok(StatusCode::ArgumentOutOfRange),
+      x if x == StatusCode::UnreachableInstruction as u32 => Ok(StatusCode::UnreachableInstruction),
+      x if x == StatusCode::Trap as u32 => Ok(StatusCode::Trap),
       x if x == StatusCode::InsufficientBalance as u32 => Ok(StatusCode::InsufficientBalance),
       x if x == StatusCode::InternalError as u32 => Ok(StatusCode::InternalError),
       x if x == StatusCode::Rejected as u32 => Ok(StatusCode::Rejected),
@@ -251,12 +266,19 @@ impl fmt::Display for StatusCode {
       StatusCode::Failure => write!(f, "Generic execution failure."),
       StatusCode::Revert => write!(f, "Execution terminated with REVERT opcode."),
       StatusCode::OutOfGas => write!(f, "The execution has run out of gas."),
+      StatusCode::InvalidInstruction => write!(f, "The execution has encountered an invalid instruction."),
       StatusCode::UndefinedInstruction => write!(f, "An undefined instruction has been encountered."),
+      StatusCode::StackOverflow => write!(f, "A stack overflow has been encountered."),
+      StatusCode::StackUnderflow => write!(f, "A stack underflow has been encountered."),
+      StatusCode::BadJumpDestination => write!(f, "A bad jump destination has been encountered."),
       StatusCode::InvalidMemoryAccess => write!(f, "Tried to read outside memory bounds."),
       StatusCode::CallDepthExceeded => write!(f, "Call depth has exceeded the limit."),
+      StatusCode::StaticModeViolation => write!(f, "Static mode violation."),
       StatusCode::PrecompileFailure => write!(f, "A call to a precompiled or system contract has ended with a failure."),
       StatusCode::ContractValidationFailure => write!(f, "Contract validation has failed."),
       StatusCode::ArgumentOutOfRange => write!(f, "An argument to a state accessing method has a value outside of the accepted range."),
+      StatusCode::UnreachableInstruction => write!(f, "An unreachable instruction has been encountered."),
+      StatusCode::Trap => write!(f, "A trap has been encountered."),
       StatusCode::InsufficientBalance => write!(f, "The caller does not have enough funds for value transfer."),
       StatusCode::InternalError => write!(f, "Athena implementation generic internal error."),
       StatusCode::Rejected => write!(f, "The execution of the given code and/or message has been rejected by the Athena implementation."),
@@ -372,9 +394,9 @@ impl<'a> MockHost<'a> {
     if value > balance_from {
       return StatusCode::InsufficientBalance;
     }
-    self.balance.insert(*from, balance_from - value);
     match balance_to.checked_add(value) {
       Some(new_balance) => {
+        self.balance.insert(*from, balance_from - value);
         self.balance.insert(*to, new_balance);
         StatusCode::Success
       }
@@ -453,7 +475,8 @@ impl<'a> HostInterface for MockHost<'a> {
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
     log::info!(
-      "MockHost::call:depth {} before backup storage item is :: {:?}",
+      "MockHost::call:id {:?} depth {} before backup storage item is :: {:?}",
+      self as *const Self as usize,
       depth,
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
@@ -474,11 +497,12 @@ impl<'a> HostInterface for MockHost<'a> {
 
     // check programs list first
     let res = if let Some(code) = self.programs.get(&msg.recipient).cloned() {
-      // create an owned, cloned copy of VM before taking the host from self
-      let vm = self.vm.clone();
+      // create an owned copy of VM before taking the host from self
+      let vm = self.vm;
 
       // HostProvider requires an owned instance, so we need to take it from self
       let provider = HostProvider::new(std::mem::take(self));
+      #[allow(clippy::arc_with_non_send_sync)]
       let host = Arc::new(RefCell::new(provider));
       let res = vm.expect("missing VM instance").execute(
         host.clone(),
@@ -507,18 +531,20 @@ impl<'a> HostInterface for MockHost<'a> {
       ExecutionResult::new(status_code, gas_left, None, None)
     };
 
+    log::info!(
+      "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
+      self as *const Self as usize,
+      depth,
+      self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
+    );
     if res.status_code != StatusCode::Success {
-      log::info!(
-        "MockHost::call:depth {} before restore storage item is :: {:?}",
-        depth,
-        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
-      );
       // rollback state
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.programs = backup_programs;
       log::info!(
-        "MockHost::call:depth {} after restore storage item is :: {:?}",
+        "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
+        self as *const Self as usize,
         depth,
         self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
       );

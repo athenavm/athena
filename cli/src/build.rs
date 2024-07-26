@@ -8,16 +8,28 @@ use std::{
   thread,
 };
 
-fn get_docker_image() -> String {
+fn get_docker_image(tag: &str) -> String {
   // Get the docker image name from the environment variable
-  std::env::var("ATHENA_DOCKER_IMAGE")
-    .unwrap_or_else(|_| "ghcr.io/athenavm/athena:latest".to_string())
+  std::env::var("ATHENA_DOCKER_IMAGE").unwrap_or_else(|_| {
+    let image_base = "ghcr.io/athenavm/athena";
+    format!("{}:{}", image_base, tag)
+  })
 }
 
 #[derive(Parser)]
 pub(crate) struct BuildArgs {
-  #[clap(long, action, help = "Use Dockerized build.")]
+  #[clap(
+    long,
+    action,
+    help = "Create a binary using the reproducible build system with docker."
+  )]
   pub(crate) docker: bool,
+  #[clap(
+    long,
+    help = "The ghcr.io/athenavm/athena image tag to use when building with docker.",
+    default_value = "latest"
+  )]
+  pub(crate) tag: String,
   #[clap(long, action, help = "Ignore Rust version check.")]
   pub(crate) ignore_rust_version: bool,
 }
@@ -30,7 +42,7 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
 
   let build_target = "riscv32em-athena-zkvm-elf";
   if args.docker {
-    let image = get_docker_image();
+    let image = get_docker_image(&args.tag);
 
     let docker_check = Command::new("docker")
       .args(["info"])
@@ -40,7 +52,7 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
       .context("failed to run docker command")?;
 
     if !docker_check.success() {
-      eprintln!("Docker is not installed or not running.");
+      eprintln!("Docker is not installed or not running: https://docs.docker.com/get-docker/");
       exit(1);
     }
 
@@ -48,6 +60,8 @@ pub fn build_program(args: &BuildArgs) -> Result<Utf8PathBuf> {
     let mut child_args = vec![
       "run",
       "--rm",
+      "--platform",
+      "linux/amd64",
       "-v",
       workspace_root_path.as_str(),
       image.as_str(),

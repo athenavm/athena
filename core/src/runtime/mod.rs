@@ -1,6 +1,5 @@
 mod instruction;
 mod io;
-mod memory;
 mod opcode;
 mod program;
 mod register;
@@ -10,7 +9,6 @@ mod syscall;
 mod utils;
 
 pub use instruction::*;
-pub use memory::*;
 pub use opcode::*;
 pub use program::*;
 pub use register::*;
@@ -69,11 +67,22 @@ pub struct Runtime<T: HostInterface> {
   /// Max gas for the runtime.
   pub max_gas: Option<u32>,
 
-  pub(crate) unconstrained_state: ForkState,
-
+  /// The mapping between syscall codes and their implementations.
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
 
+  /// The maximum number of cycles for a syscall.
   pub max_syscall_cycles: u32,
+}
+
+/// An record of a write to a memory address.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum MemoryAccessPosition {
+  Memory = 0,
+  // Note that these AccessPositions mean that when when read/writing registers, they must be
+  // read/written in the following order: C, B, A.
+  C = 1,
+  B = 2,
+  A = 3,
 }
 
 #[derive(Error, Debug)]
@@ -92,6 +101,20 @@ pub enum ExecutionError {
   Breakpoint(),
   #[error("got unimplemented as opcode")]
   Unimplemented(),
+}
+
+fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
+  {
+    match position {
+      MemoryAccessPosition::Memory => {
+        assert_eq!(addr % 4, 0, "addr is not aligned");
+        assert!(addr > 40);
+      }
+      _ => {
+        Register::from_u32(addr);
+      }
+    };
+  }
 }
 
 impl<T> Runtime<T>
@@ -134,7 +157,6 @@ where
       trace_buf,
       unconstrained: false,
       max_gas: opts.max_gas(),
-      unconstrained_state: ForkState::default(),
       syscall_map,
       max_syscall_cycles,
     }
@@ -153,7 +175,7 @@ where
     for i in 0..32 {
       let addr = Register::from_u32(i as u32) as u32;
       registers[i] = match self.state.memory.get(&addr) {
-        Some(record) => record.value,
+        Some(record) => *record,
         None => 0,
       };
     }
@@ -164,7 +186,7 @@ where
   pub fn register(&self, register: Register) -> u32 {
     let addr = register as u32;
     match self.state.memory.get(&addr) {
-      Some(record) => record.value,
+      Some(record) => *record,
       None => 0,
     }
   }
@@ -172,7 +194,7 @@ where
   /// Get the current value of a word.
   pub fn word(&self, addr: u32) -> u32 {
     match self.state.memory.get(&addr) {
-      Some(record) => record.value,
+      Some(record) => *record,
       None => 0,
     }
   }
@@ -183,110 +205,55 @@ where
     (word >> ((addr % 4) * 8)) as u8
   }
 
-  /// Get the current timestamp for a given memory access position.
-  pub const fn timestamp(&self, position: &MemoryAccessPosition) -> u32 {
-    self.state.clk + *position as u32
-  }
-
-  /// Read a word from memory and create an access record.
-  pub fn mr(&mut self, addr: u32, timestamp: u32) -> MemoryReadRecord {
-    // Get the memory record entry.
+  /// Read a word from memory.
+  pub fn mr(&mut self, addr: u32) -> u32 {
+    // Get the memory entry.
     let entry = self.state.memory.entry(addr);
 
-    // If we're in unconstrained mode, we don't want to modify state, so we'll save the
-    // original state if it's the first time modifying it.
-    if self.unconstrained {
-      let record = match entry {
-        Entry::Occupied(ref entry) => Some(entry.get()),
-        Entry::Vacant(_) => None,
-      };
-      self
-        .unconstrained_state
-        .memory_diff
-        .entry(addr)
-        .or_insert(record.copied());
-    }
-
     // If it's the first time accessing this address, initialize previous values.
-    let record: &mut MemoryRecord = match entry {
-      Entry::Occupied(entry) => entry.into_mut(),
+    match entry {
+      Entry::Occupied(entry) => *entry.get(),
       Entry::Vacant(entry) => {
         // If addr has a specific value to be initialized with, use that, otherwise 0.
         let value = self.state.uninitialized_memory.remove(&addr).unwrap_or(0);
-
-        entry.insert(MemoryRecord {
-          value,
-          timestamp: 0,
-        })
+        *entry.insert(value)
       }
-    };
-    let value = record.value;
-    let prev_timestamp = record.timestamp;
-    record.timestamp = timestamp;
-
-    // Construct the memory read record.
-    MemoryReadRecord::new(value, timestamp, prev_timestamp)
+    }
   }
 
-  /// Write a word to memory and create an access record.
-  pub fn mw(&mut self, addr: u32, value: u32, timestamp: u32) -> MemoryWriteRecord {
+  /// Write a word to memory.
+  pub fn mw(&mut self, addr: u32, value: u32) {
     // Get the memory record entry.
     let entry = self.state.memory.entry(addr);
 
-    // If we're in unconstrained mode, we don't want to modify state, so we'll save the
-    // original state if it's the first time modifying it.
-    if self.unconstrained {
-      let record = match entry {
-        Entry::Occupied(ref entry) => Some(entry.get()),
-        Entry::Vacant(_) => None,
-      };
-      self
-        .unconstrained_state
-        .memory_diff
-        .entry(addr)
-        .or_insert(record.copied());
-    }
-
-    // If it's the first time accessing this address, initialize previous values.
-    let record: &mut MemoryRecord = match entry {
-      Entry::Occupied(entry) => entry.into_mut(),
+    match entry {
+      Entry::Occupied(mut entry) => {
+        entry.insert(value);
+      }
       Entry::Vacant(entry) => {
         // If addr has a specific value to be initialized with, use that, otherwise 0.
-        let value = self.state.uninitialized_memory.remove(&addr).unwrap_or(0);
-
-        entry.insert(MemoryRecord {
-          value,
-          timestamp: 0,
-        })
+        self.state.uninitialized_memory.remove(&addr);
+        entry.insert(value);
       }
     };
-    let prev_value = record.value;
-    let prev_timestamp = record.timestamp;
-    record.value = value;
-    record.timestamp = timestamp;
-
-    // Construct the memory write record.
-    MemoryWriteRecord::new(value, timestamp, prev_value, prev_timestamp)
   }
 
   /// Read from memory, assuming that all addresses are aligned.
   pub fn mr_cpu(&mut self, addr: u32, position: MemoryAccessPosition) -> u32 {
     // Assert that the address is aligned.
-    assert_valid_memory_access!(addr, position);
+    assert_valid_memory_access(addr, position);
 
     // Read the address from memory and create a memory read record.
-    let record = self.mr(addr, self.timestamp(&position));
-
-    record.value
+    self.mr(addr)
   }
 
   /// Write to memory.
   pub fn mw_cpu(&mut self, addr: u32, value: u32, position: MemoryAccessPosition) {
     // Assert that the address is aligned.
-    assert_valid_memory_access!(addr, position);
+    assert_valid_memory_access(addr, position);
 
     // Read the address from memory and create a memory read record.
-    let _ = self.mw(addr, value, self.timestamp(&position));
+    self.mw(addr, value);
   }
 
   /// Read from a register.
@@ -706,6 +673,8 @@ where
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
+    log::info!("Executing cycle with instruction: {:?}", instruction);
+
     // Log the current state of the runtime.
     self.log(&instruction);
 
@@ -731,9 +700,9 @@ where
 
   pub(crate) fn gas_left(&self) -> Option<i64> {
     // gas left can be negative, if we spent too much on the last instruction
-    return self
+    self
       .max_gas
-      .map(|max_gas| max_gas as i64 - self.state.clk as i64);
+      .map(|max_gas| max_gas as i64 - self.state.clk as i64)
   }
 
   fn initialize(&mut self) {
@@ -741,13 +710,7 @@ where
 
     tracing::info!("loading memory image");
     for (addr, value) in self.program.memory_image.iter() {
-      self.state.memory.insert(
-        *addr,
-        MemoryRecord {
-          value: *value,
-          timestamp: 0,
-        },
-      );
+      self.state.memory.insert(*addr, *value);
     }
 
     tracing::info!("starting execution");
@@ -757,6 +720,7 @@ where
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
+      log::info!("Initializing");
       self.initialize();
     }
 
@@ -766,6 +730,7 @@ where
         break;
       }
     }
+    log::info!("Execution finished");
 
     self.postprocess();
 
@@ -883,6 +848,7 @@ pub mod tests {
     let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),
@@ -902,6 +868,7 @@ pub mod tests {
 
     // we need a new host provider for each test to reset state
     fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
+      #[allow(clippy::arc_with_non_send_sync)]
       Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
     }
 
@@ -909,7 +876,7 @@ pub mod tests {
     let mut runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(539)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(543)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
@@ -918,7 +885,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(540)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -928,7 +895,7 @@ pub mod tests {
     runtime = Runtime::<MockHost>::new(
       program.clone(),
       Some(get_provider()),
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(541)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -1042,6 +1009,7 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let host = MockHost::new();
+    #[allow(clippy::arc_with_non_send_sync)]
     let provider = Arc::new(RefCell::new(HostProvider::new(host)));
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
@@ -1104,6 +1072,7 @@ pub mod tests {
     let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),
@@ -1149,6 +1118,7 @@ pub mod tests {
     let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::<MockHost>::new(
       program,
       Some(Arc::new(RefCell::new(provider))),

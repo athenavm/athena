@@ -7,7 +7,7 @@ set -e
 
 echo Installing athup...
 
-BASE_DIR=${XDG_CONFIG_HOME:-$HOME}
+BASE_DIR=$HOME
 ATHENA_DIR=${ATHENA_DIR-"$BASE_DIR/.athena"}
 ATHENA_BIN_DIR="$ATHENA_DIR/bin"
 

@@ -31,7 +31,7 @@ pub fn pad_to_power_of_two<const N: usize, T: Clone + Default>(values: &mut Vec<
   values.resize(n_real_rows.next_power_of_two() * N, T::default());
 }
 
-pub fn pad_rows<T: Clone, const N: usize>(rows: &mut Vec<[T; N]>, row_fn: impl Fn() -> [T; N]) {
+pub fn pad_rows<T: Clone>(rows: &mut Vec<T>, row_fn: impl Fn() -> T) {
   let nb_rows = rows.len();
   let mut padded_nb_rows = nb_rows.next_power_of_two();
   if padded_nb_rows < 16 {

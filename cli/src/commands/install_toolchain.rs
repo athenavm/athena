@@ -13,19 +13,51 @@ use std::process::Command;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::{get_target, get_toolchain_download_url, url_exists, RUSTUP_TOOLCHAIN_NAME};
+use crate::{
+  get_target, get_toolchain_download_url, is_supported_target, url_exists, RUSTUP_TOOLCHAIN_NAME,
+};
 
 #[derive(Parser)]
 #[command(
   name = "install-toolchain",
   about = "Install the cargo-athena toolchain."
 )]
-pub struct InstallToolchainCmd {}
+pub struct InstallToolchainCmd {
+  #[arg(short, long, env = "GITHUB_TOKEN")]
+  pub token: Option<String>,
+}
 
 impl InstallToolchainCmd {
   pub fn run(&self) -> Result<()> {
-    // Setup client.
-    let client = Client::builder().user_agent("Mozilla/5.0").build()?;
+    // Check if rust is installed.
+    if Command::new("rustup")
+      .arg("--version")
+      .stdout(std::process::Stdio::null())
+      .stderr(std::process::Stdio::null())
+      .status()
+      .is_err()
+    {
+      return Err(anyhow::anyhow!(
+        "Rust is not installed. Please install Rust from https://rustup.rs/ and try again."
+      ));
+    }
+
+    // Setup client with optional token.
+    let client_builder = Client::builder().user_agent("Mozilla/5.0");
+    let client = if let Some(ref token) = self.token {
+      client_builder
+        .default_headers({
+          let mut headers = reqwest::header::HeaderMap::new();
+          headers.insert(
+            reqwest::header::AUTHORIZATION,
+            reqwest::header::HeaderValue::from_str(&format!("token {}", token)).unwrap(),
+          );
+          headers
+        })
+        .build()?
+    } else {
+      client_builder.build()?
+    };
 
     // Setup variables.
     let root_dir = home_dir().unwrap().join(".athena");
@@ -60,6 +92,10 @@ impl InstallToolchainCmd {
       Ok(_) => println!("Successfully created ~/.athena directory."),
       Err(err) => println!("Failed to create ~/.athena directory: {}", err),
     };
+    assert!(
+      is_supported_target(),
+      "Unsupported architecture. Please build the toolchain from source."
+    );
     let target = get_target();
     let toolchain_asset_name = format!("rust-toolchain-{}.tar.gz", target);
     let toolchain_archive_path = root_dir.join(toolchain_asset_name.clone());

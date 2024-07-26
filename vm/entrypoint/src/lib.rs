@@ -1,20 +1,22 @@
+extern crate alloc;
+
 pub mod heap;
 pub mod helpers;
 pub mod syscalls;
 pub mod host {
   pub use athena_hostfunctions::*;
 }
+#[cfg(feature = "lib")]
 pub mod io {
-  pub use athena_precompiles::io::*;
+  pub use athena_lib::io::*;
 }
-pub mod precompiles {
-  pub use athena_precompiles::*;
+#[cfg(feature = "lib")]
+pub mod lib {
+  pub use athena_lib::*;
 }
 pub mod types {
   pub use athena_interface::*;
 }
-
-extern crate alloc;
 
 #[macro_export]
 macro_rules! entrypoint {
@@ -76,24 +78,16 @@ mod vm {
         .option pop;
         la sp, {0}
         lw sp, 0(sp)
-        jal ra, __start;
+        call __start;
     "#,
       sym STACK_TOP
   );
 
-  static GETRANDOM_WARNING_ONCE: std::sync::Once = std::sync::Once::new();
-
   fn vm_getrandom(s: &mut [u8]) -> Result<(), Error> {
-    use rand::Rng;
-    use rand::SeedableRng;
-
-    GETRANDOM_WARNING_ONCE.call_once(|| {
-      println!("WARNING: Using insecure random number generator");
-    });
-    let mut rng = rand::rngs::StdRng::seed_from_u64(123);
-    for i in 0..s.len() {
-      s[i] = rng.gen();
+    unsafe {
+      crate::syscalls::sys_rand(s.as_mut_ptr(), s.len());
     }
+
     Ok(())
   }
 

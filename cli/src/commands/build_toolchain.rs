@@ -99,8 +99,8 @@ impl BuildToolchainCmd {
       "patches/config.toml"
     };
     std::fs::copy(
-      &toolchain_dir.join(config_file_src),
-      &rust_dir.join("config.toml"),
+      toolchain_dir.join(config_file_src),
+      rust_dir.join("config.toml"),
     )
     .with_context(|| {
       format!(
@@ -172,7 +172,7 @@ impl BuildToolchainCmd {
     for tool in tools_bin_dir.read_dir()? {
       let tool = tool?;
       let tool_name = tool.file_name();
-      std::fs::copy(&tool.path(), target_bin_dir.join(tool_name))?;
+      std::fs::copy(tool.path(), target_bin_dir.join(tool_name))?;
     }
 
     // Link the toolchain to rustup.

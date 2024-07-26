@@ -14,6 +14,7 @@ pub trait HostContext {
   fn get_balance(&self, addr: &Address) -> Bytes32;
   fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
   fn get_block_hash(&self, number: i64) -> Bytes32;
+  #[allow(clippy::too_many_arguments)]
   fn call(
     &mut self,
     kind: MessageKind,
@@ -42,9 +43,9 @@ unsafe extern "C" fn account_exists(
   context: *mut ffi::athcon_host_context,
   address: *const ffi::athcon_address,
 ) -> bool {
-  return (*(context as *mut ExtendedContext))
+  (*(context as *mut ExtendedContext))
     .hctx
-    .account_exists(&(*address).bytes);
+    .account_exists(&(*address).bytes)
 }
 
 unsafe extern "C" fn get_storage(
@@ -52,11 +53,11 @@ unsafe extern "C" fn get_storage(
   address: *const ffi::athcon_address,
   key: *const ffi::athcon_bytes32,
 ) -> ffi::athcon_bytes32 {
-  return ffi::athcon_bytes32 {
+  ffi::athcon_bytes32 {
     bytes: (*(context as *mut ExtendedContext))
       .hctx
       .get_storage(&(*address).bytes, &(*key).bytes),
-  };
+  }
 }
 
 unsafe extern "C" fn set_storage(
@@ -65,22 +66,22 @@ unsafe extern "C" fn set_storage(
   key: *const ffi::athcon_bytes32,
   value: *const ffi::athcon_bytes32,
 ) -> ffi::athcon_storage_status {
-  return (*(context as *mut ExtendedContext)).hctx.set_storage(
+  (*(context as *mut ExtendedContext)).hctx.set_storage(
     &(*address).bytes,
     &(*key).bytes,
     &(*value).bytes,
-  );
+  )
 }
 
 unsafe extern "C" fn get_balance(
   context: *mut ffi::athcon_host_context,
   address: *const ffi::athcon_address,
 ) -> ffi::athcon_uint256be {
-  return ffi::athcon_uint256be {
+  ffi::athcon_uint256be {
     bytes: (*(context as *mut ExtendedContext))
       .hctx
       .get_balance(&(*address).bytes),
-  };
+  }
 }
 
 unsafe extern "C" fn get_tx_context(
@@ -88,25 +89,25 @@ unsafe extern "C" fn get_tx_context(
 ) -> ffi::athcon_tx_context {
   let (gas_price, origin, height, timestamp, gas_limit, chain_id) =
     (*(context as *mut ExtendedContext)).hctx.get_tx_context();
-  return ffi::athcon_tx_context {
+  ffi::athcon_tx_context {
     tx_gas_price: athcon_sys::athcon_bytes32 { bytes: gas_price },
     tx_origin: athcon_sys::athcon_address { bytes: origin },
     block_height: height,
     block_timestamp: timestamp,
     block_gas_limit: gas_limit,
     chain_id: athcon_sys::athcon_bytes32 { bytes: chain_id },
-  };
+  }
 }
 
 unsafe extern "C" fn get_block_hash(
   context: *mut ffi::athcon_host_context,
   number: i64,
 ) -> ffi::athcon_bytes32 {
-  return ffi::athcon_bytes32 {
+  ffi::athcon_bytes32 {
     bytes: (*(context as *mut ExtendedContext))
       .hctx
       .get_block_hash(number),
-  };
+  }
 }
 
 unsafe extern "C" fn release(result: *const ffi::athcon_result) {
@@ -120,6 +121,7 @@ unsafe extern "C" fn release(result: *const ffi::athcon_result) {
   // No need to explicitly call drop here; it will be dropped when _output goes out of scope
 }
 
+#[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn call(
   context: *mut ffi::athcon_host_context,
   msg: *const ffi::athcon_message,
@@ -131,7 +133,7 @@ pub unsafe extern "C" fn call(
       &msg.recipient.bytes,
       &msg.sender.bytes,
       &msg.value.bytes,
-      &std::slice::from_raw_parts(msg.input_data, msg.input_size),
+      std::slice::from_raw_parts(msg.input_data, msg.input_size),
       msg.gas,
       msg.depth,
     );
@@ -139,14 +141,14 @@ pub unsafe extern "C" fn call(
   // Prevent Rust from automatically freeing the memory
   let len = output.len();
   mem::forget(output);
-  return ffi::athcon_result {
-    status_code: status_code,
-    gas_left: gas_left,
+  ffi::athcon_result {
+    status_code,
+    gas_left,
     output_data: ptr,
     output_size: len,
     release: Some(release),
     create_address: ffi::athcon_address {
       bytes: create_address,
     },
-  };
+  }
 }

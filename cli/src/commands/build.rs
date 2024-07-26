@@ -1,5 +1,5 @@
-use crate::build::{build_program, BuildArgs};
 use anyhow::Result;
+use athena_builder::{build_program, BuildArgs};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -14,7 +14,7 @@ pub struct BuildCmd {
 
 impl BuildCmd {
   pub fn run(&self) -> Result<()> {
-    build_program(&self.build_args)?;
+    build_program(&self.build_args, None)?;
 
     Ok(())
   }

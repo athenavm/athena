@@ -1,4 +1,3 @@
-mod build;
 pub mod commands;
 mod util;
 
@@ -38,6 +37,23 @@ pub async fn url_exists(client: &Client, url: &str) -> bool {
   res.is_ok()
 }
 
+#[allow(unreachable_code)]
+pub fn is_supported_target() -> bool {
+  #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+  return true;
+
+  #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+  return true;
+
+  #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+  return true;
+
+  #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+  return true;
+
+  false
+}
+
 pub fn get_target() -> String {
   target_lexicon::HOST.to_string()
 }
@@ -52,7 +68,9 @@ pub async fn get_toolchain_download_url(client: &Client, target: String) -> Stri
     .json::<serde_json::Value>()
     .await
     .unwrap();
-  let tag = json["tag_name"].as_str().unwrap();
+  let tag = json["tag_name"].as_str().expect(
+    "Failed to download toolchain. Likely caused by GitHub rate limiting. Please try again.",
+  );
 
   let url = format!(
         "https://github.com/athenavm/rustc-rv32e-toolchain/releases/download/{}/athena-rust-toolchain-{}-{}.tar.gz",

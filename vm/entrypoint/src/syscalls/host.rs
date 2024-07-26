@@ -70,7 +70,7 @@ pub extern "C" fn write_storage(key: *mut u32, value: *const u32) {
 
 /// Get the current account balance
 ///
-/// The result status code is stored in the `result` pointer.
+/// The result status code is stored in the `value` pointer.
 #[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn get_balance(value: *mut u32) {
