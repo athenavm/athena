@@ -52,6 +52,7 @@ jobs:
           echo $(pwd)/mdbook-template >> $GITHUB_PATH
 
       - name: Build book
+        working-directory: book
         run: mdbook build
 
       - name: Archive artifact
