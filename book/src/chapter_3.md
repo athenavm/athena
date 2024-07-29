@@ -8,7 +8,7 @@ Currently, to write, compile, and run smart contracts for Athena, you need to ha
 
 ## Getting Started
 
-To start, simple enter the following command in a terminal to install Athena and the Athena toolchain:
+To start, simply enter the following command in a terminal to install Athena and the Athena toolchain:
 
 `curl -L http://install.athenavm.org | bash && athup`
 
