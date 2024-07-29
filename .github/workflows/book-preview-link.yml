@@ -1,0 +1,22 @@
+name: Book Preview Link
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  preview-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add Preview Link
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const previewUrl = `https://www.athenavm.org/book/preview/${context.issue.number}/`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `📘 Book preview available at: ${previewUrl}`
+            })
