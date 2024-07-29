@@ -85,17 +85,18 @@ jobs:
         uses: actions/configure-pages@v4
 
       - name: Deploy to Staging
+        if: github.ref_name != 'main' || github.event_name != 'push'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./book
-          destination_dir: book/preview/${{ github.event.pull_request.number }}
-          # publish_branch: gh-pages
+          destination_dir: preview/${{ github.event.pull_request.number }}
 
+      # Note: this step will overwrite the work of the previous step.
+      # That's okay since they're mutually exclusive.
       - name: Deploy
+        if: github.ref_name == 'main' && github.event_name == 'push'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./book
-          destination_dir: book/
-          # publish_branch: gh-pages
