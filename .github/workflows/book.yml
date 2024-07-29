@@ -30,6 +30,7 @@ jobs:
           echo $(pwd)/mdbook-linkcheck >> $GITHUB_PATH
 
       - name: Run linkcheck
+        working-directory: book
         run: mdbook-linkcheck --standalone
 
   build:
@@ -51,6 +52,7 @@ jobs:
           echo $(pwd)/mdbook-template >> $GITHUB_PATH
 
       - name: Build book
+        working-directory: book
         run: mdbook build
 
       - name: Setup Pages

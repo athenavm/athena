@@ -7,6 +7,8 @@ on:
 jobs:
   preview-link:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Add Preview Link
         uses: actions/github-script@v6
