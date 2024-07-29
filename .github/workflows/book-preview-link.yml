@@ -16,9 +16,26 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const previewUrl = `https://www.athenavm.org/book/preview/${context.issue.number}/`;
-            github.rest.issues.createComment({
+            const commentBody = `📘 Book preview available at: ${previewUrl}`;
+
+            // Get all comments
+            const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `📘 Book preview available at: ${previewUrl}`
-            })
+              repo: context.repo.repo
+            });
+
+            // Find our bot comment
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' && comment.body.includes('Book preview available at:')
+            );
+
+            if (!botComment) {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            }
