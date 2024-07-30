@@ -1,7 +1,0 @@
-# Introduction
-
-Athena is a general-purpose VM that is designed to run smart contracts for the Spacemesh blockchain protocol. At its core is [SP1](https://github.com/succinctlabs/sp1), the VM by Succinct Labs that targets the RISC-V instruction set. However, Athena does not support Zero Knowledge (ZK) proofs which is why the ZK proving components of SP1 are not being incorporated into Athena for now (though ZK functionality is planned for the future). The ultimate aim behind Athena is to build a modern, secure, and performant RISC-V blockchain VM that natively targets ZK execution and proving.
-
-Athena supports mainline Rust as its smart contract programming language. Rust appeared to be the perfect candidate for this purpose due to its mature ecosystem, high performance, built-in safety features, and powerful and mature LLVM toolchain. In addition, Athena is based on the RV32E variant of the RISC-V ISA and thus all Rust code has to compile to the `riscv32em` target. However, the current Rust toolchain does not fully support compiling to this target. As a result, we had to create and maintain [our own fork](https://github.com/athenavm/rustc-rv32e-toolchain/tree/main) of the PolkaVM Rust toolchain. Hence, for now, Athena users will need to download this toolchain to be able to compile and run Athena code. We are hopeful that users will not have to use this special toolchain once full RISC-V support is added to Rust.
-
-With this, let us start writing smart contracts for Athena!
