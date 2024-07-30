@@ -1,0 +1,77 @@
+# Documentation and mdbook related jobs.
+# Reference: https://github.com/paradigmxyz/reth/blob/main/.github/workflows/book.yml
+
+name: book
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "book/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "book/**"
+  merge_group:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: lint
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdbook-linkcheck
+        run: |
+          mkdir mdbook-linkcheck
+          curl -sSL -o mdbook-linkcheck.zip https://github.com/Michael-F-Bryan/mdbook-linkcheck/releases/latest/download/mdbook-linkcheck.x86_64-unknown-linux-gnu.zip
+          unzip mdbook-linkcheck.zip -d ./mdbook-linkcheck
+          chmod +x $(pwd)/mdbook-linkcheck/mdbook-linkcheck
+          echo $(pwd)/mdbook-linkcheck >> $GITHUB_PATH
+
+      - name: Run linkcheck
+        working-directory: book
+        run: mdbook-linkcheck --standalone
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    needs: lint
+
+    timeout-minutes: 60
+
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup mdBook
+        uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: "latest"
+
+      - name: Build book
+        working-directory: book
+        run: mdbook build
+
+      - name: Deploy to Staging
+        if: github.ref_name != 'main' || github.event_name != 'push'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./book
+          destination_dir: preview/${{ github.event.pull_request.number }}
+
+      # Note: this step will overwrite the work of the previous step.
+      # That's okay since they're mutually exclusive.
+      - name: Deploy
+        if: github.ref_name == 'main' && github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./book
