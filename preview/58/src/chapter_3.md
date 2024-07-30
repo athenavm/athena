@@ -10,7 +10,7 @@ Currently, to write, compile, and run smart contracts for Athena, you need to ha
 
 To start, simply enter the following command in a terminal:
 
-`curl -L http://install.athenavm.org | bash`
+`curl -L https://install.athenavm.org | bash`
 
 Follow the instructions to add Athena to your shell's path directory, then run
 
