@@ -2,6 +2,8 @@ name: Book Preview Link
 
 on:
   pull_request:
+    paths:
+      - "book/**"
     types: [opened, synchronize, reopened]
 
 jobs:

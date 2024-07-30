@@ -6,6 +6,8 @@ name: book
 on:
   push:
     branches: [main]
+    paths:
+      - "book/**"
   pull_request:
     branches: [main]
     paths:
