@@ -15,7 +15,7 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            const previewUrl = `https://www.athenavm.org/book/preview/${context.issue.number}/`;
+            const previewUrl = `https://www.athenavm.org/athena/preview/${context.issue.number}/book/`;
             const commentBody = `📘 Book preview available at: ${previewUrl}`;
 
             // Get all comments
