@@ -35,35 +35,11 @@ jobs:
         working-directory: book
         run: mdbook-linkcheck --standalone
 
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v2
-        with:
-          # mdbook-version: '0.4.8'
-          mdbook-version: "latest"
-
-      - name: Build book
-        working-directory: book
-        run: mdbook build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: "book/book"
-
   build-and-deploy:
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
-    needs: [lint, build]
+    needs: lint
 
     timeout-minutes: 60
 
@@ -82,9 +58,6 @@ jobs:
       - name: Build book
         working-directory: book
         run: mdbook build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
 
       - name: Deploy to Staging
         if: github.ref_name != 'main' || github.event_name != 'push'
