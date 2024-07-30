@@ -16,6 +16,7 @@ members = [
   "vm/entrypoint",
   "vm/hostfunctions",
   "vm/lib",
+  "vm/sdk",
 ]
 resolver = "2"
 
