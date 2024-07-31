@@ -1,0 +1,9 @@
+[package]
+name = "wallet-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+athena-interface = { path = "../../../interface" }
+athena-vm-sdk = { path = "../../../vm/sdk" }
+parity-scale-codec = { version = "3.6.12", features = ["derive"] }
