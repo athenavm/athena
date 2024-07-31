@@ -3,6 +3,15 @@ members = [
   "builder",
   "cli",
   "core",
+  "examples/fibonacci/program",
+  "examples/fibonacci/script",
+  "examples/hello_world/program",
+  "examples/hello_world/script",
+  "examples/io/script",
+  "examples/io/script",
+  "examples/wallet/common",
+  "examples/wallet/program",
+  "examples/wallet/script",
   "ffi/athcon/bindings/rust/athcon-client",
   "ffi/athcon/bindings/rust/athcon-declare",
   "ffi/athcon/bindings/rust/athcon-sys",
@@ -18,6 +27,7 @@ members = [
   "vm/lib",
   "vm/sdk",
 ]
+exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]

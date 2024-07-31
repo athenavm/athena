@@ -1,6 +1,8 @@
 use athena_hostfunctions;
-use athena_interface::{Address, Balance};
+use athena_interface::{Address, Balance, Bytes32};
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
+
+pub type Pubkey = Bytes32;
 
 pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
   let address = address_to_32bit_words(address);
@@ -31,4 +33,12 @@ pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
   unsafe {
     athena_hostfunctions::call(address.as_ptr(), input, input_len, amount.as_ptr());
   }
+}
+
+pub trait WalletTemplate {
+  fn spawn(owner: Pubkey);
+}
+
+pub trait WalletProgram {
+  fn spend(&self, recipient: Address, amount: Balance);
 }

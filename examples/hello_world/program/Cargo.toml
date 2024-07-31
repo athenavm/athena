@@ -1,4 +1,3 @@
-[workspace]
 [package]
 name = "hello-world-program"
 version = "0.1.0"
