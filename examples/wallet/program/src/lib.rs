@@ -3,7 +3,7 @@
 athena_vm::entrypoint!(main);
 
 use athena_interface::{Address, Balance};
-use athena_vm_declare::export;
+use athena_vm_declare::{callable, template};
 use athena_vm_sdk::{call, Pubkey, VerifiableTemplate, WalletProgram};
 use borsh::{from_slice, to_vec};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
@@ -29,8 +29,9 @@ impl Wallet {
   }
 }
 
+#[template]
 impl WalletProgram for Wallet {
-  #[export]
+  #[callable]
   fn spawn(owner: Pubkey) {
     // for now this just tests the args
     Wallet::new(owner);
@@ -38,7 +39,7 @@ impl WalletProgram for Wallet {
     // TODO: call spawn host function
   }
 
-  #[export]
+  #[callable]
   fn send(&self, recipient: Address, amount: Balance) {
     // Send coins
     // Note: error checking happens inside the host
