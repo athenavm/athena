@@ -42,7 +42,7 @@ pub trait VerifiableTemplate {
 }
 
 pub trait WalletTemplate {
-  fn spawn(owner: Pubkey);
+  extern "C" fn athexp_spawn(vm_state: *const u8, vm_state_len: usize, owner: Pubkey);
 }
 
 pub trait WalletProgram {
