@@ -22,6 +22,7 @@ members = [
   "interface",
   "runner",
   "sdk",
+  "vm/declare",
   "vm/entrypoint",
   "vm/hostfunctions",
   "vm/lib",
