@@ -35,10 +35,18 @@ pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
   }
 }
 
+// These traits define the reference wallet interface.
+
+pub trait VerifiableTemplate {
+  fn verify(self, tx: &[u8], signature: &[u8; 64]) -> bool;
+}
+
 pub trait WalletTemplate {
   fn spawn(owner: Pubkey);
 }
 
 pub trait WalletProgram {
-  fn spend(&self, recipient: Address, amount: Balance);
+  fn send(self, recipient: Address, amount: Balance);
+  fn proxy(self, destination: Address, args: Vec<u8>);
+  fn deploy(self, code: Vec<u8>);
 }

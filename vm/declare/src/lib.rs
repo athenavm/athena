@@ -45,26 +45,29 @@ fn process_export_method(input: ItemFn) -> Result<TokenStream2> {
   let export_func_name = format_ident!("athexpm_{}", func_name, span = Span::call_site());
 
   Ok(quote! {
-      #vis #input
+    // all externally callable functions need entrypoint code
+    athena_vm::entrypoint!(#export_func_name);
 
-      #[no_mangle]
-      pub extern "C" fn #export_func_name(vm_state: *mut u8, vm_state_len: usize, #(#args),*) #output
-      where
-          Self: parity_scale_codec::Encode + parity_scale_codec::Decode,
-      {
-          unsafe {
-              let state = std::slice::from_raw_parts(vm_state, vm_state_len);
-              let mut program = Self::decode(&mut &state[..])
-                  .expect("Failed to deserialize VM state");
-              let result = program.#func_name(#(#arg_names),*);
+    #vis #input
 
-              // Serialize the updated state back to the VM
-              let updated_state = program.encode();
-              std::ptr::copy(updated_state.as_ptr(), vm_state, updated_state.len());
+    #[no_mangle]
+    pub extern "C" fn #export_func_name(vm_state: *mut u8, vm_state_len: usize, #(#args),*) #output
+    where
+        Self: parity_scale_codec::Encode + parity_scale_codec::Decode,
+    {
+        unsafe {
+            let state = std::slice::from_raw_parts(vm_state, vm_state_len);
+            let mut program = Self::decode(&mut &state[..])
+                .expect("Failed to deserialize VM state");
+            let result = program.#func_name(#(#arg_names),*);
 
-              result
-          }
-      }
+            // Serialize the updated state back to the VM
+            let updated_state = program.encode();
+            std::ptr::copy(updated_state.as_ptr(), vm_state, updated_state.len());
+
+            result
+        }
+    }
   })
 }
 
@@ -78,12 +81,14 @@ pub fn export(_attr: TokenStream, item: TokenStream) -> TokenStream {
   let export_func_name = format_ident!("athexp_{}", func_name);
 
   let output = quote! {
-      #vis #input
+    // all externally callable functions need entrypoint code
+    athena_vm::entrypoint!(#func_name);
+    #vis #input
 
-      #[no_mangle]
-      pub extern "C" fn #export_func_name(#inputs) {
-          Self::#func_name(#inputs)
-      }
+    #[no_mangle]
+    pub extern "C" fn #export_func_name(#inputs) {
+        Self::#func_name(#inputs)
+    }
   };
 
   output.into()

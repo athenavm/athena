@@ -2,10 +2,13 @@
 #![no_main]
 athena_vm::entrypoint!(main);
 
-use athena_vm_sdk::{call, Pubkey, WalletProgram, WalletTemplate};
+use athena_interface::{Address, Balance};
+use athena_vm_sdk::{call, Pubkey, VerifiableTemplate, WalletProgram, WalletTemplate};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use parity_scale_codec::{Decode, Encode};
-use wallet_common::{MethodId, SendArguments, SpawnArguments};
+// use wallet_common::{SendArguments, SpawnArguments};
+
+pub fn main() {}
 
 #[derive(Encode, Decode)]
 pub struct Wallet {
@@ -22,78 +25,38 @@ impl Wallet {
       owner,
     }
   }
+}
 
-  fn send(self, args: SendArguments) {
+impl WalletTemplate for Wallet {
+  fn spawn(owner: Pubkey) {
+    // for now this just tests the args
+    Wallet::new(owner);
+
+    // TODO: call spawn host function
+  }
+}
+
+impl WalletProgram for Wallet {
+  fn send(self, recipient: Address, amount: Balance) {
     // Send coins
     // Note: error checking happens inside the host
-    call(args.recipient, None, args.amount);
+    call(recipient, None, amount);
   }
 
-  fn proxy(self, _args: Vec<u8>) {
+  fn proxy(self, _destination: Address, _args: Vec<u8>) {
     unimplemented!();
   }
 
-  fn deploy(self, _args: Vec<u8>) {
+  fn deploy(self, _code: Vec<u8>) {
     unimplemented!();
   }
+}
 
+impl VerifiableTemplate for Wallet {
   fn verify(self, tx: &[u8], signature: &[u8; 64]) -> bool {
     // Check that the transaction is signed by the owner
     let public_key = VerifyingKey::from_bytes(&self.owner).unwrap();
     let signature = Signature::from_bytes(signature);
     public_key.verify(&tx, &signature).is_ok()
   }
-}
-
-pub fn main() {
-  // Read function selector and input to selected function.
-  let method_id = athena_vm::io::read::<u8>();
-  let encoded_method_args = athena_vm::io::read::<Vec<u8>>();
-
-  // convert method_id to MethodId enum
-  let method = match method_id {
-    0 => MethodId::Spawn,
-    1 => MethodId::Send,
-    2 => MethodId::Proxy,
-    3 => MethodId::Deploy,
-    _ => panic!("unsupported method"),
-  };
-
-  // Template only implements a single method, spawn.
-  // A spawned program implements the other methods.
-  // This is the entrypoint for both.
-  if method == MethodId::Spawn {
-    // Template only implements spawn
-    spawn(encoded_method_args);
-  } else {
-    // Instantiate the wallet and dispatch
-    let spawn_args = athena_vm::io::read::<Vec<u8>>();
-    let wallet = Wallet::decode(&mut &spawn_args[..]).unwrap();
-    match method {
-      MethodId::Send => {
-        let send_arguments = SendArguments::decode(&mut &encoded_method_args[..]).unwrap();
-        wallet.send(send_arguments);
-      }
-      MethodId::Proxy => {
-        wallet.proxy(encoded_method_args);
-      }
-      MethodId::Deploy => {
-        wallet.deploy(encoded_method_args);
-      }
-      _ => panic!("unsupported method"),
-    }
-  };
-}
-
-fn spawn(args: Vec<u8>) {
-  // Decode the arguments
-  // This just makes sure they're valid
-  let args = SpawnArguments::decode(&mut &args[..]).unwrap();
-  Wallet::new(args.owner);
-
-  // Spawn the wallet
-  // Note: newly-created program address gets passed directly back from the VM
-  // unsafe {
-  //     athena_vm::host::spawn(args.as_ptr(), args.len());
-  // }
 }
