@@ -54,10 +54,10 @@ fn process_export(input: ItemFn) -> Result<proc_macro2::TokenStream> {
     }
   } else {
     quote! {
-        #[no_mangle]
-        pub extern "C" fn #export_func_name(#(#args),*) #output {
-            Self::#func_name(#(#arg_names),*)
-        }
+      #[no_mangle]
+      extern "C" fn #export_func_name(#(#args),*) #output {
+          Self::#func_name(#(#arg_names),*)
+      }
     }
   };
 
