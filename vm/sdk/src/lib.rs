@@ -41,9 +41,8 @@ pub trait VerifiableTemplate {
   fn verify(self, tx: &[u8], signature: &[u8; 64]) -> bool;
 }
 
-pub trait WalletTemplate {
-  extern "C" fn athexp_spawn(vm_state: *const u8, vm_state_len: usize, owner: Pubkey);
-}
+// pub trait WalletTemplate {
+// }
 
 pub trait WalletProgram {
   fn send(self, recipient: Address, amount: Balance);

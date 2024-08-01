@@ -4,7 +4,7 @@ athena_vm::entrypoint!(main);
 
 use athena_interface::{Address, Balance};
 use athena_vm_declare::export;
-use athena_vm_sdk::{call, Pubkey, VerifiableTemplate, WalletProgram, WalletTemplate};
+use athena_vm_sdk::{call, Pubkey, VerifiableTemplate, WalletProgram};
 use borsh::from_slice;
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -27,9 +27,7 @@ impl Wallet {
       owner,
     }
   }
-}
 
-impl WalletTemplate for Wallet {
   #[export]
   fn spawn(owner: Pubkey) {
     // for now this just tests the args

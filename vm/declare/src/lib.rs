@@ -1,8 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Error, FnArg, ItemFn, Pat, PatType, Result};
+use syn::{parse_macro_input, Error, FnArg, ItemFn, PatType, Result};
 
 #[proc_macro_attribute]
 pub fn export(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -12,7 +11,7 @@ pub fn export(_attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
-fn process_export(input: ItemFn) -> Result<TokenStream2> {
+fn process_export(input: ItemFn) -> Result<proc_macro2::TokenStream> {
   let func_name = &input.sig.ident;
   let inputs = &input.sig.inputs;
   let output = &input.sig.output;
@@ -21,9 +20,12 @@ fn process_export(input: ItemFn) -> Result<TokenStream2> {
 
   let args: Vec<_> = inputs
     .iter()
-    .filter_map(|arg| match arg {
-      FnArg::Typed(pat_type) => Some(pat_type),
-      _ => None,
+    .filter_map(|arg| {
+      if let FnArg::Typed(pat_type) = arg {
+        Some(pat_type)
+      } else {
+        None
+      }
     })
     .collect();
 
@@ -31,38 +33,32 @@ fn process_export(input: ItemFn) -> Result<TokenStream2> {
     .iter()
     .map(|arg| {
       let PatType { pat, .. } = arg;
-      if let Pat::Ident(pat_ident) = pat.as_ref() {
-        let ident = &pat_ident.ident;
-        quote! { #ident }
-      } else {
-        quote! {}
-      }
+      quote! { #pat }
     })
     .collect();
 
-  let export_func_name = format_ident!("athexp_{}", func_name, span = Span::call_site());
+  let export_func_name = format_ident!("athexp_{}", func_name);
 
-  if is_instance_method {
-    Ok(quote! {
-        #[no_mangle]
-        extern "C" fn #export_func_name(vm_state: *const u8, vm_state_len: usize, #(#args),*) #output
-        where
-            Self: borsh::BorshDeserialize + borsh::BorshSerialize,
-        {
-            unsafe {
-                let state = std::slice::from_raw_parts(vm_state, vm_state_len);
-                let program = from_slice::<Self>(&state)
-                    .expect("Failed to deserialize VM state");
-                program.#func_name(#(#arg_names),*)
-            }
-        }
-    })
+  let generated_func = if is_instance_method {
+    quote! {
+      extern "C" fn #export_func_name(vm_state: *const u8, vm_state_len: usize, #(#args),*) #output {
+          let state = unsafe { std::slice::from_raw_parts(vm_state, vm_state_len) };
+          let mut program = from_slice::<Self>(&state).expect("Failed to deserialize VM state");
+          program.#func_name(#(#arg_names),*)
+      }
+    }
   } else {
-    Ok(quote! {
+    quote! {
         #[no_mangle]
-        extern "C" fn #export_func_name(#(#args),*) #output {
+        pub extern "C" fn #export_func_name(#(#args),*) #output {
             Self::#func_name(#(#arg_names),*)
         }
-    })
-  }
+    }
+  };
+
+  Ok(quote! {
+      // #input
+
+      #generated_func
+  })
 }
