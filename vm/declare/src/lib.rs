@@ -39,8 +39,13 @@ fn process_export(input: ItemFn) -> Result<proc_macro2::TokenStream> {
 
   let export_func_name = format_ident!("athexp_{}", func_name);
 
+  // We treat static "associated functions" (those without a `self` receiver) differently
+  // from instance methods. For static functions, we generate a normal extern "C" function.
+  // For instance methods, we generate a function that takes a serialized VM state
+  // and first deserializes it into the program instance.
   let generated_func = if is_instance_method {
     quote! {
+      #[no_mangle]
       extern "C" fn #export_func_name(vm_state: *const u8, vm_state_len: usize, #(#args),*) #output {
           let state = unsafe { std::slice::from_raw_parts(vm_state, vm_state_len) };
           let mut program = from_slice::<Self>(&state).expect("Failed to deserialize VM state");
@@ -56,8 +61,10 @@ fn process_export(input: ItemFn) -> Result<proc_macro2::TokenStream> {
     }
   };
 
+  // Output both the original function and the generated function.
+  // The generated function calls the original function.
   Ok(quote! {
-      // #input
+      #input
 
       #generated_func
   })
