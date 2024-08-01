@@ -43,14 +43,7 @@ pub trait VerifiableTemplate {
 
 pub trait WalletProgram {
   fn spawn(owner: Pubkey);
-  extern "C" fn athexp_spawn(owner: Pubkey);
   fn send(&self, recipient: Address, amount: Balance);
-  extern "C" fn athexp_send(
-    vm_state: *const u8,
-    vm_state_len: usize,
-    recipient: Address,
-    amount: Balance,
-  );
   fn proxy(&self, destination: Address, args: Vec<u8>);
   fn deploy(&self, code: Vec<u8>);
 }

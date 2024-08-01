@@ -1,71 +1,89 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Error, FnArg, ItemFn, PatType, Result};
+use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, Pat};
 
 #[proc_macro_attribute]
-pub fn export(_attr: TokenStream, item: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(item as ItemFn);
-  process_export(input)
-    .unwrap_or_else(Error::into_compile_error)
-    .into()
-}
+pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(item as ItemImpl);
+  let struct_name = &input.self_ty;
 
-fn process_export(input: ItemFn) -> Result<proc_macro2::TokenStream> {
-  let func_name = &input.sig.ident;
-  let inputs = &input.sig.inputs;
-  let output = &input.sig.output;
+  let mut c_functions = vec![];
 
-  let is_instance_method = inputs.iter().any(|arg| matches!(arg, FnArg::Receiver(_)));
+  for item in &input.items {
+    if let ImplItem::Fn(method) = item {
+      if method
+        .attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("callable"))
+      {
+        let method_name = &method.sig.ident;
+        let c_func_name = format_ident!("athexp_{}", method_name);
 
-  let args: Vec<_> = inputs
-    .iter()
-    .filter_map(|arg| {
-      if let FnArg::Typed(pat_type) = arg {
-        Some(pat_type)
-      } else {
-        None
-      }
-    })
-    .collect();
+        let (params, args): (Vec<_>, Vec<_>) = method
+          .sig
+          .inputs
+          .iter()
+          .filter_map(|arg| {
+            if let FnArg::Typed(pat_type) = arg {
+              if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                let ident = &pat_ident.ident;
+                let ty = &pat_type.ty;
+                Some((quote!(#ident: #ty), quote!(#ident)))
+              } else {
+                None
+              }
+            } else {
+              None
+            }
+          })
+          .unzip();
 
-  let arg_names: Vec<_> = args
-    .iter()
-    .map(|arg| {
-      let PatType { pat, .. } = arg;
-      quote! { #pat }
-    })
-    .collect();
+        let (self_param, call) = if is_static_method(&method.sig) {
+          (None, quote! { #struct_name::#method_name(#(#args),*) })
+        } else {
+          (
+            Some(quote!(vm_state: *const u8, vm_state_len: usize)),
+            quote! {
+                let obj = std::slice::from_raw_parts(vm_state, vm_state_len);
+                let mut program = from_slice::<#struct_name>(&obj).expect("failed to deserialize program");
+                program.#method_name(#(#args),*)
+            },
+          )
+        };
 
-  let export_func_name = format_ident!("athexp_{}", func_name);
+        let all_params = self_param.into_iter().chain(params).collect::<Vec<_>>();
 
-  // We treat static "associated functions" (those without a `self` receiver) differently
-  // from instance methods. For static functions, we generate a normal extern "C" function.
-  // For instance methods, we generate a function that takes a serialized VM state
-  // and first deserializes it into the program instance.
-  let generated_func = if is_instance_method {
-    quote! {
-      #[no_mangle]
-      extern "C" fn #export_func_name(vm_state: *const u8, vm_state_len: usize, #(#args),*) #output {
-          let state = unsafe { std::slice::from_raw_parts(vm_state, vm_state_len) };
-          let mut program = from_slice::<Self>(&state).expect("Failed to deserialize VM state");
-          program.#func_name(#(#arg_names),*)
+        c_functions.push(quote! {
+            #[no_mangle]
+            pub unsafe extern "C" fn #c_func_name(#(#all_params),*) {
+                #call
+            }
+        });
       }
     }
-  } else {
-    quote! {
-      #[no_mangle]
-      extern "C" fn #export_func_name(#(#args),*) #output {
-          Self::#func_name(#(#arg_names),*)
-      }
-    }
-  };
+  }
 
-  // Output both the original function and the generated function.
-  // The generated function calls the original function.
-  Ok(quote! {
+  let output = quote! {
       #input
 
-      #generated_func
-  })
+      #(#c_functions)*
+  };
+
+  output.into()
+}
+
+fn is_static_method(sig: &syn::Signature) -> bool {
+  match sig.inputs.first() {
+    Some(FnArg::Receiver(_)) => false,
+    _ => true,
+  }
+}
+
+// Define the callable attribute
+#[proc_macro_attribute]
+pub fn callable(_attr: TokenStream, item: TokenStream) -> TokenStream {
+  // This attribute doesn't modify the item it's applied to,
+  // it just marks it for processing by the template macro
+  item
 }
