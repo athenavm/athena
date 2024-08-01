@@ -3,14 +3,16 @@
 athena_vm::entrypoint!(main);
 
 use athena_interface::{Address, Balance};
+use athena_vm_declare::export;
 use athena_vm_sdk::{call, Pubkey, VerifiableTemplate, WalletProgram, WalletTemplate};
+use borsh::from_slice;
+use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use parity_scale_codec::{Decode, Encode};
 // use wallet_common::{SendArguments, SpawnArguments};
 
 pub fn main() {}
 
-#[derive(Encode, Decode)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct Wallet {
   nonce: u64,
   balance: u64,
@@ -28,6 +30,7 @@ impl Wallet {
 }
 
 impl WalletTemplate for Wallet {
+  #[export]
   fn spawn(owner: Pubkey) {
     // for now this just tests the args
     Wallet::new(owner);
