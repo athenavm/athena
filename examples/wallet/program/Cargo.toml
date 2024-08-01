@@ -12,3 +12,6 @@ borsh = "1.5.1"
 borsh-derive = "1.5.1"
 ed25519-dalek = "2.1.1"
 wallet-common = { path = "../common" }
+
+[lib]
+crate-type = ["staticlib"]
