@@ -795,7 +795,7 @@ pub mod tests {
   use crate::{
     runtime::Register,
     utils::{
-      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF},
+      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF, WALLET_ELF},
       AthenaCoreOpts,
     },
   };
@@ -824,6 +824,10 @@ pub mod tests {
     Program::from(TEST_HOST)
   }
 
+  pub fn wallet_program() -> Program {
+    Program::from(WALLET_ELF)
+  }
+
   #[test]
   fn test_simple_program_run() {
     let program = simple_program();
@@ -838,6 +842,35 @@ pub mod tests {
     let program = panic_program();
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
+  }
+
+  #[test]
+  fn test_wallet() {
+    let program = wallet_program();
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+
+    // make sure the program loaded correctly
+    assert_eq!(
+      runtime
+        .program
+        .as_ref()
+        .symbol_table
+        .get("athexp_spawn")
+        .unwrap(),
+      &0x00200940
+    );
+    assert_eq!(
+      runtime
+        .program
+        .as_ref()
+        .symbol_table
+        .get("athexp_send")
+        .unwrap(),
+      &0x0020094c
+    );
+
+    runtime.execute().unwrap();
+    assert_eq!(runtime.register(Register::X31), 42);
   }
 
   #[test]
