@@ -45,9 +45,9 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           (
             Some(quote!(vm_state: *const u8, vm_state_len: usize)),
             quote! {
-                let obj = std::slice::from_raw_parts(vm_state, vm_state_len);
-                let mut program = from_slice::<#struct_name>(&obj).expect("failed to deserialize program");
-                program.#method_name(#(#args),*)
+              let obj = std::slice::from_raw_parts(vm_state, vm_state_len);
+              let mut program = from_slice::<#struct_name>(&obj).expect("failed to deserialize program");
+              program.#method_name(#(#args),*)
             },
           )
         };
@@ -55,10 +55,14 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let all_params = self_param.into_iter().chain(params).collect::<Vec<_>>();
 
         c_functions.push(quote! {
-            #[no_mangle]
-            pub unsafe extern "C" fn #c_func_name(#(#all_params),*) {
-                #call
-            }
+          #[inline(never)]
+          #[no_mangle]
+          pub unsafe extern "C" fn #c_func_name(#(#all_params),*) {
+            // This forces the compiler not to inline this function.
+            // Without this, trivial functions without side effects still get inlined.
+            let result = { #call };
+            std::hint::black_box(result)
+          }
         });
       }
     }
