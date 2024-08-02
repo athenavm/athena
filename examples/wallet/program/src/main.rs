@@ -8,9 +8,19 @@ use athena_vm_sdk::{call, Pubkey, VerifiableTemplate, WalletProgram};
 use borsh::{from_slice, to_vec};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+// use std::hint::black_box;
 // use wallet_common::{SendArguments, SpawnArguments};
 
-pub fn main() {}
+pub fn main() {
+  let wallet = Wallet::new([0u8; 32]);
+  Wallet::spawn([0u8; 32]);
+  wallet.send([0u8; 24], 0);
+  wallet.verify(&[0u8; 32], &[0u8; 64]);
+  unsafe { athexp_spawn([0u8; 32]) };
+  let serialized = to_vec(&wallet).unwrap();
+  let (state, statelen) = (serialized.as_ptr(), serialized.len());
+  unsafe { athexp_send(state, statelen, [0u8; 24], 0) };
+}
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Wallet {
@@ -73,9 +83,9 @@ mod test {
     let wallet = Wallet::new([0u8; 32]);
     Wallet::spawn([0u8; 32]);
     wallet.send([0u8; 24], 0);
-    Wallet::athexp_spawn([0u8; 32]);
+    unsafe { athexp_spawn([0u8; 32]) };
     let serialized = to_vec(&wallet).unwrap();
     let (state, statelen) = (serialized.as_ptr(), serialized.len());
-    Wallet::athexp_send(state, statelen, [0u8; 24], 0);
+    unsafe { athexp_send(state, statelen, [0u8; 24], 0) };
   }
 }
