@@ -182,17 +182,18 @@ jobs:
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
             tar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" \
             -C $GITHUB_WORKSPACE/target/${TARGET}/release libathena_vmlib.so \
-            --exclude='CMakeLists.txt' \
-            -C $GITHUB_WORKSPACE/ffi/athcon lib include
+            -C $GITHUB_WORKSPACE/ffi/athcon include
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
             # We need to use gtar here otherwise the archive is corrupt.
             # See: https://github.com/actions/virtual-environments/issues/2619
+            # TODO: add vmlib
             gtar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
             gtar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.dylib
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           else
+            # TODO: add vmlib
             cd ./target/${TARGET}/release
             7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-athena.exe
             mv "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
