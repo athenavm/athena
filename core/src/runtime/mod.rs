@@ -101,6 +101,8 @@ pub enum ExecutionError {
   Breakpoint(),
   #[error("got unimplemented as opcode")]
   Unimplemented(),
+  #[error("symbol not found")]
+  UnknownSymbol(),
 }
 
 fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
@@ -716,6 +718,19 @@ where
     tracing::info!("starting execution");
   }
 
+  /// Execute an exported function. Does the same work as execute().
+  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+    // Make sure the symbol exists, and set the program counter
+    let offset = match self.program.symbol_table.get(symbol_name) {
+      Some(offset) => *offset,
+      None => return Err(ExecutionError::UnknownSymbol()),
+    };
+    self.state.pc = offset;
+
+    // Hand over to execute
+    self.execute()
+  }
+
   /// Execute the program, returning remaining gas. Execution will either complete or produce an error.
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
@@ -849,6 +864,7 @@ pub mod tests {
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
 
     // make sure the program loaded correctly
+    // riscv32-unknown-linux-gnu/bin/objdump -d -j .text elf/wallet-template | grep athexp
     assert_eq!(
       runtime
         .program
@@ -868,8 +884,9 @@ pub mod tests {
       &0x0020094c
     );
 
-    runtime.execute().unwrap();
-    assert_eq!(runtime.register(Register::X31), 42);
+    // now attempt to execute each function in turn
+    runtime.execute_function("athexp_spawn").unwrap();
+    runtime.execute_function("athexp_send").unwrap();
   }
 
   #[test]

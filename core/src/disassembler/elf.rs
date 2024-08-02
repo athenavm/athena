@@ -171,7 +171,13 @@ impl Elf {
             .get(sym.st_name as usize)
             .ok()
             .filter(|name| name.starts_with("athexp_"))
-            .map(|name| (name.to_string(), sym.st_value.try_into().unwrap()))
+            .map(|name| {
+              let offset = u32::try_from(sym.st_value).unwrap();
+              if offset % 4 != 0 {
+                panic!("symbol table offset isn't aligned");
+              }
+              (name.to_string(), offset)
+            })
         }),
     );
 
