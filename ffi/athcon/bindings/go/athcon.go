@@ -6,7 +6,6 @@ package athcon
 
 #include <athcon/athcon.h>
 #include <athcon/helpers.h>
-#include <athcon/loader.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -48,8 +47,12 @@ static struct athcon_result execute_wrapper(struct athcon_vm* vm,
 import "C"
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"sync"
 	"unsafe"
+
+	"github.com/ebitengine/purego"
 )
 
 // Address represents the 24 bytes address of an Athena account.
@@ -95,43 +98,40 @@ const (
 )
 
 type VM struct {
+	lib    uintptr
 	handle *C.struct_athcon_vm
 }
 
-func Load(filename string) (vm *VM, err error) {
-	cfilename := C.CString(filename)
-	loaderErr := C.enum_athcon_loader_error_code(C.ATHCON_LOADER_UNSPECIFIED_ERROR)
-	handle := C.athcon_load_and_create(cfilename, &loaderErr)
-	C.free(unsafe.Pointer(cfilename))
-
-	if loaderErr == C.ATHCON_LOADER_SUCCESS {
-		vm = &VM{handle}
-	} else {
-		errMsg := C.athcon_last_error_msg()
-		if errMsg != nil {
-			err = fmt.Errorf("ATHCON loading error: %s", C.GoString(errMsg))
-		} else {
-			err = fmt.Errorf("ATHCON loading error %d", int(loaderErr))
-		}
+func Load(path string) (*VM, error) {
+	handle, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		return nil, fmt.Errorf("loading library: %v", err)
 	}
 
-	return vm, err
+	filename := filepath.Base(path)
+	filename = strings.TrimSuffix(filename, filepath.Ext(filename))
+	vmName := strings.TrimPrefix(filename, "lib")
+
+	var athcon_create func() *C.struct_athcon_vm
+	purego.RegisterLibFunc(&athcon_create, handle, "athcon_create_"+vmName)
+	vmHandle := athcon_create()
+
+	if vmHandle == nil {
+		return nil, fmt.Errorf("failed to create VM")
+	}
+	return &VM{lib: handle, handle: vmHandle}, nil
 }
 
-func LoadAndConfigure(config string) (vm *VM, err error) {
-	cconfig := C.CString(config)
-	loaderErr := C.enum_athcon_loader_error_code(C.ATHCON_LOADER_UNSPECIFIED_ERROR)
-	handle := C.athcon_load_and_configure(cconfig, &loaderErr)
-	C.free(unsafe.Pointer(cconfig))
-
-	if loaderErr == C.ATHCON_LOADER_SUCCESS {
-		vm = &VM{handle}
-	} else {
-		errMsg := C.athcon_last_error_msg()
-		if errMsg != nil {
-			err = fmt.Errorf("ATHCON loading error: %s", C.GoString(errMsg))
-		} else {
-			err = fmt.Errorf("ATHCON loading error %d", int(loaderErr))
+func LoadAndConfigure(filename string, config map[string]string) (vm *VM, err error) {
+	vm, err = Load(filename)
+	if err != nil {
+		return nil, err
+	}
+	for name, value := range config {
+		err = vm.SetOption(name, value)
+		if err != nil {
+			vm.Destroy()
+			return nil, err
 		}
 	}
 
@@ -140,6 +140,7 @@ func LoadAndConfigure(config string) (vm *VM, err error) {
 
 func (vm *VM) Destroy() {
 	C.athcon_destroy(vm.handle)
+	purego.Dlclose(vm.lib)
 }
 
 func (vm *VM) Name() string {
@@ -159,7 +160,6 @@ func (vm *VM) HasCapability(capability Capability) bool {
 }
 
 func (vm *VM) SetOption(name string, value string) (err error) {
-
 	r := C.set_option(vm.handle, C.CString(name), C.CString(value))
 	switch r {
 	case C.ATHCON_SET_OPTION_INVALID_NAME:
