@@ -53,6 +53,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
         };
 
         let all_params = self_param.into_iter().chain(params).collect::<Vec<_>>();
+        let static_name = format_ident!("dummy_{}", method_name);
 
         c_functions.push(quote! {
           #[inline(never)]
@@ -63,6 +64,11 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let result = { #call };
             std::hint::black_box(result)
           }
+
+          // This black magic ensures the function symbol makes it into the final binary.
+          #[used]
+          #[link_section = ".init_array"]
+          static #static_name: unsafe extern "C" fn(#(#all_params),*) = #c_func_name;
         });
       }
     }
