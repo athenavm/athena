@@ -1,6 +1,6 @@
 //! The Spacemesh standard wallet template.
 #![no_main]
-athena_vm::entrypoint!(main);
+#![no_std]
 
 use athena_interface::{Address, Balance};
 use athena_vm_declare::{callable, template};
@@ -9,8 +9,6 @@ use borsh::{from_slice, to_vec};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 // use wallet_common::{SendArguments, SpawnArguments};
-
-pub fn main() {}
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Wallet {
@@ -46,11 +44,11 @@ impl WalletProgram for Wallet {
     call(recipient, None, amount);
   }
 
-  fn proxy(&self, _destination: Address, _args: Vec<u8>) {
+  fn proxy(&self, _destination: Address, _args: &[u8]) {
     unimplemented!();
   }
 
-  fn deploy(&self, _code: Vec<u8>) {
+  fn deploy(&self, _code: &[u8]) {
     unimplemented!();
   }
 }
