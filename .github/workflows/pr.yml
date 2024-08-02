@@ -9,6 +9,7 @@ on:
     paths:
       - "cli/**"
       - "core/**"
+      - "ffi/**"
       - "sdk/**"
       - "vm/**"
       - "tests/**"
