@@ -42,7 +42,7 @@ pub trait VerifiableTemplate {
 }
 
 pub trait WalletProgram {
-  fn spawn(owner: Pubkey);
+  fn spawn(owner: &Pubkey) -> &[u8];
   fn send(&self, recipient: Address, amount: Balance);
   fn proxy(&self, destination: Address, args: &[u8]);
   fn deploy(&self, code: &[u8]);

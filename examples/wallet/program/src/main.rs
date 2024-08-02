@@ -30,9 +30,9 @@ impl Wallet {
 #[template]
 impl WalletProgram for Wallet {
   #[callable]
-  fn spawn(owner: Pubkey) {
+  fn spawn(owner: &Pubkey) -> &[u8] {
     // for now this just tests the args
-    Wallet::new(owner);
+    Wallet::new(owner).to_vec().as_slice()
 
     // TODO: call spawn host function
   }

@@ -40,7 +40,17 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           .unzip();
 
         let (self_param, call) = if is_static_method(&method.sig) {
-          (None, quote! { #struct_name::#method_name(#(#args),*) })
+          (
+            Some(quote!(
+                result_ptr_loc: *mut *const u8,
+                result_len_loc: *mut usize,
+            )),
+            quote! {
+                let result = #struct_name::#method_name(#(#args),*);
+                *result_ptr_loc = result.as_ptr();
+                *result_len_loc = result.len();
+            },
+          )
         } else {
           (
             Some(quote!(vm_state: *const u8, vm_state_len: usize)),
@@ -61,7 +71,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           #[cfg(all(any(target_arch = "riscv32", target_arch = "riscv64"), target_feature = "e"))]
           #[link_section = #section_name]
           #[no_mangle]
-          pub unsafe extern "C" fn #c_func_name(#(#all_params),*) {
+          pub unsafe extern "C" fn #c_func_name( #(#all_params),*) {
             #call;
             syscall_halt(0);
           }
