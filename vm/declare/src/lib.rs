@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, Pat};
+use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, LitStr, Pat};
 
 #[proc_macro_attribute]
 pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -45,7 +45,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           (
             Some(quote!(vm_state: *const u8, vm_state_len: usize)),
             quote! {
-              let obj = std::slice::from_raw_parts(vm_state, vm_state_len);
+              let obj = core::slice::from_raw_parts(vm_state, vm_state_len);
               let mut program = from_slice::<#struct_name>(&obj).expect("failed to deserialize program");
               program.#method_name(#(#args),*)
             },
@@ -53,16 +53,17 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
         };
 
         let all_params = self_param.into_iter().chain(params).collect::<Vec<_>>();
-        let static_name = format_ident!("dummy_{}", method_name);
+        let section_name =
+          LitStr::new(&format!(".text.athexp.{}", method_name), method_name.span());
+        let static_name = format_ident!("DUMMY_{}", method_name.to_string().to_uppercase());
 
         c_functions.push(quote! {
-          #[inline(never)]
+          #[cfg(all(any(target_arch = "riscv32", target_arch = "riscv64"), target_feature = "e"))]
+          #[link_section = #section_name]
           #[no_mangle]
           pub unsafe extern "C" fn #c_func_name(#(#all_params),*) {
-            // This forces the compiler not to inline this function.
-            // Without this, trivial functions without side effects still get inlined.
-            let result = { #call };
-            std::hint::black_box(result)
+            #call;
+            syscall_halt(0);
           }
 
           // This black magic ensures the function symbol makes it into the final binary.
@@ -75,6 +76,10 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
   }
 
   let output = quote! {
+      // Basic Athena preamble, for use without a main entrypoint.
+      use athena_vm::syscalls::syscall_halt;
+      athena_vm::entrypoint!();
+
       #input
 
       #(#c_functions)*
