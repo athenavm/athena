@@ -461,6 +461,7 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
       .into();
     value_wrapper.into()
   }
+
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     convert_storage_status(self.context.set_storage(
       &AddressWrapper(*addr).into(),
@@ -468,15 +469,21 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
       &Bytes32Wrapper(*value).into(),
     ))
   }
+
   fn get_balance(&self, addr: &Address) -> Balance {
     let balance = self.context.get_balance(&AddressWrapper(*addr).into());
     Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
   }
+
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
     let execmsg = AthconExecutionMessage::from(AthenaMessageWrapper(msg));
     let res = ExecutionResultWrapper::from(self.context.call(&execmsg));
     // the execution message contains raw pointers that were passed over FFI and now need to be freed
     res.into()
+  }
+
+  fn spawn(&mut self, blob: &[u8]) -> Address {
+    AddressWrapper::from(self.context.spawn(blob)).into()
   }
 }
 
@@ -506,6 +513,7 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
     call: None,
     get_tx_context: Some(get_dummy_tx_context),
     get_block_hash: None,
+    spawn: None,
   }
 }
 

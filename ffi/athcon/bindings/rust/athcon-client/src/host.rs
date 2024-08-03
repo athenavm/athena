@@ -14,6 +14,7 @@ pub trait HostContext {
   fn get_balance(&self, addr: &Address) -> Bytes32;
   fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
   fn get_block_hash(&self, number: i64) -> Bytes32;
+  fn spawn(&mut self, blob: &[u8]) -> Address;
   #[allow(clippy::too_many_arguments)]
   fn call(
     &mut self,
@@ -36,6 +37,7 @@ pub(crate) fn get_athcon_host_interface() -> ffi::athcon_host_interface {
     call: Some(call),
     get_tx_context: Some(get_tx_context),
     get_block_hash: Some(get_block_hash),
+    spawn: Some(spawn),
   }
 }
 
@@ -107,6 +109,18 @@ unsafe extern "C" fn get_block_hash(
     bytes: (*(context as *mut ExtendedContext))
       .hctx
       .get_block_hash(number),
+  }
+}
+
+unsafe extern "C" fn spawn(
+  context: *mut ffi::athcon_host_context,
+  blob: *const u8,
+  blob_size: usize,
+) -> ffi::athcon_address {
+  ffi::athcon_address {
+    bytes: (*(context as *mut ExtendedContext))
+      .hctx
+      .spawn(std::slice::from_raw_parts(blob, blob_size)),
   }
 }
 

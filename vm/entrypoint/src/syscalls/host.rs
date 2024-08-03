@@ -86,3 +86,28 @@ pub extern "C" fn get_balance(value: *mut u32) {
   #[cfg(not(target_os = "zkvm"))]
   unreachable!()
 }
+
+/// Spawn a new instance of a template.
+///
+/// No return value. It either succeeds or reverts.
+/// The host calculates the new program address based on the template,
+/// the state blob, and the principal nonce. The template and nonce are
+/// available in its context and don't need to be passed here. The
+/// owner of the new program is implicit in the blob, which is just a
+/// serialized version of the instantiated template (struct) state.
+#[allow(unused_variables)]
+#[no_mangle]
+pub extern "C" fn spawn(blob: *const u32, len: usize) {
+  #[cfg(target_os = "zkvm")]
+  unsafe {
+    asm!(
+        "ecall",
+        in("t0") crate::syscalls::HOST_SPAWN,
+        in("a0") blob,
+        in("a1") len,
+    )
+  }
+
+  #[cfg(not(target_os = "zkvm"))]
+  unreachable!()
+}

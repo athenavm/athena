@@ -35,5 +35,6 @@ fn gen_bindings() {
 }
 
 fn main() {
+  println!("cargo:rerun-if-changed=../../../include/athcon/athcon.h");
   gen_bindings();
 }
