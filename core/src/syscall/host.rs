@@ -207,3 +207,37 @@ where
     None
   }
 }
+
+pub struct SyscallHostSpawn;
+
+impl SyscallHostSpawn {
+  pub const fn new() -> Self {
+    Self
+  }
+}
+
+impl<T> Syscall<T> for SyscallHostSpawn
+where
+  T: HostInterface,
+{
+  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+    // let athena_ctx = ctx
+    //   .rt
+    //   .context
+    //   .as_ref()
+    //   .expect("Missing Athena runtime context");
+
+    let len = arg2;
+    let blob: Vec<u8> = ctx
+      .slice(arg1, len as usize / 4)
+      .iter()
+      .flat_map(|&num| num.to_le_bytes().to_vec())
+      .collect();
+
+    // get value from host
+    let host = ctx.rt.host.as_mut().expect("Missing host interface");
+    host.borrow_mut().spawn(blob.as_slice());
+
+    None
+  }
+}

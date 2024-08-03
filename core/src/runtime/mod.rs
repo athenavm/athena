@@ -710,6 +710,7 @@ where
   fn initialize(&mut self) {
     self.state.clk = 0;
 
+    // TODO: do we want to load all of the memory when executing a particular function?
     tracing::info!("loading memory image");
     for (addr, value) in self.program.memory_image.iter() {
       self.state.memory.insert(*addr, *value);

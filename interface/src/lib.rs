@@ -5,6 +5,8 @@
 mod context;
 pub use context::*;
 
+use blake3::Hasher;
+
 use std::{cell::RefCell, collections::BTreeMap, convert::TryFrom, fmt, sync::Arc};
 
 pub const ADDRESS_LENGTH: usize = 24;
@@ -309,6 +311,7 @@ pub trait HostInterface {
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
+  fn spawn(&mut self, blob: Vec<u8>) -> Address;
 }
 
 // a very simple mock host implementation for testing
@@ -325,7 +328,13 @@ pub struct MockHost<'a> {
   balance: BTreeMap<Address, Balance>,
 
   // stores contract code
+  templates: BTreeMap<Address, &'a [u8]>,
+
+  // stores program instances
   programs: BTreeMap<Address, &'a [u8]>,
+
+  // message currently being processed, for context
+  current_message: Option<AthenaMessage>,
 }
 
 impl<'a> MockHost<'a> {
@@ -340,8 +349,34 @@ impl<'a> MockHost<'a> {
     }
   }
 
+  fn get_current_message(&self) -> Option<&AthenaMessage> {
+    self.current_message.as_ref()
+  }
+
+  fn set_current_message(&mut self, msg: Option<AthenaMessage>) {
+    self.current_message = msg;
+  }
+
+  pub fn spawn_program(
+    &mut self,
+    template: Address,
+    blob: Vec<u8>,
+    principal: Address,
+    nonce: u64,
+  ) -> Address {
+    // calculate address by hashing the template, blob, principal, and nonce
+    let mut hasher = Hasher::new();
+    hasher.update(&template);
+    hasher.update(blob);
+    hasher.update(&principal);
+    hasher.update(&nonce.to_le_bytes());
+    let address = hasher.finalize().as_bytes()[..24].try_into().unwrap();
+    self.programs.insert(address, blob);
+    address
+  }
+
   pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
-    self.programs.insert(address, code);
+    self.templates.insert(address, code);
   }
 
   fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
@@ -381,6 +416,7 @@ impl<'a> Default for MockHost<'a> {
     // init
     let mut storage = BTreeMap::new();
     let mut balance = BTreeMap::new();
+    let templates = BTreeMap::new();
     let programs = BTreeMap::new();
 
     // pre-populate some balances, values, and code for testing
@@ -392,7 +428,9 @@ impl<'a> Default for MockHost<'a> {
       vm: None,
       storage,
       balance,
+      templates,
       programs,
+      current_message: None,
     }
   }
 }
@@ -438,7 +476,7 @@ impl<'a> HostInterface for MockHost<'a> {
     );
     let backup_storage = self.storage.clone();
     let backup_balance = self.balance.clone();
-    let backup_programs = self.programs.clone();
+    let backup_programs = self.templates.clone();
 
     // transfer balance
     // note: the host should have already subtracted an amount from the sender
@@ -451,8 +489,11 @@ impl<'a> HostInterface for MockHost<'a> {
       }
     }
 
+    // save message for context
+    self.set_current_message(Some(msg.clone()));
+
     // check programs list first
-    let res = if let Some(code) = self.programs.get(&msg.recipient).cloned() {
+    let res = if let Some(code) = self.templates.get(&msg.recipient).cloned() {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
 
@@ -485,6 +526,8 @@ impl<'a> HostInterface for MockHost<'a> {
       ExecutionResult::new(status_code, gas_left, None, None)
     };
 
+    self.set_current_message(None);
+
     log::info!(
       "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
       self as *const Self as usize,
@@ -495,7 +538,7 @@ impl<'a> HostInterface for MockHost<'a> {
       // rollback state
       self.storage = backup_storage;
       self.balance = backup_balance;
-      self.programs = backup_programs;
+      self.templates = backup_programs;
       log::info!(
         "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
         self as *const Self as usize,
@@ -504,6 +547,17 @@ impl<'a> HostInterface for MockHost<'a> {
       );
     }
     res
+  }
+
+  fn spawn(&mut self, blob: Vec<u8>) -> Address {
+    // get the details from context
+    let msg = self
+      .get_current_message()
+      .expect("no message context found");
+
+    // TODO: double-check these semantics and how Spacemesh principal account semantics map to this
+    // TODO: add nonce
+    self.spawn_program(msg.recipient, blob, msg.sender, 0)
   }
 }
 
