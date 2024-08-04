@@ -314,6 +314,34 @@ pub trait HostInterface {
   fn spawn(&mut self, blob: Vec<u8>) -> Address;
 }
 
+// Stores some of the context that a running host would store to keep
+// track of what's going on in the VM execution
+// static context is set from the transaction and doesn't change until
+// the execution stack is done.
+pub struct HostStaticContext {
+  // the ultimate initiator of the current execution stack. also the
+  // account that pays gas for the execution stack.
+  principal: Address,
+
+  // the principal's nonce from the tx
+  nonce: u64,
+
+  // the destination of the transaction. note that, while this is the
+  // program that was initiated, it likely made additional calls.
+  // this is generally the caller's wallet, and is generally the same
+  // as the principal.
+  destination: Address,
+  // in the future we'll probably need things here like block height,
+  // block hash, etc.
+}
+
+// this context is relevant only for the current execution frame
+pub struct HostDynamicContext {
+  // the initiator and recipient programs of the current message/call frame
+  template: Address,
+  callee: Address,
+}
+
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
@@ -333,8 +361,9 @@ pub struct MockHost<'a> {
   // stores program instances
   programs: BTreeMap<Address, &'a [u8]>,
 
-  // message currently being processed, for context
-  current_message: Option<AthenaMessage>,
+  // context information
+  static_context: Option<HostStaticContext>,
+  dynamic_context: Option<HostDynamicContext>,
 }
 
 impl<'a> MockHost<'a> {
@@ -349,19 +378,11 @@ impl<'a> MockHost<'a> {
     }
   }
 
-  fn get_current_message(&self) -> Option<&AthenaMessage> {
-    self.current_message.as_ref()
-  }
-
-  fn set_current_message(&mut self, msg: Option<AthenaMessage>) {
-    self.current_message = msg;
-  }
-
   pub fn spawn_program(
     &mut self,
-    template: Address,
+    template: &Address,
     blob: Vec<u8>,
-    principal: Address,
+    principal: &Address,
     nonce: u64,
   ) -> Address {
     // calculate address by hashing the template, blob, principal, and nonce
@@ -430,7 +451,8 @@ impl<'a> Default for MockHost<'a> {
       balance,
       templates,
       programs,
-      current_message: None,
+      static_context: None,
+      dynamic_context: None,
     }
   }
 }
@@ -490,7 +512,11 @@ impl<'a> HostInterface for MockHost<'a> {
     }
 
     // save message for context
-    self.set_current_message(Some(msg.clone()));
+    let old_dynamic_context = self.dynamic_context.take();
+    self.dynamic_context = Some(HostDynamicContext {
+      template: msg.sender,
+      callee: msg.recipient,
+    });
 
     // check programs list first
     let res = if let Some(code) = self.templates.get(&msg.recipient).cloned() {
@@ -526,7 +552,7 @@ impl<'a> HostInterface for MockHost<'a> {
       ExecutionResult::new(status_code, gas_left, None, None)
     };
 
-    self.set_current_message(None);
+    self.dynamic_context = old_dynamic_context;
 
     log::info!(
       "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
@@ -550,14 +576,27 @@ impl<'a> HostInterface for MockHost<'a> {
   }
 
   fn spawn(&mut self, blob: Vec<u8>) -> Address {
-    // get the details from context
-    let msg = self
-      .get_current_message()
-      .expect("no message context found");
-
     // TODO: double-check these semantics and how Spacemesh principal account semantics map to this
-    // TODO: add nonce
-    self.spawn_program(msg.recipient, blob, msg.sender, 0)
+    self.spawn_program(
+      self
+        .dynamic_context
+        .as_ref()
+        .expect("missing host context")
+        .template
+        .as_ref()
+        .try_into()
+        .unwrap(),
+      blob,
+      self
+        .static_context
+        .as_ref()
+        .expect("missing host context")
+        .principal
+        .as_ref()
+        .try_into()
+        .unwrap(),
+      self.static_context.as_ref().unwrap().nonce,
+    )
   }
 }
 
