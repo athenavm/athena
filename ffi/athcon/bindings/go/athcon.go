@@ -98,12 +98,18 @@ const (
 )
 
 type VM struct {
-	lib    uintptr
+	// handle to the opened shared library. Must be closed with Dlclose.
+	libHandle uintptr
+	// handle to the VM instance. Must be destroyed with athcon_destroy.
 	handle *C.struct_athcon_vm
 }
 
+// Load loads the VM from the shared library and returns an instance of VM.
+//
+// It is the caller's responsibility to call Destroy on the VM instance when it
+// is no longer needed.
 func Load(path string) (*VM, error) {
-	handle, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	libHandle, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 	if err != nil {
 		return nil, fmt.Errorf("loading library: %v", err)
 	}
@@ -113,15 +119,20 @@ func Load(path string) (*VM, error) {
 	vmName := strings.TrimPrefix(filename, "lib")
 
 	var athcon_create func() *C.struct_athcon_vm
-	purego.RegisterLibFunc(&athcon_create, handle, "athcon_create_"+vmName)
+	purego.RegisterLibFunc(&athcon_create, libHandle, "athcon_create_"+vmName)
 	vmHandle := athcon_create()
 
 	if vmHandle == nil {
 		return nil, fmt.Errorf("failed to create VM")
 	}
-	return &VM{lib: handle, handle: vmHandle}, nil
+	return &VM{libHandle: libHandle, handle: vmHandle}, nil
 }
 
+// LoadAndConfigure loads the VM from the shared library and configures it with
+// the provided options.
+//
+// It is the caller's responsibility to call Destroy on the VM instance when it
+// is no longer needed.
 func LoadAndConfigure(filename string, config map[string]string) (vm *VM, err error) {
 	vm, err = Load(filename)
 	if err != nil {
@@ -140,7 +151,7 @@ func LoadAndConfigure(filename string, config map[string]string) (vm *VM, err er
 
 func (vm *VM) Destroy() {
 	C.athcon_destroy(vm.handle)
-	purego.Dlclose(vm.lib)
+	purego.Dlclose(vm.libHandle)
 }
 
 func (vm *VM) Name() string {
