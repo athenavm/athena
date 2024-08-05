@@ -1,7 +1,6 @@
 //! System calls for the Athena VM.
 
 pub mod io;
-pub mod utils;
 
 extern "C" {
   pub fn syscall_halt(exit_code: u8) -> !;
