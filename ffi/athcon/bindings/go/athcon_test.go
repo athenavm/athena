@@ -4,11 +4,12 @@
 package athcon
 
 import (
-	"bytes"
 	"log"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var modulePath string
@@ -23,51 +24,45 @@ func init() {
 }
 
 func TestLoad(t *testing.T) {
-	i, err := Load(modulePath)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer i.Destroy()
-	if i.Name() != "Athena" {
-		t.Fatalf("name is %s", i.Name())
-	}
-	if i.Version()[0] < '0' || i.Version()[0] > '9' {
-		t.Fatalf("version number is weird: %s", i.Version())
-	}
+	t.Run("invalid lib path", func(t *testing.T) {
+		vm, err := Load("invalid path")
+		require.Error(t, err)
+		require.Nil(t, vm)
+	})
+	t.Run("valid lib path", func(t *testing.T) {
+		vm, err := Load(modulePath)
+		require.NoError(t, err)
+		defer vm.Destroy()
+		require.Equal(t, "Athena", vm.Name())
+		require.NotEmpty(t, vm.Version())
+		require.Equal(t, "0.1.0", vm.Version())
+	})
 }
 
 func TestLoadConfigure(t *testing.T) {
-	i, err := LoadAndConfigure(modulePath)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer i.Destroy()
-	if i.Name() != "Athena" {
-		t.Fatalf("name is %s", i.Name())
-	}
-	if i.Version()[0] < '0' || i.Version()[0] > '9' {
-		t.Fatalf("version number is weird: %s", i.Version())
-	}
+	// TODO: would be good if the VM accepted any options to test their behavior
+	vm, err := LoadAndConfigure(modulePath, nil)
+	require.NoError(t, err)
+	defer vm.Destroy()
+
+	require.Equal(t, "Athena", vm.Name())
+	require.NotEmpty(t, vm.Version())
+	require.Equal(t, "0.1.0", vm.Version())
 }
 
 // Execute with no code is an error.
 func TestExecuteEmptyCode(t *testing.T) {
-	vm, _ := Load(modulePath)
+	vm, err := Load(modulePath)
+	require.NoError(t, err)
 	defer vm.Destroy()
 
 	addr := Address{}
 	h := Bytes32{}
 	result, err := vm.Execute(nil, Frontier, Call, 1, 999, addr, addr, nil, h, nil)
 
-	if !bytes.Equal(result.Output, []byte("")) {
-		t.Errorf("execution unexpected output: %x", result.Output)
-	}
-	if result.GasLeft != 0 {
-		t.Errorf("execution gas left is incorrect: %d", result.GasLeft)
-	}
-	if err == nil {
-		t.Errorf("expected execution error")
-	}
+	require.Error(t, err)
+	require.Empty(t, result.Output)
+	require.Zero(t, result.GasLeft)
 }
 
 func TestRevision(t *testing.T) {

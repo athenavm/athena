@@ -9,6 +9,7 @@ on:
     paths:
       - "cli/**"
       - "core/**"
+      - "ffi/**"
       - "sdk/**"
       - "vm/**"
       - "tests/**"
@@ -90,11 +91,6 @@ jobs:
 
       - name: Setup CI
         uses: ./.github/actions/setup
-
-      - name: Build
-        run: |
-          cmake -B build -S .
-          cmake --build build
 
       - name: Run go test
         run: |
