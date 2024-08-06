@@ -11,7 +11,7 @@ edition.workspace = true
 quote = "1.0"
 heck = "0.5.0"
 proc-macro2 = "1.0"
-syn = { version = "1.0", features = ["full"] }
+syn = { version = "2.0", features = ["full"] }
 # For documentation examples
 athcon-vm = { path = "../athcon-vm" }
 
