@@ -187,6 +187,10 @@ func (vm *VM) Execute(
 		value:     athconBytes32(value),
 	}
 	if len(input) > 0 {
+		// Allocate memory for input data in C.
+		// Otherwise, the Go garbage collector may move the data around and
+		// invalidate the pointer passed to the C code.
+		// Without this, the CGO complains `cgo argument has Go pointer to unpinned Go pointer`.
 		cInputData := C.malloc(C.size_t(len(input)))
 		if cInputData == nil {
 			return res, fmt.Errorf("failed to allocate memory for input data")
