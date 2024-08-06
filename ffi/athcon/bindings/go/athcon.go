@@ -23,19 +23,19 @@ extern const struct athcon_host_interface athcon_go_host;
 static struct athcon_result execute_wrapper(struct athcon_vm* vm,
 	uintptr_t context_index, enum athcon_revision rev,
 	enum athcon_call_kind kind, int32_t depth, int64_t gas,
-	const athcon_address* recipient, const athcon_address* sender,
-	const uint8_t* input_data, size_t input_size, const athcon_uint256be* value,
+	const athcon_address recipient, const athcon_address sender,
+	const uint8_t* input_data, size_t input_size, const athcon_uint256be value,
 	const uint8_t* code, size_t code_size)
 {
 	struct athcon_message msg = {
 		kind,
 		depth,
 		gas,
-		*recipient,
-		*sender,
+		recipient,
+		sender,
 		input_data,
 		input_size,
-		*value,
+		value,
 		0,     // code
 		0,     // code_size
 	};
@@ -48,8 +48,8 @@ import "C"
 import (
 	"fmt"
 	"path/filepath"
+	"runtime/cgo"
 	"strings"
-	"sync"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -193,16 +193,52 @@ func (vm *VM) Execute(ctx HostContext, rev Revision,
 	recipient Address, sender Address, input []byte, value Bytes32,
 	code []byte) (res Result, err error) {
 
-	ctxId := addHostContext(ctx)
-	// FIXME: Clarify passing by pointer vs passing by value.
+	ctxHandle := cgo.NewHandle(ctx)
+
 	athconRecipient := athconAddress(recipient)
 	athconSender := athconAddress(sender)
 	athconValue := athconBytes32(value)
-	result := C.execute_wrapper(vm.handle, C.uintptr_t(ctxId), uint32(rev),
-		C.enum_athcon_call_kind(kind), C.int32_t(depth), C.int64_t(gas),
-		&athconRecipient, &athconSender, bytesPtr(input), C.size_t(len(input)), &athconValue,
-		bytesPtr(code), C.size_t(len(code)))
-	removeHostContext(ctxId)
+	// result := C.execute_wrapper(
+	// 	vm.handle,
+	// 	C.uintptr_t(ctxHandle),
+	// 	uint32(rev),
+	// 	C.enum_athcon_call_kind(kind),
+	// 	C.int32_t(depth),
+	// 	C.int64_t(gas),
+	// 	athconRecipient,
+	// 	athconSender,
+	// 	bytesPtr(input),
+	// 	C.size_t(len(input)),
+	// 	athconValue,
+	// 	bytesPtr(code),
+	// 	C.size_t(len(code)),
+	// )
+
+	msg := C.struct_athcon_message{
+		kind:       C.enum_athcon_call_kind(kind),
+		depth:      C.int32_t(depth),
+		gas:        C.int64_t(gas),
+		recipient:  athconRecipient,
+		sender:     athconSender,
+		input_data: bytesPtr(input),
+		input_size: C.size_t(len(input)),
+		value:      athconValue,
+		code:       nil,
+		code_size:  0,
+	}
+
+	cData := (*C.uint8_t)(unsafe.Pointer(&code[0]))
+	size := C.size_t(len(code))
+
+	result := C.athcon_execute(
+		vm.handle,
+		&C.athcon_go_host,
+		(*C.struct_athcon_host_context)(unsafe.Pointer(uintptr(ctxHandle))),
+		uint32(rev),
+		&msg,
+		cData,
+		size,
+	)
 
 	res.Output = C.GoBytes(unsafe.Pointer(result.output_data), C.int(result.output_size))
 	res.GasLeft = int64(result.gas_left)
@@ -215,34 +251,6 @@ func (vm *VM) Execute(ctx HostContext, rev Revision,
 	}
 
 	return res, err
-}
-
-var (
-	hostContextCounter uintptr
-	hostContextMap     = map[uintptr]HostContext{}
-	hostContextMapMu   sync.Mutex
-)
-
-func addHostContext(ctx HostContext) uintptr {
-	hostContextMapMu.Lock()
-	id := hostContextCounter
-	hostContextCounter++
-	hostContextMap[id] = ctx
-	hostContextMapMu.Unlock()
-	return id
-}
-
-func removeHostContext(id uintptr) {
-	hostContextMapMu.Lock()
-	delete(hostContextMap, id)
-	hostContextMapMu.Unlock()
-}
-
-func getHostContext(idx uintptr) HostContext {
-	hostContextMapMu.Lock()
-	ctx := hostContextMap[idx]
-	hostContextMapMu.Unlock()
-	return ctx
 }
 
 func athconBytes32(in Bytes32) C.athcon_bytes32 {
