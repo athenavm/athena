@@ -19,30 +19,6 @@ static inline enum athcon_set_option_result set_option(struct athcon_vm* vm, cha
 }
 
 extern const struct athcon_host_interface athcon_go_host;
-
-static struct athcon_result execute_wrapper(struct athcon_vm* vm,
-	uintptr_t context_index, enum athcon_revision rev,
-	enum athcon_call_kind kind, int32_t depth, int64_t gas,
-	const athcon_address recipient, const athcon_address sender,
-	const uint8_t* input_data, size_t input_size, const athcon_uint256be value,
-	const uint8_t* code, size_t code_size)
-{
-	struct athcon_message msg = {
-		kind,
-		depth,
-		gas,
-		recipient,
-		sender,
-		input_data,
-		input_size,
-		value,
-		0,     // code
-		0,     // code_size
-	};
-
-	struct athcon_host_context* context = (struct athcon_host_context*)context_index;
-	return athcon_execute(vm, &athcon_go_host, context, rev, &msg, code, code_size);
-}
 */
 import "C"
 import (
@@ -188,57 +164,52 @@ type Result struct {
 	GasRefund int64
 }
 
-func (vm *VM) Execute(ctx HostContext, rev Revision,
-	kind CallKind, depth int, gas int64,
-	recipient Address, sender Address, input []byte, value Bytes32,
-	code []byte) (res Result, err error) {
-
-	ctxHandle := cgo.NewHandle(ctx)
-
-	athconRecipient := athconAddress(recipient)
-	athconSender := athconAddress(sender)
-	athconValue := athconBytes32(value)
-	// result := C.execute_wrapper(
-	// 	vm.handle,
-	// 	C.uintptr_t(ctxHandle),
-	// 	uint32(rev),
-	// 	C.enum_athcon_call_kind(kind),
-	// 	C.int32_t(depth),
-	// 	C.int64_t(gas),
-	// 	athconRecipient,
-	// 	athconSender,
-	// 	bytesPtr(input),
-	// 	C.size_t(len(input)),
-	// 	athconValue,
-	// 	bytesPtr(code),
-	// 	C.size_t(len(code)),
-	// )
-
+func (vm *VM) Execute(
+	ctx HostContext,
+	rev Revision,
+	kind CallKind,
+	depth int,
+	gas int64,
+	recipient, sender Address,
+	input []byte,
+	value Bytes32,
+	code []byte,
+) (res Result, err error) {
+	if len(code) == 0 {
+		return res, fmt.Errorf("code is empty")
+	}
 	msg := C.struct_athcon_message{
-		kind:       C.enum_athcon_call_kind(kind),
-		depth:      C.int32_t(depth),
-		gas:        C.int64_t(gas),
-		recipient:  athconRecipient,
-		sender:     athconSender,
-		input_data: bytesPtr(input),
-		input_size: C.size_t(len(input)),
-		value:      athconValue,
-		code:       nil,
-		code_size:  0,
+		kind:      C.enum_athcon_call_kind(kind),
+		depth:     C.int32_t(depth),
+		gas:       C.int64_t(gas),
+		recipient: athconAddress(recipient),
+		sender:    athconAddress(sender),
+		value:     athconBytes32(value),
+	}
+	if len(input) > 0 {
+		cInputData := C.malloc(C.size_t(len(input)))
+		if cInputData == nil {
+			return res, fmt.Errorf("failed to allocate memory for input data")
+		}
+		defer C.free(cInputData)
+
+		cSlice := unsafe.Slice((*byte)(cInputData), len(input))
+		copy(cSlice, input)
+		msg.input_data = (*C.uchar)(unsafe.Pointer(&cSlice[0]))
+		msg.input_size = C.size_t(len(input))
 	}
 
-	cData := (*C.uint8_t)(unsafe.Pointer(&code[0]))
-	size := C.size_t(len(code))
-
+	ctxHandle := cgo.NewHandle(ctx)
 	result := C.athcon_execute(
 		vm.handle,
 		&C.athcon_go_host,
 		(*C.struct_athcon_host_context)(unsafe.Pointer(uintptr(ctxHandle))),
 		uint32(rev),
 		&msg,
-		cData,
-		size,
+		(*C.uint8_t)(unsafe.Pointer(&code[0])),
+		C.size_t(len(code)),
 	)
+	ctxHandle.Delete()
 
 	res.Output = C.GoBytes(unsafe.Pointer(result.output_data), C.int(result.output_size))
 	res.GasLeft = int64(result.gas_left)
@@ -267,11 +238,4 @@ func athconAddress(address Address) C.athcon_address {
 		r.bytes[i] = C.uint8_t(address[i])
 	}
 	return r
-}
-
-func bytesPtr(bytes []byte) *C.uint8_t {
-	if len(bytes) == 0 {
-		return nil
-	}
-	return (*C.uint8_t)(unsafe.Pointer(&bytes[0]))
 }
