@@ -36,7 +36,6 @@
 extern crate proc_macro;
 
 use heck::AsShoutySnakeCase;
-use heck::AsSnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
