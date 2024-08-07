@@ -7,16 +7,7 @@ package athcon
 #include <athcon/athcon.h>
 #include <athcon/helpers.h>
 
-#include <stdlib.h>
-#include <string.h>
-
-static inline enum athcon_set_option_result set_option(struct athcon_vm* vm, char* name, char* value)
-{
-	enum athcon_set_option_result ret = athcon_set_option(vm, name, value);
-	free(name);
-	free(value);
-	return ret;
-}
+#include <stdlib.h> // for 'free'
 
 extern const struct athcon_host_interface athcon_go_host;
 
@@ -171,15 +162,22 @@ func (vm *VM) HasCapability(capability Capability) bool {
 }
 
 func (vm *VM) SetOption(name string, value string) (err error) {
-	r := C.set_option(vm.handle, C.CString(name), C.CString(value))
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+	cValue := C.CString(value)
+	defer C.free(unsafe.Pointer(cValue))
+
+	r := C.athcon_set_option(vm.handle, cName, cValue)
 	switch r {
-	case C.ATHCON_SET_OPTION_INVALID_NAME:
-		err = fmt.Errorf("athcon: option '%s' not accepted", name)
-	case C.ATHCON_SET_OPTION_INVALID_VALUE:
-		err = fmt.Errorf("athcon: option '%s' has invalid value", name)
 	case C.ATHCON_SET_OPTION_SUCCESS:
+		return nil
+	case C.ATHCON_SET_OPTION_INVALID_NAME:
+		return fmt.Errorf("athcon: option '%s' not accepted", name)
+	case C.ATHCON_SET_OPTION_INVALID_VALUE:
+		return fmt.Errorf("athcon: option '%s' has invalid value", name)
+	default:
+		return fmt.Errorf("athcon: unknown error %d setting option '%s'", r, name)
 	}
-	return err
 }
 
 type Result struct {
