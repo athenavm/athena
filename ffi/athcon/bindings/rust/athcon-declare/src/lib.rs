@@ -38,8 +38,8 @@ extern crate proc_macro;
 use std::ffi::CString;
 
 use heck::AsShoutySnakeCase;
-use heck::AsSnakeCase;
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
@@ -51,70 +51,36 @@ use syn::Lit;
 use syn::LitCStr;
 use syn::LitInt;
 
-struct VMNameSet {
-  type_name: String,
-  name_allcaps: String,
-  name_lowercase: String,
-}
+struct VMName(String);
 
 #[derive(Debug)]
 struct VMMetaData {
   capabilities: u32,
-  // Not included in VMNameSet because it is parsed from the meta-item arguments.
+  // Not included in VMName because it is parsed from the meta-item arguments.
   name_stylized: String,
   custom_version: String,
 }
 
-#[allow(dead_code)]
-impl VMNameSet {
+impl VMName {
   fn new(ident: String) -> Self {
-    let caps = format!("{}", AsShoutySnakeCase(ident.clone()));
-    let lowercase = format!("{}", AsSnakeCase(ident.clone()));
-    let lowercase = lowercase.chars().filter(|c| *c != '_').collect();
-    VMNameSet {
-      type_name: ident,
-      name_allcaps: caps,
-      name_lowercase: lowercase,
-    }
-  }
-
-  /// Return a reference to the struct name, as a string.
-  fn get_type_name(&self) -> &String {
-    &self.type_name
-  }
-
-  /// Return a reference to the name in shouty snake case.
-  fn get_name_caps(&self) -> &String {
-    &self.name_allcaps
-  }
-
-  /// Return a reference to the name in lowercase, with all underscores removed. (Used for
-  /// symbols like athcon_create_vmname)
-  fn get_name_lowercase(&self) -> &String {
-    &self.name_lowercase
+    VMName(ident)
   }
 
   /// Get the struct's name as an explicit identifier to be interpolated with quote.
-  fn get_type_as_ident(&self) -> Ident {
-    Ident::new(&self.type_name, self.type_name.span())
-  }
-
-  /// Get the lowercase name appended with arbitrary text as an explicit ident.
-  fn get_lowercase_as_ident_append(&self, suffix: &str) -> Ident {
-    let concat = format!("{}{}", &self.name_lowercase, suffix);
-    Ident::new(&concat, self.name_lowercase.span())
+  fn as_type_ident(&self) -> Ident {
+    Ident::new(&self.0, Span::call_site())
   }
 
   /// Get the lowercase name prepended with arbitrary text as an explicit ident.
   fn get_lowercase_as_ident_prepend(&self, prefix: &str) -> Ident {
-    let concat = format!("{}{}", prefix, &self.name_lowercase);
-    Ident::new(&concat, self.name_lowercase.span())
+    let concat = format!("{}{}", prefix, self.0.to_lowercase());
+    Ident::new(&concat, Span::call_site())
   }
 
   /// Get the lowercase name appended with arbitrary text as an explicit ident.
   fn get_caps_as_ident_append(&self, suffix: &str) -> Ident {
-    let concat = format!("{}{}", &self.name_allcaps, suffix);
-    Ident::new(&concat, self.name_allcaps.span())
+    let concat = format!("{}{}", AsShoutySnakeCase(&self.0), suffix);
+    Ident::new(&concat, Span::call_site())
   }
 }
 
@@ -188,19 +154,18 @@ pub fn athcon_declare_vm(args: TokenStream, item: TokenStream) -> TokenStream {
   // Extract the identifier of the struct from the AST node.
   let vm_type_name: String = input.ident.to_string();
 
-  // Build the VM name set.
-  let names = VMNameSet::new(vm_type_name);
+  let name = VMName::new(vm_type_name);
 
   // Parse the arguments for the macro.
   let vm_data = parse_macro_input!(args as VMMetaData);
 
   // Get all the tokens from the respective helpers.
-  let static_data_tokens = build_static_data(&names, &vm_data);
+  let static_data_tokens = build_static_data(&name, &vm_data);
   let capabilities_tokens = build_capabilities_fn(vm_data.capabilities);
-  let set_option_tokens = build_set_option_fn(&names);
-  let create_tokens = build_create_fn(&names);
-  let destroy_tokens = build_destroy_fn(&names);
-  let execute_tokens = build_execute_fn(&names);
+  let set_option_tokens = build_set_option_fn(&name);
+  let create_tokens = build_create_fn(&name);
+  let destroy_tokens = build_destroy_fn(&name);
+  let execute_tokens = build_execute_fn(&name);
 
   let quoted = quote! {
       #input
@@ -216,10 +181,10 @@ pub fn athcon_declare_vm(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Generate tokens for the static data associated with an athcon VM.
-fn build_static_data(names: &VMNameSet, metadata: &VMMetaData) -> proc_macro2::TokenStream {
+fn build_static_data(name: &VMName, metadata: &VMMetaData) -> proc_macro2::TokenStream {
   // Stitch together the VM name and the suffix _NAME
-  let static_name_ident = names.get_caps_as_ident_append("_NAME");
-  let static_version_ident = names.get_caps_as_ident_append("_VERSION");
+  let static_name_ident = name.get_caps_as_ident_append("_NAME");
+  let static_version_ident = name.get_caps_as_ident_append("_VERSION");
 
   // Turn the stylized VM name and version into string literals.
   let stylized_name = CString::new(metadata.name_stylized.as_str()).unwrap();
@@ -246,8 +211,8 @@ fn build_capabilities_fn(capabilities: u32) -> proc_macro2::TokenStream {
   }
 }
 
-fn build_set_option_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
-  let type_name_ident = names.get_type_as_ident();
+fn build_set_option_fn(name: &VMName) -> proc_macro2::TokenStream {
+  let type_name_ident = name.as_type_ident();
 
   quote! {
       extern "C" fn __athcon_set_option(
@@ -304,12 +269,12 @@ fn build_set_option_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
 }
 
 /// Takes an identifier and struct definition, builds an athcon_create_* function for FFI.
-fn build_create_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
-  let type_ident = names.get_type_as_ident();
-  let fn_ident = names.get_lowercase_as_ident_prepend("athcon_create_");
+fn build_create_fn(name: &VMName) -> proc_macro2::TokenStream {
+  let type_ident = name.as_type_ident();
+  let fn_ident = name.get_lowercase_as_ident_prepend("athcon_create_");
 
-  let static_version_ident = names.get_caps_as_ident_append("_VERSION");
-  let static_name_ident = names.get_caps_as_ident_append("_NAME");
+  let static_version_ident = name.get_caps_as_ident_append("_VERSION");
+  let static_name_ident = name.get_caps_as_ident_append("_NAME");
 
   // Note: we can get CStrs unchecked because we did the checks on instantiation of VMMetaData.
   quote! {
@@ -336,8 +301,8 @@ fn build_create_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
 }
 
 /// Builds a callback to dispose of the VM instance.
-fn build_destroy_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
-  let type_ident = names.get_type_as_ident();
+fn build_destroy_fn(name: &VMName) -> proc_macro2::TokenStream {
+  let type_ident = name.as_type_ident();
 
   quote! {
       extern "C" fn __athcon_destroy(instance: *mut ::athcon_vm::ffi::athcon_vm) {
@@ -354,8 +319,8 @@ fn build_destroy_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
 }
 
 /// Builds the main execution entry point.
-fn build_execute_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
-  let type_name_ident = names.get_type_as_ident();
+fn build_execute_fn(name: &VMName) -> proc_macro2::TokenStream {
+  let type_name_ident = name.as_type_ident();
 
   quote! {
       extern "C" fn __athcon_execute(
@@ -421,6 +386,19 @@ fn build_execute_fn(names: &VMNameSet) -> proc_macro2::TokenStream {
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn test_vm_name_prepend_lowercase() {
+    let name = super::VMName::new("ExampleVM".to_string());
+    let ident = name.get_lowercase_as_ident_prepend("athcon_");
+    assert_eq!(ident.to_string(), "athcon_examplevm");
+  }
+  #[test]
+  fn test_vm_name_append_caps() {
+    let name = super::VMName::new("ExampleVM".to_string());
+    let ident = name.get_caps_as_ident_append("_NAME");
+    assert_eq!(ident.to_string(), "EXAMPLE_VM_NAME");
+  }
+
   #[test]
   fn test_vmmetadata_parsing() {
     let s = syn::parse_str::<super::VMMetaData>(
