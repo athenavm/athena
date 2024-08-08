@@ -10,37 +10,13 @@ package athcon
 #include <stdlib.h> // for 'free'
 
 extern const struct athcon_host_interface athcon_go_host;
-
-static struct athcon_result execute_wrapper(struct athcon_vm* vm,
-	uintptr_t context_index, enum athcon_revision rev,
-	enum athcon_call_kind kind, int32_t depth, int64_t gas,
-	const athcon_address* recipient, const athcon_address* sender,
-	const uint8_t* input_data, size_t input_size, const athcon_uint256be* value,
-	const uint8_t* code, size_t code_size)
-{
-	struct athcon_message msg = {
-		kind,
-		depth,
-		gas,
-		*recipient,
-		*sender,
-		input_data,
-		input_size,
-		*value,
-		0,     // code
-		0,     // code_size
-	};
-
-	struct athcon_host_context* context = (struct athcon_host_context*)context_index;
-	return athcon_execute(vm, &athcon_go_host, context, rev, &msg, code, code_size);
-}
 */
 import "C"
 import (
 	"fmt"
 	"path/filepath"
+	"runtime/cgo"
 	"strings"
-	"sync"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -186,21 +162,56 @@ type Result struct {
 	GasRefund int64
 }
 
-func (vm *VM) Execute(ctx HostContext, rev Revision,
-	kind CallKind, depth int, gas int64,
-	recipient Address, sender Address, input []byte, value Bytes32,
-	code []byte) (res Result, err error) {
+func (vm *VM) Execute(
+	ctx HostContext,
+	rev Revision,
+	kind CallKind,
+	depth int,
+	gas int64,
+	recipient, sender Address,
+	input []byte,
+	value Bytes32,
+	code []byte,
+) (res Result, err error) {
+	if len(code) == 0 {
+		return res, fmt.Errorf("code is empty")
+	}
+	msg := C.struct_athcon_message{
+		kind:      C.enum_athcon_call_kind(kind),
+		depth:     C.int32_t(depth),
+		gas:       C.int64_t(gas),
+		recipient: athconAddress(recipient),
+		sender:    athconAddress(sender),
+		value:     athconBytes32(value),
+	}
+	if len(input) > 0 {
+		// Allocate memory for input data in C.
+		// Otherwise, the Go garbage collector may move the data around and
+		// invalidate the pointer passed to the C code.
+		// Without this, the CGO complains `cgo argument has Go pointer to unpinned Go pointer`.
+		cInputData := C.malloc(C.size_t(len(input)))
+		if cInputData == nil {
+			return res, fmt.Errorf("failed to allocate memory for input data")
+		}
+		defer C.free(cInputData)
 
-	ctxId := addHostContext(ctx)
-	// FIXME: Clarify passing by pointer vs passing by value.
-	athconRecipient := athconAddress(recipient)
-	athconSender := athconAddress(sender)
-	athconValue := athconBytes32(value)
-	result := C.execute_wrapper(vm.handle, C.uintptr_t(ctxId), uint32(rev),
-		C.enum_athcon_call_kind(kind), C.int32_t(depth), C.int64_t(gas),
-		&athconRecipient, &athconSender, bytesPtr(input), C.size_t(len(input)), &athconValue,
-		bytesPtr(code), C.size_t(len(code)))
-	removeHostContext(ctxId)
+		cSlice := unsafe.Slice((*byte)(cInputData), len(input))
+		copy(cSlice, input)
+		msg.input_data = (*C.uchar)(unsafe.Pointer(&cSlice[0]))
+		msg.input_size = C.size_t(len(input))
+	}
+
+	ctxHandle := cgo.NewHandle(ctx)
+	result := C.athcon_execute(
+		vm.handle,
+		&C.athcon_go_host,
+		(*C.struct_athcon_host_context)(unsafe.Pointer(uintptr(ctxHandle))),
+		uint32(rev),
+		&msg,
+		(*C.uint8_t)(unsafe.Pointer(&code[0])),
+		C.size_t(len(code)),
+	)
+	ctxHandle.Delete()
 
 	res.Output = C.GoBytes(unsafe.Pointer(result.output_data), C.int(result.output_size))
 	res.GasLeft = int64(result.gas_left)
@@ -213,34 +224,6 @@ func (vm *VM) Execute(ctx HostContext, rev Revision,
 	}
 
 	return res, err
-}
-
-var (
-	hostContextCounter uintptr
-	hostContextMap     = map[uintptr]HostContext{}
-	hostContextMapMu   sync.Mutex
-)
-
-func addHostContext(ctx HostContext) uintptr {
-	hostContextMapMu.Lock()
-	id := hostContextCounter
-	hostContextCounter++
-	hostContextMap[id] = ctx
-	hostContextMapMu.Unlock()
-	return id
-}
-
-func removeHostContext(id uintptr) {
-	hostContextMapMu.Lock()
-	delete(hostContextMap, id)
-	hostContextMapMu.Unlock()
-}
-
-func getHostContext(idx uintptr) HostContext {
-	hostContextMapMu.Lock()
-	ctx := hostContextMap[idx]
-	hostContextMapMu.Unlock()
-	return ctx
 }
 
 func athconBytes32(in Bytes32) C.athcon_bytes32 {
@@ -257,11 +240,4 @@ func athconAddress(address Address) C.athcon_address {
 		r.bytes[i] = C.uint8_t(address[i])
 	}
 	return r
-}
-
-func bytesPtr(bytes []byte) *C.uint8_t {
-	if len(bytes) == 0 {
-		return nil
-	}
-	return (*C.uint8_t)(unsafe.Pointer(&bytes[0]))
 }
