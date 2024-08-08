@@ -18,6 +18,10 @@ Cargo.lock
 /.idea
 /.vscode
 /target
+.DS_Store
 
 # Ignore the book build directory
 /book/book/
+
+# Still not sure why cargo creates this in the root directory
+/elf

@@ -101,6 +101,8 @@ pub enum ExecutionError {
   Breakpoint(),
   #[error("got unimplemented as opcode")]
   Unimplemented(),
+  #[error("symbol not found")]
+  UnknownSymbol(),
 }
 
 fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
@@ -708,12 +710,26 @@ where
   fn initialize(&mut self) {
     self.state.clk = 0;
 
+    // TODO: do we want to load all of the memory when executing a particular function?
     tracing::info!("loading memory image");
     for (addr, value) in self.program.memory_image.iter() {
       self.state.memory.insert(*addr, *value);
     }
 
     tracing::info!("starting execution");
+  }
+
+  /// Execute an exported function. Does the same work as execute().
+  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+    // Make sure the symbol exists, and set the program counter
+    let offset = match self.program.symbol_table.get(symbol_name) {
+      Some(offset) => *offset,
+      None => return Err(ExecutionError::UnknownSymbol()),
+    };
+    self.state.pc = offset;
+
+    // Hand over to execute
+    self.execute()
   }
 
   /// Execute the program, returning remaining gas. Execution will either complete or produce an error.
@@ -795,7 +811,7 @@ pub mod tests {
   use crate::{
     runtime::Register,
     utils::{
-      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF},
+      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF, WALLET_ELF},
       AthenaCoreOpts,
     },
   };
@@ -824,6 +840,10 @@ pub mod tests {
     Program::from(TEST_HOST)
   }
 
+  pub fn wallet_program() -> Program {
+    Program::from(WALLET_ELF)
+  }
+
   #[test]
   fn test_simple_program_run() {
     let program = simple_program();
@@ -838,6 +858,37 @@ pub mod tests {
     let program = panic_program();
     let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
+  }
+
+  #[test]
+  fn test_wallet() {
+    let program = wallet_program();
+    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+
+    // make sure the program loaded correctly
+    // riscv32-unknown-linux-gnu/bin/objdump -d -j .text elf/wallet-template | grep athexp
+    assert_eq!(
+      runtime
+        .program
+        .as_ref()
+        .symbol_table
+        .get("athexp_spawn")
+        .unwrap(),
+      &0x00200940
+    );
+    assert_eq!(
+      runtime
+        .program
+        .as_ref()
+        .symbol_table
+        .get("athexp_send")
+        .unwrap(),
+      &0x0020094c
+    );
+
+    // now attempt to execute each function in turn
+    runtime.execute_function("athexp_spawn").unwrap();
+    runtime.execute_function("athexp_send").unwrap();
   }
 
   #[test]

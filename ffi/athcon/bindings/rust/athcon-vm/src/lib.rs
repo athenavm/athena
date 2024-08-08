@@ -301,6 +301,11 @@ impl<'a> ExecutionContext<'a> {
       self.host.get_block_hash.unwrap()(self.context, num)
     }
   }
+
+  /// Spawn a new program from a template
+  pub fn spawn(&self, code: &[u8]) -> Address {
+    unsafe { self.host.spawn.unwrap()(self.context, code.as_ptr(), code.len()) }
+  }
 }
 
 impl From<ffi::athcon_result> for ExecutionResult {
@@ -790,6 +795,7 @@ mod tests {
       call: Some(execute_call),
       get_tx_context: Some(get_dummy_tx_context),
       get_block_hash: None,
+      spawn: None,
     }
   }
 

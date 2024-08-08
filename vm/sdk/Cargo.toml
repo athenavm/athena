@@ -1,5 +1,5 @@
 [package]
-name = "athena-interface"
+name = "athena-vm-sdk"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,6 +8,6 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-blake3 = "1.5.3"
-bytemuck = "1.16.0"
-log = "0.4.21"
+athena-vm = { path = "../entrypoint" }
+athena-hostfunctions = { path = "../hostfunctions" }
+athena-interface = { path = "../../interface" }

@@ -14,13 +14,14 @@ impl Program {
   pub const fn new(instructions: Vec<Instruction>, pc_start: u32, pc_base: u32) -> Self {
     Self {
       instructions,
+      symbol_table: BTreeMap::new(),
       pc_start,
       pc_base,
       memory_image: BTreeMap::new(),
     }
   }
 
-  /// Disassemble a RV32IM ELF to a program that be executed by the VM.
+  /// Disassemble an ELF to a program that be executed by the VM.
   pub fn from(input: &[u8]) -> Self {
     // Check the magic number
     if input.len() < 4 {
@@ -35,6 +36,7 @@ impl Program {
       // Return the program.
       Program {
         instructions,
+        symbol_table: elf.symbol_table,
         pc_start: elf.pc_start,
         pc_base: elf.pc_base,
         memory_image: elf.memory_image,

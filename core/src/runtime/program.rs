@@ -9,6 +9,9 @@ pub struct Program {
   /// The instructions of the program.
   pub instructions: Vec<Instruction>,
 
+  /// Symbol table
+  pub symbol_table: BTreeMap<String, u32>,
+
   /// The start address of the program.
   pub pc_start: u32,
 

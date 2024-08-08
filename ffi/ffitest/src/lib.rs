@@ -95,6 +95,11 @@ mod ffi_tests {
       [0u8; BYTES32_LENGTH]
     }
 
+    fn spawn(&mut self, _blob: &[u8]) -> Address {
+      println!("Host: spawn");
+      ADDRESS_ALICE
+    }
+
     fn call(
       &mut self,
       kind: MessageKind,

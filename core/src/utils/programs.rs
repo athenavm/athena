@@ -10,6 +10,9 @@ pub mod tests {
 
   pub const IO_ELF: &[u8] = include_bytes!("../../../examples/io/program/elf/io-program");
 
+  pub const WALLET_ELF: &[u8] =
+    include_bytes!("../../../examples/wallet/program/elf/wallet-template");
+
   /// Tests.
 
   pub const TEST_FIBONACCI_ELF: &[u8] =

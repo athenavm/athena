@@ -3,6 +3,16 @@ members = [
   "builder",
   "cli",
   "core",
+  "examples/fibonacci/program",
+  "examples/fibonacci/script",
+  "examples/hello_world/program",
+  "examples/hello_world/script",
+  "examples/io/program",
+  "examples/io/script",
+  "examples/wallet/common",
+  # Exclude this because it has a feature-flag conflict with the others (noentrypoint)
+  #"examples/wallet/program",
+  #"examples/wallet/script",
   "ffi/athcon/bindings/rust/athcon-client",
   "ffi/athcon/bindings/rust/athcon-declare",
   "ffi/athcon/bindings/rust/athcon-sys",
@@ -13,10 +23,13 @@ members = [
   "interface",
   "runner",
   "sdk",
+  "vm/declare",
   "vm/entrypoint",
   "vm/hostfunctions",
   "vm/lib",
+  "vm/sdk",
 ]
+exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
@@ -26,5 +39,3 @@ repository = "https://github.com/athenavm/athena"
 homepage = "https://www.athenavm.org/"
 license = "MIT OR Apache-2.0"
 edition = "2021"
-
-[workspace.dependencies]

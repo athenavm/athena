@@ -18,6 +18,27 @@ pub mod types {
   pub use athena_interface::*;
 }
 
+// This macro should be used for libraries with multiple exported functions
+#[cfg(feature = "noentrypoint")]
+#[macro_export]
+macro_rules! entrypoint {
+  () => {
+    use $crate::heap::SimpleAlloc;
+
+    #[global_allocator]
+    static HEAP: SimpleAlloc = SimpleAlloc;
+
+    mod vm_generated_main {
+      #[no_mangle]
+      fn main() {
+        panic!("noentrypoint feature is enabled");
+      }
+    }
+  };
+}
+
+// This macro should be used for programs with a single entrypoint
+#[cfg(not(feature = "noentrypoint"))]
 #[macro_export]
 macro_rules! entrypoint {
   ($path:path) => {
@@ -43,7 +64,6 @@ mod vm {
 
   use getrandom::{register_custom_getrandom, Error};
 
-  #[cfg(not(feature = "interface"))]
   #[no_mangle]
   unsafe extern "C" fn __start() {
     {
