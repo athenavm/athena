@@ -35,22 +35,25 @@
 
 extern crate proc_macro;
 
+use std::ffi::CString;
+
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
+use syn::parse::Parse;
+use syn::parse::ParseStream;
 use syn::parse_macro_input;
 use syn::spanned::Spanned;
-use syn::AttributeArgs;
 use syn::Ident;
 use syn::ItemStruct;
 use syn::Lit;
+use syn::LitCStr;
 use syn::LitInt;
-use syn::LitStr;
-use syn::NestedMeta;
 
 struct VMName(String);
 
+#[derive(Debug)]
 struct VMMetaData {
   capabilities: u32,
   // Not included in VMName because it is parsed from the meta-item arguments.
@@ -81,95 +84,64 @@ impl VMName {
   }
 }
 
-impl VMMetaData {
-  fn new(args: AttributeArgs) -> Self {
-    assert_eq!(args.len(), 3, "Incorrect number of arguments supplied");
+impl Parse for VMMetaData {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    let lits = syn::punctuated::Punctuated::<Lit, syn::Token![,]>::parse_terminated(input)?;
 
-    let vm_name_meta = &args[0];
-    let vm_capabilities_meta = &args[1];
-    let vm_version_meta = &args[2];
+    if lits.len() != 3 {
+      return Err(syn::Error::new_spanned(
+        lits,
+        "Expected exactly three arguments",
+      ));
+    }
 
-    let vm_name_string = match vm_name_meta {
-      NestedMeta::Lit(lit) => {
-        if let Lit::Str(s) = lit {
-          // Add a null terminator here to ensure that it is handled correctly when
-          // converted to a C String.
-          let mut ret = s.value();
-          ret.push('\0');
-          ret
-        } else {
-          panic!("Literal argument type mismatch")
-        }
+    let name = match &lits[0] {
+      Lit::Str(s) => s.value(),
+      lit => {
+        return Err(syn::Error::new_spanned(
+          lit,
+          "First argument must be a string literal",
+        ))
       }
-      _ => panic!("Argument 1 must be a string literal"),
     };
 
-    let vm_capabilities_string = match vm_capabilities_meta {
-      NestedMeta::Lit(lit) => {
-        if let Lit::Str(s) = lit {
-          s.value()
-        } else {
-          panic!("Literal argument type mismatch")
-        }
+    let capabilities_string = match &lits[1] {
+      Lit::Str(s) => s.value(),
+      lit => {
+        return Err(syn::Error::new_spanned(
+          lit,
+          "Second argument must be a string literal",
+        ))
       }
-      _ => panic!("Argument 2 must be a string literal"),
     };
 
-    // Parse the individual capabilities out of the list and prepare a capabilities flagset.
-    // Prune spaces and underscores here to make a clean comma-separated list.
-    let capabilities_list_pruned: String = vm_capabilities_string
+    let capabilities_list_pruned: String = capabilities_string
       .chars()
       .filter(|c| *c != '_' && *c != ' ')
       .collect();
-    let capabilities_flags = {
-      let mut ret: u32 = 0;
-      for capability in capabilities_list_pruned.split(',') {
-        match capability {
-          "athena1" => ret |= 1,
-          // "ewasm" => ret |= 1 << 1,
-          // "precompiles" => ret |= 1 << 2,
-          _ => panic!("Invalid capability specified."),
-        }
+    let mut capabilities_flags = 0u32;
+    for capability in capabilities_list_pruned.split(',') {
+      match capability {
+        "athena1" => capabilities_flags |= 1,
+        _ => panic!("Invalid capability specified."),
       }
-      ret
-    };
-
-    let vm_version_string: String = if let NestedMeta::Lit(lit) = vm_version_meta {
-      match lit {
-        // Add a null terminator here to ensure that it is handled correctly when
-        // converted to a C String.
-        Lit::Str(s) => {
-          let mut ret = s.value();
-          ret.push('\0');
-          ret
-        }
-        _ => panic!("Literal argument type mismatch"),
-      }
-    } else {
-      panic!("Argument 3 must be a string literal")
-    };
-
-    // Make sure that the only null byte is the terminator we inserted in each string.
-    assert_eq!(vm_name_string.matches('\0').count(), 1);
-    assert_eq!(vm_version_string.matches('\0').count(), 1);
-
-    VMMetaData {
-      capabilities: capabilities_flags,
-      name_stylized: vm_name_string,
-      custom_version: vm_version_string,
     }
-  }
 
-  fn get_capabilities(&self) -> u32 {
-    self.capabilities
-  }
+    let version = match &lits[2] {
+      Lit::Str(s) => s.value(),
+      lit => {
+        return Err(syn::Error::new_spanned(
+          lit,
+          "Third argument must be a string literal",
+        ))
+      }
+    };
 
-  fn get_name_stylized_nulterm(&self) -> &String {
-    &self.name_stylized
-  }
-
-  fn get_custom_version_nulterm(&self) -> &String {
-    &self.custom_version
+    Ok(VMMetaData {
+      capabilities: capabilities_flags,
+      name_stylized: name,
+      custom_version: version,
+    })
   }
 }
 
@@ -185,12 +157,11 @@ pub fn athcon_declare_vm(args: TokenStream, item: TokenStream) -> TokenStream {
   let name = VMName::new(vm_type_name);
 
   // Parse the arguments for the macro.
-  let meta_args = parse_macro_input!(args as AttributeArgs);
-  let vm_data = VMMetaData::new(meta_args);
+  let vm_data = parse_macro_input!(args as VMMetaData);
 
   // Get all the tokens from the respective helpers.
   let static_data_tokens = build_static_data(&name, &vm_data);
-  let capabilities_tokens = build_capabilities_fn(vm_data.get_capabilities());
+  let capabilities_tokens = build_capabilities_fn(vm_data.capabilities);
   let set_option_tokens = build_set_option_fn(&name);
   let create_tokens = build_create_fn(&name);
   let destroy_tokens = build_destroy_fn(&name);
@@ -216,18 +187,15 @@ fn build_static_data(name: &VMName, metadata: &VMMetaData) -> proc_macro2::Token
   let static_version_ident = name.get_caps_as_ident_append("_VERSION");
 
   // Turn the stylized VM name and version into string literals.
-  let stylized_name_literal = LitStr::new(
-    metadata.get_name_stylized_nulterm().as_str(),
-    metadata.get_name_stylized_nulterm().as_str().span(),
-  );
+  let stylized_name = CString::new(metadata.name_stylized.as_str()).unwrap();
+  let stylized_name_literal = LitCStr::new(stylized_name.as_c_str(), metadata.name_stylized.span());
 
-  // Turn the version into a string literal.
-  let version_string = metadata.get_custom_version_nulterm();
-  let version_literal = LitStr::new(version_string.as_str(), version_string.as_str().span());
+  let version = CString::new(metadata.custom_version.as_str()).unwrap();
+  let version_literal = LitCStr::new(version.as_c_str(), metadata.custom_version.span());
 
   quote! {
-      static #static_name_ident: &'static str = #stylized_name_literal;
-      static #static_version_ident: &'static str = #version_literal;
+      static #static_name_ident: &'static core::ffi::CStr = #stylized_name_literal;
+      static #static_version_ident: &'static core::ffi::CStr = #version_literal;
   }
 }
 
@@ -318,8 +286,8 @@ fn build_create_fn(name: &VMName) -> proc_macro2::TokenStream {
               execute: Some(__athcon_execute),
               get_capabilities: Some(__athcon_get_capabilities),
               set_option: Some(__athcon_set_option),
-              name: unsafe { ::std::ffi::CStr::from_bytes_with_nul_unchecked(#static_name_ident.as_bytes()).as_ptr() },
-              version: unsafe { ::std::ffi::CStr::from_bytes_with_nul_unchecked(#static_version_ident.as_bytes()).as_ptr() },
+              name: #static_name_ident.as_ptr(),
+              version: #static_version_ident.as_ptr(),
           };
 
           let container = ::athcon_vm::AthconContainer::<#type_ident>::new(new_instance);
@@ -429,5 +397,25 @@ mod tests {
     let name = super::VMName::new("ExampleVM".to_string());
     let ident = name.get_caps_as_ident_append("_NAME");
     assert_eq!(ident.to_string(), "EXAMPLE_VM_NAME");
+  }
+
+  #[test]
+  fn test_vmmetadata_parsing() {
+    let s = syn::parse_str::<super::VMMetaData>(
+      r#""This is an example VM name", "athena1", "1.2.3-custom""#,
+    )
+    .unwrap();
+
+    assert_eq!(s.capabilities, 1);
+    assert_eq!(s.name_stylized, "This is an example VM name");
+    assert_eq!(s.custom_version, "1.2.3-custom");
+  }
+
+  #[test]
+  fn test_vmmetadata_parsing_needs_3_attributes() {
+    let s = syn::parse_str::<super::VMMetaData>(r#""This is an example VM name", "athena1""#);
+
+    let err = s.unwrap_err();
+    assert_eq!(err.to_string(), "Expected exactly three arguments");
   }
 }
