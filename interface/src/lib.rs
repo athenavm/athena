@@ -757,4 +757,12 @@ mod tests {
     assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
     assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
   }
+
+  #[test]
+  fn test_spawn() {
+    let mut host = MockHost::new();
+    let code = vec![1, 2, 3, 4];
+    let address = host.spawn_program(&ADDRESS_ALICE, code.clone(), &ADDRESS_ALICE, 0);
+    assert_eq!(host.templates.get(&address), Some(&code));
+  }
 }

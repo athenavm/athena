@@ -27,6 +27,10 @@ impl Wallet {
   }
 }
 
+#[cfg(all(
+  any(target_arch = "riscv32", target_arch = "riscv64"),
+  target_feature = "e"
+))]
 #[template]
 impl WalletProgram for Wallet {
   #[callable]
@@ -66,7 +70,11 @@ impl VerifiableTemplate for Wallet {
   }
 }
 
-#[cfg(test)]
+#[cfg(all(
+  any(target_arch = "riscv32", target_arch = "riscv64"),
+  target_feature = "e",
+  test
+))]
 mod test {
   use super::*;
 

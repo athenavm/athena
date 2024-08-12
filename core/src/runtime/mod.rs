@@ -720,7 +720,11 @@ where
   }
 
   /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+  pub fn execute_function(
+    &mut self,
+    symbol_name: &str,
+    input: Option<Vec<u8>>,
+  ) -> Result<Option<u32>, ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
       Some(offset) => *offset,
@@ -794,7 +798,6 @@ where
 
 #[cfg(test)]
 pub mod tests {
-
   use std::{cell::RefCell, sync::Arc};
 
   use crate::{
@@ -806,6 +809,7 @@ pub mod tests {
     Address, AthenaContext, HostInterface, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
+  use athena_vm_sdk::PUBKEY_LENGTH;
 
   use crate::{
     runtime::Register,
@@ -886,7 +890,13 @@ pub mod tests {
     );
 
     // now attempt to execute each function in turn
-    runtime.execute_function("athexp_spawn").unwrap();
+    runtime
+      .execute_function("athexp_spawn", Some([0u8; PUBKEY_LENGTH].to_vec()))
+      .unwrap();
+
+    // read wallet state
+
+
     runtime.execute_function("athexp_send").unwrap();
   }
 
