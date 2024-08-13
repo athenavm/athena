@@ -761,8 +761,8 @@ mod tests {
   #[test]
   fn test_spawn() {
     let mut host = MockHost::new();
-    let code = vec![1, 2, 3, 4];
-    let address = host.spawn_program(&ADDRESS_ALICE, code.clone(), &ADDRESS_ALICE, 0);
-    assert_eq!(host.templates.get(&address), Some(&code));
+    let blob = vec![1, 2, 3, 4];
+    let address = host.spawn_program(&ADDRESS_ALICE, blob.clone(), &ADDRESS_ALICE, 0);
+    assert_eq!(host.programs.get(&address), Some(&blob));
   }
 }
