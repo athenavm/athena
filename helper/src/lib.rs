@@ -1,12 +1,6 @@
 pub use athena_builder::BuildArgs;
 use cargo_metadata::Metadata;
-use chrono::Local;
-use std::{path::Path, process::ExitStatus};
-
-fn current_datetime() -> String {
-  let now = Local::now();
-  now.format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use std::path::Path;
 
 /// Re-run the cargo command if the Cargo.toml or Cargo.lock file changes.
 fn cargo_rerun_if_changed(metadata: &Metadata, program_dir: &Path) {
@@ -31,14 +25,14 @@ fn cargo_rerun_if_changed(metadata: &Metadata, program_dir: &Path) {
   // workspace, this will be the program's Cargo.lock.
   println!(
     "cargo:rerun-if-changed={}",
-    metadata.workspace_root.join("Cargo.lock").as_str()
+    metadata.workspace_root.join("Cargo.lock")
   );
 
   // Re-run if any local dependency changes.
   for package in &metadata.packages {
     for dependency in &package.dependencies {
       if let Some(path) = &dependency.path {
-        println!("cargo:rerun-if-changed={}", path.as_str());
+        println!("cargo:rerun-if-changed={}", path);
       }
     }
   }
@@ -46,10 +40,7 @@ fn cargo_rerun_if_changed(metadata: &Metadata, program_dir: &Path) {
 
 /// Executes the `cargo athena build` command in the program directory. If there are any cargo athena
 /// build arguments, they are added to the command.
-fn execute_build_cmd(
-  program_dir: &impl AsRef<std::path::Path>,
-  args: Option<BuildArgs>,
-) -> Result<std::process::ExitStatus, std::io::Error> {
+fn execute_build_cmd(program_dir: &impl AsRef<std::path::Path>, args: Option<BuildArgs>) {
   // Check if RUSTC_WORKSPACE_WRAPPER is set to clippy-driver (i.e. if `cargo clippy` is the current
   // compiler). If so, don't execute `cargo athena build` because it breaks rust-analyzer's `cargo clippy` feature.
   let is_clippy_driver = std::env::var("RUSTC_WORKSPACE_WRAPPER")
@@ -57,23 +48,14 @@ fn execute_build_cmd(
     .unwrap_or(false);
   if is_clippy_driver {
     println!("cargo:warning=Skipping build due to clippy invocation.");
-    return Ok(std::process::ExitStatus::default());
+    return;
   }
 
-  // Build the program with the given arguments.
-  let path_output = if let Some(args) = args {
-    athena_builder::build_program(&args, Some(program_dir.as_ref().to_path_buf()))
-  } else {
-    athena_builder::build_program(
-      &BuildArgs::default(),
-      Some(program_dir.as_ref().to_path_buf()),
-    )
-  };
-  if let Err(err) = path_output {
-    panic!("Failed to build Athena program: {}.", err);
-  }
-
-  Ok(ExitStatus::default())
+  athena_builder::build_program(
+    &args.unwrap_or_default(),
+    Some(program_dir.as_ref().to_path_buf()),
+  )
+  .expect("building Athena program");
 }
 
 /// Builds the program if the program at the specified path, or one of its dependencies, changes.
@@ -109,15 +91,12 @@ pub fn build_program_with_args(path: &str, args: BuildArgs) {
 /// Internal helper function to build the program with or without arguments.
 fn build_program_internal(path: &str, args: Option<BuildArgs>) {
   // Get the root package name and metadata.
-  let program_dir = std::path::Path::new(path);
+  let program_dir = Path::new(path);
   let metadata_file = program_dir.join("Cargo.toml");
   let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
   let metadata = metadata_cmd.manifest_path(metadata_file).exec().unwrap();
   let root_package = metadata.root_package();
-  let root_package_name = root_package
-    .as_ref()
-    .map(|p| p.name.as_str())
-    .unwrap_or("Program");
+  let root_package_name = root_package.map(|p| p.name.as_str()).unwrap_or("Program");
 
   // Skip the program build if the ATHENA_SKIP_PROGRAM_BUILD environment variable is set to true.
   let skip_program_build = std::env::var("ATHENA_SKIP_PROGRAM_BUILD")
@@ -125,9 +104,7 @@ fn build_program_internal(path: &str, args: Option<BuildArgs>) {
     .unwrap_or(false);
   if skip_program_build {
     println!(
-      "cargo:warning=Build skipped for {} at {} due to ATHENA_SKIP_PROGRAM_BUILD flag",
-      root_package_name,
-      current_datetime()
+      "cargo:warning=Skipping building {root_package_name} due to ATHENA_SKIP_PROGRAM_BUILD flag",
     );
     return;
   }
@@ -135,11 +112,5 @@ fn build_program_internal(path: &str, args: Option<BuildArgs>) {
   // Activate the build command if the dependencies change.
   cargo_rerun_if_changed(&metadata, program_dir);
 
-  let _ = execute_build_cmd(&program_dir, args);
-
-  println!(
-    "cargo:warning={} built at {}",
-    root_package_name,
-    current_datetime()
-  );
+  execute_build_cmd(&program_dir, args);
 }
