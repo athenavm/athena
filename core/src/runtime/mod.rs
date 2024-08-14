@@ -28,7 +28,7 @@ use thiserror::Error;
 
 use crate::utils::AthenaCoreOpts;
 
-use athena_interface::{AthenaContext, HostInterface, HostProvider, StatusCode};
+use athena_interface::{AthenaContext, HostInterface, StatusCode};
 
 /// An implementation of a runtime for the Athena RISC-V VM.
 ///
@@ -47,7 +47,7 @@ pub struct Runtime<T: HostInterface> {
   pub state: ExecutionState,
 
   /// The host interface for host calls.
-  pub host: Option<Arc<RefCell<HostProvider<T>>>>,
+  pub host: Option<Arc<RefCell<T>>>,
 
   /// A counter for the number of cycles that have been executed in certain functions.
   pub cycle_tracker: HashMap<String, (u64, u32)>,
@@ -124,7 +124,7 @@ where
   // Create a new runtime from a program and, optionally, a host.
   pub fn new(
     program: Program,
-    host: Option<Arc<RefCell<HostProvider<T>>>>,
+    host: Option<Arc<RefCell<T>>>,
     opts: AthenaCoreOpts,
     context: Option<AthenaContext>,
   ) -> Self {
@@ -787,8 +787,7 @@ pub mod tests {
     utils::{self, with_max_gas},
   };
   use athena_interface::{
-    Address, AthenaContext, HostInterface, HostProvider, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE,
-    SOME_COINS,
+    Address, AthenaContext, HostInterface, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
 
@@ -844,14 +843,12 @@ pub mod tests {
   fn test_host() {
     utils::setup_logger();
     let program = host_program();
-    let host = MockHost::new();
-    let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::<MockHost>::new(
+    let mut runtime = Runtime::new(
       program,
-      Some(Arc::new(RefCell::new(provider))),
+      Some(Arc::new(RefCell::new(MockHost::new()))),
       opts,
       Some(ctx),
     );
@@ -867,9 +864,9 @@ pub mod tests {
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
     // we need a new host provider for each test to reset state
-    fn get_provider<'a>() -> Arc<RefCell<HostProvider<MockHost<'a>>>> {
+    fn get_provider<'a>() -> Arc<RefCell<MockHost<'a>>> {
       #[allow(clippy::arc_with_non_send_sync)]
-      Arc::new(RefCell::new(HostProvider::new(MockHost::new())))
+      Arc::new(RefCell::new(MockHost::new()))
     }
 
     // failure
@@ -1010,7 +1007,7 @@ pub mod tests {
 
     let host = MockHost::new();
     #[allow(clippy::arc_with_non_send_sync)]
-    let provider = Arc::new(RefCell::new(HostProvider::new(host)));
+    let provider = Arc::new(RefCell::new(host));
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut runtime = Runtime::<MockHost>::new(program, Some(provider.clone()), opts, Some(ctx));
@@ -1068,14 +1065,12 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let host = MockHost::new();
-    let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::<MockHost>::new(
+    let mut runtime = Runtime::new(
       program,
-      Some(Arc::new(RefCell::new(provider))),
+      Some(Arc::new(RefCell::new(MockHost::new()))),
       opts,
       Some(ctx),
     );
@@ -1114,14 +1109,12 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let host = MockHost::new();
-    let provider = HostProvider::new(host);
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::<MockHost>::new(
+    let mut runtime = Runtime::new(
       program,
-      Some(Arc::new(RefCell::new(provider))),
+      Some(Arc::new(RefCell::new(MockHost::new()))),
       opts,
       Some(ctx),
     );

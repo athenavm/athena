@@ -9,8 +9,7 @@ use athcon_vm::{
 };
 use athena_interface::{
   Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
-  HostInterface, HostProvider, MessageKind, StatusCode, StorageStatus, TransactionContext,
-  VmInterface,
+  HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
 use athena_runner::AthenaVm;
 
@@ -57,9 +56,8 @@ impl AthconVm for AthenaVMWrapper {
     let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
     let execution_context = AthconExecutionContext::new(host_interface, context);
     let host = WrappedHostInterface::new(execution_context);
-    let provider = HostProvider::new(host);
     #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(provider));
+    let host = Arc::new(RefCell::new(host));
 
     // Execute the code and proxy the result back to the caller
     let execution_result =
