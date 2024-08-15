@@ -131,7 +131,7 @@ impl BuildToolchainCmd {
     if !patch_output.status.success() {
       let stdout = str::from_utf8(&patch_output.stdout).unwrap_or("Failed to read stdout");
       let stderr = str::from_utf8(&patch_output.stderr).unwrap_or("Failed to read stderr");
-      println!("Failed to apply patches to rust with code: {:?}. This is expected if the patches have already been applied.", patch_output.status.code());
+      println!("Failed to apply patches to rust with code: {:?}. This is expected if the patches have already been applied.", patch_output.status.code().unwrap());
       println!("stdout: {}", stdout);
       println!("stderr: {}", stderr);
     }
