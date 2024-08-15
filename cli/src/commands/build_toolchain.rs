@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use core::str;
 use std::{path::PathBuf, process::Command};
 
 use crate::{get_target, CommandExecutor, RUSTUP_TOOLCHAIN_NAME};
@@ -115,15 +116,22 @@ impl BuildToolchainCmd {
     })?;
 
     // Apply patches
-    Command::new("patch")
+    // We allow this to fail, but want to warn the user if it did.
+    let patch_output = Command::new("patch")
       .args([
         "-f",
+        "-N",
         "-p1",
         "-i",
         toolchain_dir.join("patches/rust.patch").to_str().unwrap(),
       ])
       .current_dir(&rust_dir)
-      .run()?;
+      .output()
+      .expect("Failed to run patch command");
+    if !patch_output.status.success() {
+      let stderr = str::from_utf8(&patch_output.stderr).unwrap_or("Failed to read stderr");
+      println!("Failed to apply patches to rust with code: {:?}. This is expected if the patches have already been applied. Error output: {}", patch_output.status.code(), stderr);
+    }
 
     // Create the custom target file.
     // Note: Rust doesn't actually read this file, it just needs to see that it exists
