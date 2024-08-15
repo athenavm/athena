@@ -132,6 +132,10 @@ impl BuildToolchainCmd {
     // Build the toolchain (stage 1).
     Command::new("python3")
       .env(
+        "CFLAGS_riscv32em_athena_zkvm_elf",
+        "-ffunction-sections -fdata-sections -fPIC -target riscv32-unknown-elf",
+      )
+      .env(
         "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
         "-Cpasses=loweratomic",
       )
@@ -142,6 +146,10 @@ impl BuildToolchainCmd {
 
     // Build the toolchain (stage 2).
     Command::new("python3")
+      .env(
+        "CFLAGS_riscv32em_athena_zkvm_elf",
+        "-ffunction-sections -fdata-sections -fPIC -target riscv32-unknown-elf",
+      )
       .env(
         "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
         "-Cpasses=loweratomic",
