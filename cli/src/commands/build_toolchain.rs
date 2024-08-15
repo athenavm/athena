@@ -66,13 +66,14 @@ impl BuildToolchainCmd {
       .current_dir(&toolchain_dir)
       .run()?;
     let rust_dir = toolchain_dir.join("rust");
+
+    // Read the Rust commit hash
+    let rust_commit = std::fs::read_to_string(toolchain_dir.join("rust_commit.txt"))?
+      .trim()
+      .to_string();
+
     Command::new("git")
-      .args([
-        "fetch",
-        "--depth=1",
-        "origin",
-        "9b00956e56009bab2aa15d7bff10916599e3d6d6",
-      ])
+      .args(["fetch", "--depth=1", "origin", &rust_commit])
       .current_dir(&rust_dir)
       .run()?;
     Command::new("git")
