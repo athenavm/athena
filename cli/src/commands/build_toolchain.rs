@@ -137,8 +137,12 @@ impl BuildToolchainCmd {
       )
       .env(
         "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
-        "-Cpasses=loweratomic",
+        "-Cpasses=loweratomic -Clink-arg=-march=rv32em -Clink-arg=-mabi=ilp32e",
       )
+      .env("COMPILER_RT_DEFAULT_TARGET_TRIPLE", "riscv32-unknown-elf")
+      .env("CC_riscv32em_athena_zkvm_elf", "clang")
+      .env("CXX_riscv32em_athena_zkvm_elf", "clang++")
+      .env("RUSTC_TARGET_ARG", "")
       .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build"])
       .current_dir(&rust_dir)
@@ -152,8 +156,12 @@ impl BuildToolchainCmd {
       )
       .env(
         "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
-        "-Cpasses=loweratomic",
+        "-Cpasses=loweratomic -Clink-arg=-march=rv32em -Clink-arg=-mabi=ilp32e",
       )
+      .env("COMPILER_RT_DEFAULT_TARGET_TRIPLE", "riscv32-unknown-elf")
+      .env("CC_riscv32em_athena_zkvm_elf", "clang")
+      .env("CXX_riscv32em_athena_zkvm_elf", "clang++")
+      .env("RUSTC_TARGET_ARG", "")
       .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build", "--stage", "2"])
       .current_dir(&rust_dir)
