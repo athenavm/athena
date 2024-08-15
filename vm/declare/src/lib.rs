@@ -89,10 +89,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn is_static_method(sig: &syn::Signature) -> bool {
-  match sig.inputs.first() {
-    Some(FnArg::Receiver(_)) => false,
-    _ => true,
-  }
+  !matches!(sig.inputs.first(), Some(FnArg::Receiver(_)))
 }
 
 // Define the callable attribute
