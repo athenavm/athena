@@ -151,6 +151,8 @@ impl BuildToolchainCmd {
         "-Cpasses=loweratomic -Clink-arg=-march=rv32em -Clink-arg=-mabi=ilp32e",
       )
       .env("COMPILER_RT_DEFAULT_TARGET_TRIPLE", "riscv32-unknown-elf")
+      .env("CC_riscv32em_athena_zkvm_elf", "clang")
+      .env("CXX_riscv32em_athena_zkvm_elf", "clang++")
       .env("RUSTC_TARGET_ARG", "")
       .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build"])
@@ -168,6 +170,8 @@ impl BuildToolchainCmd {
         "-Cpasses=loweratomic -Clink-arg=-march=rv32em -Clink-arg=-mabi=ilp32e",
       )
       .env("COMPILER_RT_DEFAULT_TARGET_TRIPLE", "riscv32-unknown-elf")
+      .env("CC_riscv32em_athena_zkvm_elf", "clang")
+      .env("CXX_riscv32em_athena_zkvm_elf", "clang++")
       .env("RUSTC_TARGET_ARG", "")
       .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build", "--stage", "2"])
