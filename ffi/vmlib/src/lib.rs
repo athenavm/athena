@@ -480,8 +480,8 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
     res.into()
   }
 
-  fn spawn(&mut self, blob: &[u8]) -> Address {
-    AddressWrapper::from(self.context.spawn(blob)).into()
+  fn spawn(&mut self, blob: Vec<u8>) -> Address {
+    AddressWrapper::from(self.context.spawn(&blob)).into()
   }
 }
 

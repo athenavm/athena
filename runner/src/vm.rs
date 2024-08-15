@@ -129,7 +129,7 @@ mod tests {
     let vm = AthenaVm::new();
     #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
-    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     assert_eq!(
       host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
@@ -193,7 +193,7 @@ mod tests {
 
     // trying to go any higher should result in an out-of-gas error
     let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
@@ -231,7 +231,7 @@ mod tests {
     let vm = AthenaVm::new();
     #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
-    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx));
     match res {

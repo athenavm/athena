@@ -356,10 +356,10 @@ pub struct MockHost<'a> {
   balance: BTreeMap<Address, Balance>,
 
   // stores contract code
-  templates: BTreeMap<Address, &'a [u8]>,
+  templates: BTreeMap<Address, Vec<u8>>,
 
   // stores program instances
-  programs: BTreeMap<Address, &'a [u8]>,
+  programs: BTreeMap<Address, Vec<u8>>,
 
   // context information
   static_context: Option<HostStaticContext>,
@@ -387,16 +387,16 @@ impl<'a> MockHost<'a> {
   ) -> Address {
     // calculate address by hashing the template, blob, principal, and nonce
     let mut hasher = Hasher::new();
-    hasher.update(&template);
-    hasher.update(blob);
-    hasher.update(&principal);
+    hasher.update(template);
+    hasher.update(&blob);
+    hasher.update(principal);
     hasher.update(&nonce.to_le_bytes());
     let address = hasher.finalize().as_bytes()[..24].try_into().unwrap();
     self.programs.insert(address, blob);
     address
   }
 
-  pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
+  pub fn deploy_code(&mut self, address: Address, code: Vec<u8>) {
     self.templates.insert(address, code);
   }
 
@@ -530,7 +530,7 @@ impl<'a> HostInterface for MockHost<'a> {
         host.clone(),
         AthenaRevision::AthenaFrontier,
         msg,
-        code,
+        &code,
       );
 
       // Restore self
@@ -577,26 +577,28 @@ impl<'a> HostInterface for MockHost<'a> {
 
   fn spawn(&mut self, blob: Vec<u8>) -> Address {
     // TODO: double-check these semantics and how Spacemesh principal account semantics map to this
-    self.spawn_program(
-      self
-        .dynamic_context
-        .as_ref()
-        .expect("missing host context")
-        .template
-        .as_ref()
-        .try_into()
-        .unwrap(),
-      blob,
-      self
-        .static_context
-        .as_ref()
-        .expect("missing host context")
-        .principal
-        .as_ref()
-        .try_into()
-        .unwrap(),
-      self.static_context.as_ref().unwrap().nonce,
-    )
+
+    // Extract the necessary values before calling spawn_program
+    let template = self
+      .dynamic_context
+      .as_ref()
+      .expect("missing host context")
+      .template;
+
+    let principal = self
+      .static_context
+      .as_ref()
+      .expect("missing host context")
+      .principal;
+
+    let nonce = self
+      .static_context
+      .as_ref()
+      .expect("missing host context")
+      .nonce;
+
+    // Now call spawn_program with the extracted values
+    self.spawn_program(&template, blob, &principal, nonce)
   }
 }
 

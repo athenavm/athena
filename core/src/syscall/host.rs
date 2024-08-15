@@ -236,7 +236,7 @@ where
 
     // get value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    host.borrow_mut().spawn(blob.as_slice());
+    host.borrow_mut().spawn(blob);
 
     None
   }
