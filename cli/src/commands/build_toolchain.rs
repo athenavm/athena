@@ -122,12 +122,20 @@ impl BuildToolchainCmd {
       .current_dir(&rust_dir)
       .run()?;
 
+    // Create the custom target file.
+    // Note: Rust doesn't actually read this file, it just needs to see that it exists
+    // to get past the bootstrap phase.
+    Command::new("touch")
+      .arg(toolchain_dir.join("riscv32em-athena-zkvm-elf.json"))
+      .run()?;
+
     // Build the toolchain (stage 1).
     Command::new("python3")
       .env(
         "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
         "-Cpasses=loweratomic",
       )
+      .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build"])
       .current_dir(&rust_dir)
       .run()?;
@@ -138,6 +146,7 @@ impl BuildToolchainCmd {
         "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
         "-Cpasses=loweratomic",
       )
+      .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build", "--stage", "2"])
       .current_dir(&rust_dir)
       .run()?;
