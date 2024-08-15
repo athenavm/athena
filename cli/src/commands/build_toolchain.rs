@@ -161,7 +161,7 @@ impl BuildToolchainCmd {
         break;
       }
     }
-    let toolchain_dir = toolchain_dir.unwrap();
+    let toolchain_dir = toolchain_dir.expect("Missing Rust toolchain directory");
     println!(
       "Found built toolchain directory at {}.",
       toolchain_dir.as_path().to_str().unwrap()
