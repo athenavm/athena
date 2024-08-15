@@ -61,11 +61,14 @@ impl BuildToolchainCmd {
         "https://github.com/rust-lang/rust.git".to_string()
       }
     };
-    Command::new("git")
-      .args(["clone", &rust_repo_url, "--depth=1"])
-      .current_dir(&toolchain_dir)
-      .run()?;
+
     let rust_dir = toolchain_dir.join("rust");
+    if !rust_dir.exists() {
+      Command::new("git")
+        .args(["clone", &rust_repo_url, "--depth=1"])
+        .current_dir(&toolchain_dir)
+        .run()?;
+    }
 
     // Read the Rust commit hash
     let rust_commit = std::fs::read_to_string(toolchain_dir.join("rust_commit.txt"))?
