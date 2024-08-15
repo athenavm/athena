@@ -3,7 +3,7 @@ use std::{cell::RefCell, sync::Arc};
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, HostProvider, SetOptionError, StatusCode, VmInterface,
+  HostInterface, SetOptionError, StatusCode, VmInterface,
 };
 use athena_sdk::{utils::setup_logger, AthenaStdin, ExecutionClient};
 
@@ -39,7 +39,7 @@ where
 
   fn execute(
     &self,
-    host: Arc<RefCell<HostProvider<T>>>,
+    host: Arc<RefCell<T>>,
     _rev: AthenaRevision,
     msg: AthenaMessage,
     // note: ignore msg.code, should only be used on deploy
@@ -96,11 +96,8 @@ mod tests {
   #[test]
   #[should_panic]
   fn test_empty_code() {
-    // construct a mock host
-    let host = MockHost::new();
-    let host_provider = HostProvider::new(host);
     #[allow(clippy::arc_with_non_send_sync)]
-    let host_interface = Arc::new(RefCell::new(host_provider));
+    let host_interface = Arc::new(RefCell::new(MockHost::new()));
 
     // construct a vm
     AthenaVm::new().execute(
@@ -131,7 +128,7 @@ mod tests {
     stdin.write::<u32>(&7);
     let vm = AthenaVm::new();
     #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
     host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     assert_eq!(
@@ -168,7 +165,7 @@ mod tests {
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
     #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
     // host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
@@ -233,7 +230,7 @@ mod tests {
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
     #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new_with_vm(&vm))));
+    let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
     host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx));
