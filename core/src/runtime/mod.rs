@@ -809,7 +809,7 @@ pub mod tests {
     calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
     HostStaticContext, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE, SOME_COINS,
   };
-  use athena_vm::helpers::address_to_32bit_words;
+  use athena_vm::{helpers::address_to_32bit_words, host::spawn};
 
   use crate::{
     runtime::Register,
@@ -881,24 +881,8 @@ pub mod tests {
       dynamic_context,
     )));
 
-    // Set up a callback so we know when spawn has been called
-    let mut spawned_program_address: Option<Address> = None;
-    let mut spawned_blob: Option<Vec<u8>> = None;
-    let spawn_callback: Box<dyn Fn(&Address, &Vec<u8>, &Address, u64, &Address)> =
-      Box::new(|template2, blob, principal2, nonce2, address| {
-        assert_eq!(principal, principal2);
-        assert_eq!(template, template2);
-        assert_eq!(nonce, nonce2);
-        assert_eq!(
-          calculate_address(template2, blob, principal2, nonce2),
-          address
-        );
-        spawned_program_address = Some(address.clone());
-        spawned_blob = Some(blob.clone());
-      });
-
     #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(program, Some(host), opts, Some(ctx));
+    let mut runtime = Runtime::new(program, Some(host.clone()), opts, Some(ctx));
 
     // make sure the program loaded correctly
     // riscv32-unknown-linux-gnu/bin/objdump -d -j .text elf/wallet-template | grep athexp
@@ -928,16 +912,25 @@ pub mod tests {
       .unwrap();
 
     // get newly-created wallet address
-    let spawned_program_address = spawned_program_address.expect("spawned program address not set");
-    let spawned_blob = spawned_blob.expect("spawned program blob not set");
+    // let cloned_host = host.clone();
+    let borrowed_host = host.borrow();
+    let spawn_result = borrowed_host.get_spawn_result().unwrap();
+    // let spawn_result = host.borrow().get_spawn_result().unwrap();
+    assert_eq!(principal, spawn_result.principal);
+    assert_eq!(template, spawn_result.template);
+    assert_eq!(nonce, spawn_result.nonce);
     assert_eq!(
-      host.borrow().get_program(&spawned_program_address).unwrap(),
-      &spawned_blob
+      calculate_address(&template, &spawn_result.blob, &principal, nonce),
+      spawn_result.address
+    );
+    assert_eq!(
+      host.borrow().get_program(&spawn_result.address).unwrap(),
+      &spawn_result.blob
     );
 
     // now the send
     runtime
-      .execute_function("athexp_send", Some(spawned_blob))
+      .execute_function("athexp_send", Some(spawn_result.blob.clone()))
       .unwrap();
   }
 

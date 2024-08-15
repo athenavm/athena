@@ -374,6 +374,14 @@ impl HostDynamicContext {
   }
 }
 
+pub struct SpawnResult {
+  pub address: Address,
+  pub blob: Vec<u8>,
+  pub template: Address,
+  pub principal: Address,
+  pub nonce: u64,
+}
+
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
@@ -397,8 +405,8 @@ pub struct MockHost<'a> {
   static_context: Option<HostStaticContext>,
   dynamic_context: Option<HostDynamicContext>,
 
-  // callbacks for testing
-  spawn_callback: Option<Box<dyn Fn(&Address, &Vec<u8>, &Address, u64, &Address)>>,
+  // the result of the most recent spawn operation
+  spawn_result: Option<SpawnResult>,
 }
 
 impl<'a> MockHost<'a> {
@@ -424,13 +432,6 @@ impl<'a> MockHost<'a> {
     }
   }
 
-  pub fn set_spawn_callback(
-    &mut self,
-    fun: Box<dyn Fn(&Address, &Vec<u8>, &Address, u64, &Address)>,
-  ) {
-    self.spawn_callback = Some(fun);
-  }
-
   pub fn spawn_program(
     &mut self,
     template: &Address,
@@ -439,11 +440,19 @@ impl<'a> MockHost<'a> {
     nonce: u64,
   ) -> Address {
     let address = calculate_address(template, &blob, principal, nonce);
-    if let Some(spawn_callback) = &self.spawn_callback {
-      spawn_callback(template, &blob, principal, nonce, &address);
-    }
-    self.programs.insert(address, blob);
+    self.programs.insert(address, blob.clone());
+    self.spawn_result = Some(SpawnResult {
+      address,
+      blob,
+      template: *template,
+      principal: *principal,
+      nonce,
+    });
     address
+  }
+
+  pub fn get_spawn_result(&self) -> Option<&SpawnResult> {
+    self.spawn_result.as_ref()
   }
 
   pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
@@ -507,7 +516,7 @@ impl<'a> Default for MockHost<'a> {
       programs,
       static_context: None,
       dynamic_context: None,
-      spawn_callback: None,
+      spawn_result: None,
     }
   }
 }
