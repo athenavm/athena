@@ -1,4 +1,3 @@
-use athena_hostfunctions;
 use athena_interface::{Address, Balance, Bytes32, BYTES32_LENGTH};
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 
@@ -29,9 +28,7 @@ pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
     (std::ptr::null(), 0)
   };
 
-  unsafe {
-    athena_hostfunctions::call(address.as_ptr(), input, input_len, amount.as_ptr());
-  }
+  athena_vm::syscalls::call(address.as_ptr(), input, input_len, amount.as_ptr());
 }
 
 // Template address is read from context
@@ -47,9 +44,7 @@ pub fn spawn(state_blob: Vec<u8>) {
     .collect::<Vec<u32>>()
     .as_ptr();
 
-  unsafe {
-    athena_hostfunctions::spawn(state_blob, state_blob_len);
-  }
+  athena_vm::syscalls::spawn(state_blob, state_blob_len);
 }
 
 // These traits define the reference wallet interface.

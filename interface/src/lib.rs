@@ -314,6 +314,22 @@ pub trait HostInterface {
   fn spawn(&mut self, blob: Vec<u8>) -> Address;
 }
 
+// Calculates a spawned program address on the basis of the template address, state blob,
+// spawning principal and nonce.
+pub fn calculate_address(
+  template: &Address,
+  blob: &Vec<u8>,
+  principal: &Address,
+  nonce: u64,
+) -> Address {
+  // calculate address by hashing the template, blob, principal, and nonce
+  let mut hasher = Hasher::new();
+  hasher.update(template);
+  hasher.update(blob);
+  hasher.update(principal);
+  hasher.update(&nonce.to_le_bytes());
+  hasher.finalize().as_bytes()[..24].try_into().unwrap()
+}
 // Stores some of the context that a running host would store to keep
 // track of what's going on in the VM execution
 // static context is set from the transaction and doesn't change until
@@ -335,11 +351,27 @@ pub struct HostStaticContext {
   // block hash, etc.
 }
 
+impl HostStaticContext {
+  pub fn new(principal: Address, nonce: u64, destination: Address) -> HostStaticContext {
+    HostStaticContext {
+      principal,
+      nonce,
+      destination,
+    }
+  }
+}
+
 // this context is relevant only for the current execution frame
 pub struct HostDynamicContext {
   // the initiator and recipient programs of the current message/call frame
   template: Address,
   callee: Address,
+}
+
+impl HostDynamicContext {
+  pub fn new(template: Address, callee: Address) -> HostDynamicContext {
+    HostDynamicContext { template, callee }
+  }
 }
 
 // a very simple mock host implementation for testing
@@ -364,6 +396,9 @@ pub struct MockHost<'a> {
   // context information
   static_context: Option<HostStaticContext>,
   dynamic_context: Option<HostDynamicContext>,
+
+  // callbacks for testing
+  spawn_callback: Option<Box<dyn Fn(&Address, &Vec<u8>, &Address, u64, &Address)>>,
 }
 
 impl<'a> MockHost<'a> {
@@ -378,6 +413,24 @@ impl<'a> MockHost<'a> {
     }
   }
 
+  pub fn new_with_context(
+    static_context: HostStaticContext,
+    dynamic_context: HostDynamicContext,
+  ) -> Self {
+    MockHost {
+      dynamic_context: Some(dynamic_context),
+      static_context: Some(static_context),
+      ..MockHost::default()
+    }
+  }
+
+  pub fn set_spawn_callback(
+    &mut self,
+    fun: Box<dyn Fn(&Address, &Vec<u8>, &Address, u64, &Address)>,
+  ) {
+    self.spawn_callback = Some(fun);
+  }
+
   pub fn spawn_program(
     &mut self,
     template: &Address,
@@ -385,15 +438,16 @@ impl<'a> MockHost<'a> {
     principal: &Address,
     nonce: u64,
   ) -> Address {
-    // calculate address by hashing the template, blob, principal, and nonce
-    let mut hasher = Hasher::new();
-    hasher.update(template);
-    hasher.update(&blob);
-    hasher.update(principal);
-    hasher.update(&nonce.to_le_bytes());
-    let address = hasher.finalize().as_bytes()[..24].try_into().unwrap();
+    let address = calculate_address(template, &blob, principal, nonce);
+    if let Some(spawn_callback) = &self.spawn_callback {
+      spawn_callback(template, &blob, principal, nonce, &address);
+    }
     self.programs.insert(address, blob);
     address
+  }
+
+  pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
+    self.programs.get(address)
   }
 
   pub fn deploy_code(&mut self, address: Address, code: Vec<u8>) {
@@ -453,6 +507,7 @@ impl<'a> Default for MockHost<'a> {
       programs,
       static_context: None,
       dynamic_context: None,
+      spawn_callback: None,
     }
   }
 }

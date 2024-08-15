@@ -806,10 +806,10 @@ pub mod tests {
     utils::{self, with_max_gas},
   };
   use athena_interface::{
-    Address, AthenaContext, HostInterface, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE, SOME_COINS,
+    calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
+    HostStaticContext, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
-  use athena_vm_sdk::PUBKEY_LENGTH;
 
   use crate::{
     runtime::Register,
@@ -866,7 +866,39 @@ pub mod tests {
   #[test]
   fn test_wallet() {
     let program = wallet_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+
+    // set up host context
+    let principal = ADDRESS_ALICE;
+    let template = ADDRESS_BOB;
+    let callee = ADDRESS_CHARLIE;
+    let nonce = 0;
+    let static_context = HostStaticContext::new(principal, nonce, Address::default());
+    let dynamic_context = HostDynamicContext::new(template, callee);
+    let host = Arc::new(RefCell::new(MockHost::new_with_context(
+      static_context,
+      dynamic_context,
+    )));
+
+    // Set up a callback so we know when spawn has been called
+    let mut spawned_program_address: Option<Address> = None;
+    let mut spawned_blob: Option<Vec<u8>> = None;
+    let spawn_callback: Box<dyn Fn(&Address, &Vec<u8>, &Address, u64, &Address)> =
+      Box::new(|template2, blob, principal2, nonce2, address| {
+        assert_eq!(principal, principal2);
+        assert_eq!(template, template2);
+        assert_eq!(nonce, nonce2);
+        assert_eq!(
+          calculate_address(template2, blob, principal2, nonce2),
+          address
+        );
+        spawned_program_address = Some(address.clone());
+        spawned_blob = Some(blob.clone());
+      });
+
+    #[allow(clippy::arc_with_non_send_sync)]
+    let mut runtime = Runtime::new(program, Some(host), opts, Some(ctx));
 
     // make sure the program loaded correctly
     // riscv32-unknown-linux-gnu/bin/objdump -d -j .text elf/wallet-template | grep athexp
@@ -890,14 +922,23 @@ pub mod tests {
     );
 
     // now attempt to execute each function in turn
+    // first, the spawn
     runtime
-      .execute_function("athexp_spawn", Some([0u8; PUBKEY_LENGTH].to_vec()))
+      .execute_function("athexp_spawn", Some(principal.to_vec()))
       .unwrap();
 
-    // read wallet state
+    // get newly-created wallet address
+    let spawned_program_address = spawned_program_address.expect("spawned program address not set");
+    let spawned_blob = spawned_blob.expect("spawned program blob not set");
+    assert_eq!(
+      host.borrow().get_program(&spawned_program_address).unwrap(),
+      &spawned_blob
+    );
 
-
-    runtime.execute_function("athexp_send").unwrap();
+    // now the send
+    runtime
+      .execute_function("athexp_send", Some(spawned_blob))
+      .unwrap();
   }
 
   #[test]
