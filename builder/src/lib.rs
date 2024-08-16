@@ -208,7 +208,7 @@ fn copy_elf_to_output_dir(
   // For simplicity, we only consider the first target, and expect either bin or staticlib.
   // Our target does not support dylib.
   // TODO: make this Mac and Windows-compatible.
-  let target = root_package.unwrap().targets.iter().next().unwrap();
+  let target = root_package.unwrap().targets.first().unwrap();
   let artifact_name = if target.is_bin() {
     root_package_name.unwrap()
   } else if target.kind.iter().any(|k| k == "staticlib") {

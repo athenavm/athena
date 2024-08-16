@@ -318,7 +318,7 @@ pub trait HostInterface {
 // spawning principal and nonce.
 pub fn calculate_address(
   template: &Address,
-  blob: &Vec<u8>,
+  blob: &[u8],
   principal: &Address,
   nonce: u64,
 ) -> Address {
