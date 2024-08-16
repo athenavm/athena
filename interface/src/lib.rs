@@ -346,7 +346,7 @@ pub struct HostStaticContext {
   // program that was initiated, it likely made additional calls.
   // this is generally the caller's wallet, and is generally the same
   // as the principal.
-  destination: Address,
+  _destination: Address,
   // in the future we'll probably need things here like block height,
   // block hash, etc.
 }
@@ -356,7 +356,7 @@ impl HostStaticContext {
     HostStaticContext {
       principal,
       nonce,
-      destination,
+      _destination: destination,
     }
   }
 }
@@ -365,12 +365,15 @@ impl HostStaticContext {
 pub struct HostDynamicContext {
   // the initiator and recipient programs of the current message/call frame
   template: Address,
-  callee: Address,
+  _callee: Address,
 }
 
 impl HostDynamicContext {
   pub fn new(template: Address, callee: Address) -> HostDynamicContext {
-    HostDynamicContext { template, callee }
+    HostDynamicContext {
+      template,
+      _callee: callee,
+    }
   }
 }
 
@@ -579,7 +582,7 @@ impl<'a> HostInterface for MockHost<'a> {
     let old_dynamic_context = self.dynamic_context.take();
     self.dynamic_context = Some(HostDynamicContext {
       template: msg.sender,
-      callee: msg.recipient,
+      _callee: msg.recipient,
     });
 
     // check programs list first
