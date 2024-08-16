@@ -535,8 +535,8 @@ pub unsafe fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert_eq!(
       vm.set_option.unwrap()(
         vm_ptr,
-        "foo\0".as_ptr() as *const i8,
-        "bar\0".as_ptr() as *const i8
+        "foo\0".as_ptr() as *const std::os::raw::c_char,
+        "bar\0".as_ptr() as *const std::os::raw::c_char
       ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
@@ -654,8 +654,8 @@ pub unsafe fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert_eq!(
       wrapper.base.set_option.unwrap()(
         vm_ptr,
-        "foo\0".as_ptr() as *const i8,
-        "bar\0".as_ptr() as *const i8
+        "foo\0".as_ptr() as *const std::os::raw::c_char,
+        "bar\0".as_ptr() as *const std::os::raw::c_char
       ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
