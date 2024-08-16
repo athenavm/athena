@@ -97,7 +97,7 @@ where
       .context
       .as_ref()
       .expect("Missing Athena runtime context");
-    let mut host = ctx.rt.host.as_ref().expect("Missing host interface");
+    let host = ctx.rt.host.as_ref().expect("Missing host interface");
 
     // get remaining gas
     // note: this does not factor in the cost of the current instruction

@@ -805,7 +805,8 @@ pub mod tests {
   };
   use athena_interface::{
     calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
-    HostStaticContext, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE, SOME_COINS,
+    HostStaticContext, MockHost, StatusCode, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+    ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
   use athena_vm_sdk::{Pubkey, PUBKEY_LENGTH};
@@ -866,14 +867,14 @@ pub mod tests {
   #[test]
   fn test_wallet() {
     let program = wallet_program();
-    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
-    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
 
     // set up host context
     let owner_pubkey = [1u8; PUBKEY_LENGTH];
     let principal = ADDRESS_ALICE;
     let template = ADDRESS_BOB;
     let callee = ADDRESS_CHARLIE;
+    // arbitrary template address
+    let wallet_template = [9u8; ADDRESS_LENGTH];
     let nonce = 0;
     let static_context = HostStaticContext::new(principal, nonce, Address::default());
     let dynamic_context = HostDynamicContext::new(template, callee);
@@ -882,12 +883,20 @@ pub mod tests {
       dynamic_context,
     )));
 
+    // check balances: only alice has coins
+    let amount_to_send = 1000;
+    assert_eq!(host.borrow().get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.borrow().get_balance(&ADDRESS_CHARLIE), 0);
+
     // set up send arguments
     let send_args = SendArguments {
-      amount: SOME_COINS,
+      amount: amount_to_send,
       recipient: ADDRESS_CHARLIE,
     };
 
+    // alice initiates the call. initially she calls the wallet template directly.
+    let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::new(program, Some(host.clone()), opts, Some(ctx));
     let mut stdin = AthenaStdin::new();
@@ -903,7 +912,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &0x00201d54
+      &0x002016bc
     );
     assert_eq!(
       runtime
@@ -912,7 +921,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &0x00201d70
+      &0x002016d8
     );
 
     // now attempt to execute each function in turn
@@ -936,15 +945,67 @@ pub mod tests {
         &spawn_result.blob
       );
 
+      // check balances again
+      // note: Alice hasn't paid for gas since we're not charging for gas yet
+      assert_eq!(borrowed_host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+      assert_eq!(borrowed_host.get_balance(&ADDRESS_CHARLIE), 0);
+      assert_eq!(borrowed_host.get_balance(&spawn_result.address), 0);
+
       // write the input: serialized state blob, then serialized send args
       let mut stdin = AthenaStdin::new();
       stdin.write_vec(spawn_result.blob.clone());
       stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
       runtime.write_vecs(&stdin.buffer);
+
+      // update the runtime ctx to reflect the new call
+      // now, Alice calls her newly-spawned wallet
+      let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
+      runtime.context = Some(ctx);
     }
 
-    // now the send
+    // now attempt the send
+    let res = runtime.execute_function("athexp_send");
+    match res {
+      Ok(_) => panic!("expected execution error"),
+      Err(e) => match e {
+        ExecutionError::HostCallFailed(status) => {
+          assert_eq!(status, StatusCode::InsufficientBalance);
+        }
+        _ => panic!("expected HostCallFailed error"),
+      },
+    }
+
+    // transfer some coins to the new wallet
+    let address = host.borrow().get_spawn_result().unwrap().address;
+    host
+      .borrow_mut()
+      .transfer_balance(&ADDRESS_ALICE, &address, amount_to_send);
+    assert_eq!(
+      host.borrow().get_balance(&ADDRESS_ALICE),
+      SOME_COINS - amount_to_send
+    );
+    assert_eq!(host.borrow().get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.borrow().get_balance(&address), amount_to_send);
+
+    // runtime gas is now zero due to execution failure, gas up
+    runtime.state.clk = 0;
+
+    // set up the stdin again
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(host.borrow().get_spawn_result().unwrap().blob.clone());
+    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    runtime.write_vecs(&stdin.buffer);
+
+    // do the send again
     runtime.execute_function("athexp_send").unwrap();
+
+    // final balance check: some of alice's coins were sent to Charlie
+    assert_eq!(
+      host.borrow().get_balance(&ADDRESS_ALICE),
+      SOME_COINS - amount_to_send
+    );
+    assert_eq!(host.borrow().get_balance(&ADDRESS_CHARLIE), amount_to_send);
+    assert_eq!(host.borrow().get_balance(&address), 0);
   }
 
   #[test]

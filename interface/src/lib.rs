@@ -463,7 +463,7 @@ impl<'a> MockHost<'a> {
     self.templates.insert(address, code);
   }
 
-  fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
+  pub fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
     let balance_from = self.get_balance(from);
     let balance_to = self.get_balance(to);
     if value > balance_from {

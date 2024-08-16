@@ -1,9 +1,10 @@
 use athena_interface::{Address, Balance, Bytes32, BYTES32_LENGTH};
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
+use borsh_derive::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 // This type needs to be serializable
-#[derive(Serialize, Deserialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct Pubkey(pub Bytes32);
 pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
