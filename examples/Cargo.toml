@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "fibonacci/script",
+  "hello_world/script",
+  "io/script",
+  "wallet/script",
+]
+resolver = "2"
