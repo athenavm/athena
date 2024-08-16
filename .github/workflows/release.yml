@@ -95,21 +95,21 @@ jobs:
             svm_target_platform: linux-amd64
             platform: linux
             arch: amd64
-          - runner: self-hosted
+          - runner: [runs-on, runner=8cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+            target: aarch64-unknown-linux-gnu
+            svm_target_platform: linux-aarch64
+            platform: linux
+            arch: arm64
+          - runner: macos-latest
             target: aarch64-apple-darwin
             svm_target_platform: macosx-aarch64
             platform: darwin
             arch: arm64
-          # - runner: warp-ubuntu-latest-arm64-4x
-          #   target: aarch64-unknown-linux-gnu
-          #   svm_target_platform: linux-aarch64
-          #   platform: linux
-          #   arch: arm64
-          # - runner: macos-latest-large
-          #   target: x86_64-apple-darwin
-          #   svm_target_platform: macosx-amd64
-          #   platform: darwin
-          #   arch: amd64
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            svm_target_platform: macosx-amd64
+            platform: darwin
+            arch: amd64
           # - runner: windows-latest
           #   target: x86_64-pc-windows-msvc
           #   svm_target_platform: windows-amd64

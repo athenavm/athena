@@ -29,8 +29,9 @@ jobs:
       matrix:
         runner:
           - ubuntu-latest
+          - [runs-on, runner=8cpu-linux-arm64, "run-id=${{ github.run_id }}"]
           - macos-latest
-          - self-hosted
+          - macos-13
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     env:
