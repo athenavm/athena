@@ -720,11 +720,7 @@ where
   }
 
   /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function(
-    &mut self,
-    symbol_name: &str,
-    input: Option<Vec<u8>>,
-  ) -> Result<Option<u32>, ExecutionError> {
+  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
       Some(offset) => *offset,
@@ -798,9 +794,11 @@ where
 
 #[cfg(test)]
 pub mod tests {
+  use borsh::to_vec;
   use std::{cell::RefCell, sync::Arc};
 
   use crate::{
+    io::AthenaStdin,
     runtime::ExecutionError,
     runtime::MemoryAccessPosition,
     utils::{self, with_max_gas},
@@ -809,7 +807,9 @@ pub mod tests {
     calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
     HostStaticContext, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE, SOME_COINS,
   };
-  use athena_vm::{helpers::address_to_32bit_words, host::spawn};
+  use athena_vm::helpers::address_to_32bit_words;
+  use athena_vm_sdk::{Pubkey, PUBKEY_LENGTH};
+  use wallet_common::SendArguments;
 
   use crate::{
     runtime::Register,
@@ -870,6 +870,7 @@ pub mod tests {
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
 
     // set up host context
+    let owner_pubkey = [1u8; PUBKEY_LENGTH];
     let principal = ADDRESS_ALICE;
     let template = ADDRESS_BOB;
     let callee = ADDRESS_CHARLIE;
@@ -881,11 +882,20 @@ pub mod tests {
       dynamic_context,
     )));
 
+    // set up send arguments
+    let send_args = SendArguments {
+      amount: SOME_COINS,
+      recipient: ADDRESS_CHARLIE,
+    };
+
     #[allow(clippy::arc_with_non_send_sync)]
     let mut runtime = Runtime::new(program, Some(host.clone()), opts, Some(ctx));
+    let mut stdin = AthenaStdin::new();
+    stdin.write(&Pubkey(owner_pubkey));
+    runtime.write_vecs(&stdin.buffer);
 
     // make sure the program loaded correctly
-    // riscv32-unknown-linux-gnu/bin/objdump -d -j .text elf/wallet-template | grep athexp
+    // riscv32-unknown-linux-gnu-objdump -d -j .text elf/wallet-template | grep athexp
     assert_eq!(
       runtime
         .program
@@ -893,7 +903,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &0x00200940
+      &0x00201d54
     );
     assert_eq!(
       runtime
@@ -902,34 +912,39 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &0x0020094c
+      &0x00201d70
     );
 
     // now attempt to execute each function in turn
     // first, the spawn
-    runtime
-      .execute_function("athexp_spawn", Some(principal.to_vec()))
-      .unwrap();
+    runtime.execute_function("athexp_spawn").unwrap();
 
     // get newly-created wallet address
-    let borrowed_host = host.borrow();
-    let spawn_result = borrowed_host.get_spawn_result().unwrap();
-    assert_eq!(principal, spawn_result.principal);
-    assert_eq!(template, spawn_result.template);
-    assert_eq!(nonce, spawn_result.nonce);
-    assert_eq!(
-      calculate_address(&template, &spawn_result.blob, &principal, nonce),
-      spawn_result.address
-    );
-    assert_eq!(
-      host.borrow().get_program(&spawn_result.address).unwrap(),
-      &spawn_result.blob
-    );
+    // do this in a separate block so the borrow of host doesn't last too long
+    {
+      let borrowed_host = host.borrow();
+      let spawn_result = borrowed_host.get_spawn_result().unwrap();
+      assert_eq!(principal, spawn_result.principal);
+      assert_eq!(template, spawn_result.template);
+      assert_eq!(nonce, spawn_result.nonce);
+      assert_eq!(
+        calculate_address(&template, &spawn_result.blob, &principal, nonce),
+        spawn_result.address
+      );
+      assert_eq!(
+        host.borrow().get_program(&spawn_result.address).unwrap(),
+        &spawn_result.blob
+      );
+
+      // write the input: serialized state blob, then serialized send args
+      let mut stdin = AthenaStdin::new();
+      stdin.write_vec(spawn_result.blob.clone());
+      stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+      runtime.write_vecs(&stdin.buffer);
+    }
 
     // now the send
-    runtime
-      .execute_function("athexp_send", Some(spawn_result.blob.clone()))
-      .unwrap();
+    runtime.execute_function("athexp_send").unwrap();
   }
 
   #[test]

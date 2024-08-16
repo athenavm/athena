@@ -34,19 +34,21 @@ impl Wallet {
 #[template]
 impl WalletProgram for Wallet {
   #[callable]
-  // For now, callable methods must receive a blob.
-  fn spawn(owner_blob: *const u8) {
-    let obj = unsafe { core::slice::from_raw_parts(owner_blob, PUBKEY_LENGTH) };
-    let owner = from_slice::<Pubkey>(&obj).expect("failed to deserialize owner pubkey");
+  fn spawn() {
+    let owner = athena_vm::io::read::<Pubkey>();
     spawn(to_vec(&Wallet::new(owner)).expect("failed to serialize wallet"));
   }
 
   #[callable]
-  // For now, callable methods must receive a blob.
-  fn send(&self, send_arguments_blob: *const u8, send_arguments_blob_len: usize) {
-    let obj = unsafe { core::slice::from_raw_parts(send_arguments_blob, send_arguments_blob_len) };
+  fn send(&self) {
+    // let args_len = athena_vm::io::read::<u32>() as usize;
+    // let mut buffer = [0u8; 1024];
+    // if args_len > buffer.len() {
+    //   panic!("send arguments exceed buffer size");
+    // }
+    let buffer = athena_vm::io::read_vec();
     let send_arguments =
-      from_slice::<SendArguments>(&obj).expect("failed to deserialize send arguments");
+      from_slice::<SendArguments>(&buffer).expect("failed to deserialize send arguments");
     // Send coins
     // Note: error checking happens inside the host
     call(send_arguments.recipient, None, send_arguments.amount);

@@ -11,3 +11,4 @@ edition.workspace = true
 athena-vm = { path = "../entrypoint" }
 athena-hostfunctions = { path = "../hostfunctions" }
 athena-interface = { path = "../../interface" }
+serde = { version = "1.0", features = ["derive"] }

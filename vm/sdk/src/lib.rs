@@ -1,7 +1,10 @@
 use athena_interface::{Address, Balance, Bytes32, BYTES32_LENGTH};
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
+use serde::{Deserialize, Serialize};
 
-pub type Pubkey = Bytes32;
+// This type needs to be serializable
+#[derive(Serialize, Deserialize)]
+pub struct Pubkey(pub Bytes32);
 pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
 pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
@@ -54,8 +57,8 @@ pub trait VerifiableTemplate {
 }
 
 pub trait WalletProgram {
-  fn spawn(owner_blob: *const u8);
-  fn send(&self, send_arguments_blob: *const u8, send_arguments_blob_len: usize);
+  fn spawn();
+  fn send(&self);
   fn proxy(&self, destination: Address, args: &[u8]);
   fn deploy(&self, code: &[u8]);
 }

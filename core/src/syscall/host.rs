@@ -97,12 +97,7 @@ where
       .context
       .as_ref()
       .expect("Missing Athena runtime context");
-    let mut host = ctx
-      .rt
-      .host
-      .as_ref()
-      .expect("Missing host interface")
-      .borrow_mut();
+    let mut host = ctx.rt.host.as_ref().expect("Missing host interface");
 
     // get remaining gas
     // note: this does not factor in the cost of the current instruction
@@ -160,7 +155,7 @@ where
       amount,
       Vec::new(),
     );
-    let res = host.call(msg);
+    let res = host.borrow_mut().call(msg);
 
     // calculate gas spent
     // TODO: should this be a panic or should it just return an out of gas error?

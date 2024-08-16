@@ -39,14 +39,16 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           })
           .unzip();
 
+        // TODO: do we want to allow any args here at all?
+        // or do we strictly want to allow input using io syscalls?
         let (self_param, call) = if is_static_method(&method.sig) {
           (None, quote! { #struct_name::#method_name(#(#args),*) })
         } else {
           (
-            Some(quote!(vm_state: *const u8, vm_state_len: usize)),
+            None,
             quote! {
-              let obj = core::slice::from_raw_parts(vm_state, vm_state_len);
-              let mut program = from_slice::<#struct_name>(&obj).expect("failed to deserialize program");
+              let obj = athena_vm::io::read_vec();
+              let mut program = from_slice::<#struct_name>(&obj.as_slice()).expect("failed to deserialize program");
               program.#method_name(#(#args),*)
             },
           )
