@@ -912,10 +912,8 @@ pub mod tests {
       .unwrap();
 
     // get newly-created wallet address
-    // let cloned_host = host.clone();
     let borrowed_host = host.borrow();
     let spawn_result = borrowed_host.get_spawn_result().unwrap();
-    // let spawn_result = host.borrow().get_spawn_result().unwrap();
     assert_eq!(principal, spawn_result.principal);
     assert_eq!(template, spawn_result.template);
     assert_eq!(nonce, spawn_result.nonce);
