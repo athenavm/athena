@@ -878,6 +878,7 @@ pub mod tests {
     let nonce = 0;
     let static_context = HostStaticContext::new(principal, nonce, Address::default());
     let dynamic_context = HostDynamicContext::new(template, callee);
+    #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(MockHost::new_with_context(
       static_context,
       dynamic_context,
