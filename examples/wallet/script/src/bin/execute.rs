@@ -17,30 +17,30 @@ pub const ELF: &[u8] = include_bytes!("../../../program/elf/wallet-template");
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct RunArgs {
-    #[clap(long, default_value = "20")]
-    owner: String,
+  #[clap(long, default_value = "20")]
+  owner: String,
 }
 
 fn main() {
-    // Setup the logger.
-    athena_sdk::utils::setup_logger();
+  // Setup the logger.
+  athena_sdk::utils::setup_logger();
 
-    // Parse the command line arguments.
-    let args = RunArgs::parse();
+  // Parse the command line arguments.
+  let args = RunArgs::parse();
 
-    // Setup the execution client.
-    let client = ExecutionClient::new();
+  // Setup the execution client.
+  let client = ExecutionClient::new();
 
-    // Setup the inputs.
-    let mut stdin = AthenaStdin::new();
+  // Setup the inputs.
+  let mut stdin = AthenaStdin::new();
 
-    // Convert the owner to a public key.
-    let owner = args.owner.as_bytes().to_vec();
-    stdin.write(&owner);
+  // Convert the owner to a public key.
+  let owner = args.owner.as_bytes().to_vec();
+  stdin.write(&owner);
 
-    // Run the program.
-    client
-        .execute::<MockHost>(ELF, stdin, None, None, None)
-        .expect("failed to run program");
-    println!("Successfully executed program!");
+  // Run the program.
+  client
+    .execute::<MockHost>(ELF, stdin, None, None, None)
+    .expect("failed to run program");
+  println!("Successfully executed program!");
 }
