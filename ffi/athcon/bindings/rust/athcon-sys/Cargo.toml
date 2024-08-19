@@ -10,4 +10,4 @@ edition.workspace = true
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.69.4"
+bindgen = "0.70.0"
