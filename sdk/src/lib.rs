@@ -12,7 +12,7 @@ use std::sync::Arc;
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{ExecutionError, Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
-use athena_interface::{AthenaContext, HostInterface, HostProvider};
+use athena_interface::{AthenaContext, HostInterface};
 
 /// A client for interacting with Athena.
 pub struct ExecutionClient;
@@ -58,7 +58,7 @@ impl ExecutionClient {
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<Arc<RefCell<HostProvider<T>>>>,
+    host: Option<Arc<RefCell<T>>>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
@@ -91,7 +91,7 @@ mod tests {
   use std::{cell::RefCell, sync::Arc};
 
   use crate::{utils, AthenaStdin, ExecutionClient};
-  use athena_interface::{AthenaContext, HostProvider, MockHost, ADDRESS_ALICE};
+  use athena_interface::{AthenaContext, MockHost, ADDRESS_ALICE};
 
   #[test]
   fn test_execute() {
@@ -112,7 +112,7 @@ mod tests {
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
     #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(HostProvider::new(MockHost::new())));
+    let host = Arc::new(RefCell::new(MockHost::new()));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     client
       .execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx))
