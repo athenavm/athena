@@ -29,13 +29,10 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
               if let Pat::Ident(pat_ident) = &*pat_type.pat {
                 let ident = &pat_ident.ident;
                 let ty = &pat_type.ty;
-                Some((quote!(#ident: #ty), quote!(#ident)))
-              } else {
-                None
+                return Some((quote!(#ident: #ty), quote!(#ident)));
               }
-            } else {
-              None
             }
+            None
           })
           .unzip();
 
