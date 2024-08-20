@@ -579,8 +579,7 @@ impl<'a> HostInterface for MockHost<'a> {
     }
 
     // save message for context
-    let old_dynamic_context = self.dynamic_context.take();
-    self.dynamic_context = Some(HostDynamicContext {
+    let old_dynamic_context = self.dynamic_context.replace(HostDynamicContext {
       template: msg.sender,
       _callee: msg.recipient,
     });
