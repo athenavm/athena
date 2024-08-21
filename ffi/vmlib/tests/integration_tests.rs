@@ -14,10 +14,6 @@ const CONTRACT_CODE: &[u8] =
   include_bytes!("../../../tests/recursive_call/elf/recursive-call-test");
 const EMPTY_ADDRESS: Address = [0u8; ADDRESS_LENGTH];
 
-struct AthenaVmWrapper {
-  base: ffi::athcon_vm,
-}
-
 unsafe extern "C" fn get_dummy_tx_context(
   _context: *mut ffi::athcon_host_context,
 ) -> ffi::athcon_tx_context {
@@ -49,13 +45,13 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
 /// is set to null. No host calls are performed by these tests.
 #[test]
 fn test_athcon_create() {
+  let vm_ptr = athena_vmlib::athcon_create_athenavmwrapper();
+  // Ensure the returned pointer is not null
+  assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
   unsafe {
-    let vm_ptr = athena_vmlib::athcon_create_athenavmwrapper();
-    // Ensure the returned pointer is not null
-    assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
-
     // Perform additional checks on the returned VM instance
     let vm = &*vm_ptr;
+
     assert_eq!(vm.abi_version, 0, "ABI version mismatch");
     assert_eq!(
       std::ffi::CStr::from_ptr(vm.name).to_str().unwrap(),
@@ -67,8 +63,6 @@ fn test_athcon_create() {
       "0.1.0",
       "Version mismatch"
     );
-
-    let wrapper = &mut *(vm_ptr as *mut AthenaVmWrapper);
 
     // Test the FFI functions
     assert_eq!(
@@ -187,36 +181,6 @@ fn test_athcon_create() {
       .status_code,
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_SUCCESS
-    );
-
-    // Call them a second way
-    assert_eq!(
-      wrapper.base.set_option.unwrap()(
-        vm_ptr,
-        "foo\0".as_ptr() as *const std::os::raw::c_char,
-        "bar\0".as_ptr() as *const std::os::raw::c_char
-      ),
-      ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
-    );
-    assert_eq!(
-      wrapper.base.get_capabilities.unwrap()(vm_ptr),
-      ffi::athcon_capabilities::ATHCON_CAPABILITY_Athena1 as u32
-    );
-    assert_eq!(
-      wrapper.base.execute.unwrap()(
-        vm_ptr,
-        // host can be null
-        std::ptr::null(),
-        // host_context is an opaque pointer
-        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
-        ffi::athcon_revision::ATHCON_FRONTIER,
-        &message,
-        code.as_ptr(),
-        code.len(),
-      )
-      .status_code,
-      // failure expected due to input null pointers
-      ffi::athcon_status_code::ATHCON_FAILURE
     );
 
     // Cleanup: Destroy the VM instance to prevent memory leaks
