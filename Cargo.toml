@@ -7,7 +7,6 @@ members = [
   "ffi/athcon/bindings/rust/athcon-declare",
   "ffi/athcon/bindings/rust/athcon-sys",
   "ffi/athcon/bindings/rust/athcon-vm",
-  "ffi/ffitest",
   "ffi/vmlib",
   "helper",
   "interface",

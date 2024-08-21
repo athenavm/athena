@@ -16,3 +16,7 @@ athena-interface = { path = "../../interface" }
 athena-runner = { path = "../../runner" }
 athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
 athcon-vm = { path = "../athcon/bindings/rust/athcon-vm" }
+
+[dev-dependencies]
+hex = "0.4.3"
+athcon-client = { path = "../athcon/bindings/rust/athcon-client" }
