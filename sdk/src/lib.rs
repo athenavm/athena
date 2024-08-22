@@ -35,7 +35,6 @@ impl ExecutionClient {
   ///
   /// ### Examples
   /// ```no_run
-  /// use athena_interface::MockHost;
   /// use athena_sdk::{ExecutionClient, AthenaStdin};
   ///
   /// // Load the program.
@@ -49,13 +48,13 @@ impl ExecutionClient {
   /// stdin.write(&10usize);
   ///
   /// // Execute the program on the inputs.
-  /// let (public_values, gas_left) = client.execute::<MockHost>(elf, stdin, None, None, None).unwrap();
+  /// let (public_values, gas_left) = client.execute(elf, stdin, None, None, None).unwrap();
   /// ```
-  pub fn execute<T: HostInterface>(
+  pub fn execute(
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<&mut T>,
+    host: Option<&mut dyn HostInterface>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
@@ -96,9 +95,7 @@ mod tests {
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client
-      .execute::<MockHost>(elf, stdin, None, None, None)
-      .unwrap();
+    client.execute(elf, stdin, None, None, None).unwrap();
   }
 
   #[test]
@@ -121,9 +118,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
-    client
-      .execute::<MockHost>(elf, stdin, None, None, None)
-      .unwrap();
+    client.execute(elf, stdin, None, None, None).unwrap();
   }
 
   #[test]
@@ -134,8 +129,6 @@ mod tests {
     let elf = include_bytes!("../../tests/panic/elf/panic-test");
     let mut stdin = AthenaStdin::new();
     stdin.write(&10usize);
-    client
-      .execute::<MockHost>(elf, stdin, None, None, None)
-      .unwrap();
+    client.execute(elf, stdin, None, None, None).unwrap();
   }
 }

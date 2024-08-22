@@ -1,7 +1,6 @@
 use crate::runtime::{Register, Syscall, SyscallContext};
 use athena_interface::{
-  AddressWrapper, AthenaMessage, Bytes32Wrapper, HostInterface, MessageKind, ADDRESS_LENGTH,
-  BYTES32_LENGTH,
+  AddressWrapper, AthenaMessage, Bytes32Wrapper, MessageKind, ADDRESS_LENGTH, BYTES32_LENGTH,
 };
 
 pub struct SyscallHostRead;
@@ -12,11 +11,8 @@ impl SyscallHostRead {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostRead
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostRead {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
       .rt
       .context
@@ -45,11 +41,8 @@ impl SyscallHostWrite {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostWrite
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostWrite {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
       .rt
       .context
@@ -84,11 +77,8 @@ impl SyscallHostCall {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostCall
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostCall {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     // make sure we have a runtime context
     let athena_ctx = ctx
       .rt
@@ -179,11 +169,8 @@ impl SyscallHostGetBalance {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostGetBalance
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostGetBalance {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
       .rt
       .context

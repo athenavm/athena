@@ -129,7 +129,7 @@ mod tests {
       STORAGE_VALUE
     );
     let (mut output, _) = client
-      .execute::<MockHost>(
+      .execute(
         elf,
         stdin,
         Some(&mut host),
@@ -161,7 +161,7 @@ mod tests {
     host.deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
-      .execute::<MockHost>(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
+      .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
       .unwrap();
     let result = output.read::<Balance>();
     assert_eq!(result, SOME_COINS, "got wrong output value");
@@ -218,7 +218,7 @@ mod tests {
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
-    let res = client.execute::<MockHost>(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
+    let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     match res {
       Ok(_) => panic!("expected stack depth error"),
       Err(ExecutionError::HostCallFailed(StatusCode::CallDepthExceeded)) => (),

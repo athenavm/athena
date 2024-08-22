@@ -1,25 +1,18 @@
 use std::io::Read;
 
-use athena_interface::HostInterface;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use super::Runtime;
 
-impl<'host, T> Read for Runtime<'host, T>
-where
-  T: HostInterface,
-{
+impl<'host> Read for Runtime<'host> {
   fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
     self.read_public_values_slice(buf);
     Ok(buf.len())
   }
 }
 
-impl<'host, T> Runtime<'host, T>
-where
-  T: HostInterface,
-{
+impl<'host> Runtime<'host> {
   pub fn write_stdin<U: Serialize>(&mut self, input: &U) {
     let mut buf = Vec::new();
     bincode::serialize_into(&mut buf, input).expect("serialization failed");
@@ -56,7 +49,6 @@ pub mod tests {
   use super::*;
   use crate::runtime::Program;
   use crate::utils::{setup_logger, tests::IO_ELF, AthenaCoreOpts};
-  use athena_interface::MockHost;
   use serde::Deserialize;
 
   #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -85,7 +77,7 @@ pub mod tests {
   fn test_io_run() {
     setup_logger();
     let program = Program::from(IO_ELF);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     let points = points();
     runtime.write_stdin(&points.0);
     runtime.write_stdin(&points.1);
