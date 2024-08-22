@@ -16,7 +16,6 @@ pub use state::*;
 pub use syscall::*;
 pub use utils::*;
 
-use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs::File;
@@ -36,7 +35,7 @@ use athena_interface::{AthenaContext, HostInterface, StatusCode};
 ///
 /// For more information on the RV32IM instruction set, see the following:
 /// https://www.cs.sfu.ca/~ashriram/Courses/CS295/assets/notebooks/RISCV/RISCV_CARD.pdf
-pub struct Runtime<T: HostInterface> {
+pub struct Runtime<'host, T: HostInterface> {
   /// The program.
   pub program: Arc<Program>,
 
@@ -47,7 +46,7 @@ pub struct Runtime<T: HostInterface> {
   pub state: ExecutionState,
 
   /// The host interface for host calls.
-  pub host: Option<Arc<RefCell<T>>>,
+  pub host: Option<&'host mut T>,
 
   /// A counter for the number of cycles that have been executed in certain functions.
   pub cycle_tracker: HashMap<String, (u64, u32)>,
@@ -117,14 +116,14 @@ fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
   }
 }
 
-impl<T> Runtime<T>
+impl<'host, T> Runtime<'host, T>
 where
   T: HostInterface,
 {
   // Create a new runtime from a program and, optionally, a host.
   pub fn new(
     program: Program,
-    host: Option<Arc<RefCell<T>>>,
+    host: Option<&'host mut T>,
     opts: AthenaCoreOpts,
     context: Option<AthenaContext>,
   ) -> Self {
@@ -779,8 +778,6 @@ where
 #[cfg(test)]
 pub mod tests {
 
-  use std::{cell::RefCell, sync::Arc};
-
   use crate::{
     runtime::ExecutionError,
     runtime::MemoryAccessPosition,
@@ -845,13 +842,8 @@ pub mod tests {
     let program = host_program();
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(
-      program,
-      Some(Arc::new(RefCell::new(MockHost::new()))),
-      opts,
-      Some(ctx),
-    );
+    let mut host = MockHost::new();
+    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     let gas_left = runtime.execute().unwrap();
 
     // don't bother checking exact gas value, that's checked in the following test
@@ -863,25 +855,21 @@ pub mod tests {
     let program = fibonacci_program();
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
-    // we need a new host provider for each test to reset state
-    fn get_provider<'a>() -> Arc<RefCell<MockHost<'a>>> {
-      #[allow(clippy::arc_with_non_send_sync)]
-      Arc::new(RefCell::new(MockHost::new()))
-    }
-
     // failure
-    let mut runtime = Runtime::<MockHost>::new(
+    let mut host = Some(MockHost::new());
+    let mut runtime = Runtime::new(
       program.clone(),
-      Some(get_provider()),
+      host.as_mut(),
       AthenaCoreOpts::default().with_options(vec![with_max_gas(543)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
 
     // success
-    runtime = Runtime::<MockHost>::new(
+    let mut host = Some(MockHost::new());
+    let mut runtime = Runtime::new(
       program.clone(),
-      Some(get_provider()),
+      host.as_mut(),
       AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
       Some(ctx.clone()),
     );
@@ -889,9 +877,10 @@ pub mod tests {
     assert_eq!(gas_left, Some(0));
 
     // success
-    runtime = Runtime::<MockHost>::new(
+    let mut host = Some(MockHost::new());
+    let mut runtime = Runtime::new(
       program.clone(),
-      Some(get_provider()),
+      host.as_mut(),
       AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
       Some(ctx.clone()),
     );
@@ -1005,28 +994,22 @@ pub mod tests {
     instructions.push(Instruction::new(Opcode::ECALL, 0, 0, 0, false, false));
     let program = Program::new(instructions, 0, 0);
 
-    let host = MockHost::new();
-    #[allow(clippy::arc_with_non_send_sync)]
-    let provider = Arc::new(RefCell::new(host));
+    let mut host = MockHost::new();
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    let mut runtime = Runtime::<MockHost>::new(program, Some(provider.clone()), opts, Some(ctx));
-
     // balances before execution
-    assert_eq!(provider.borrow().get_balance(&ADDRESS_ALICE), SOME_COINS);
-    assert_eq!(provider.borrow().get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
+    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     assert!(runtime.execute().unwrap().is_some());
 
     // balances after execution
     assert_eq!(
-      provider.borrow().get_balance(&ADDRESS_ALICE),
+      host.get_balance(&ADDRESS_ALICE),
       SOME_COINS - amount_to_send as u64
     );
-    assert_eq!(
-      provider.borrow().get_balance(&ADDRESS_CHARLIE),
-      amount_to_send as u64
-    );
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), amount_to_send as u64);
   }
 
   #[test]
@@ -1067,13 +1050,8 @@ pub mod tests {
 
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(
-      program,
-      Some(Arc::new(RefCell::new(MockHost::new()))),
-      opts,
-      Some(ctx),
-    );
+    let mut host = Some(MockHost::new());
+    let mut runtime = Runtime::new(program, host.as_mut(), opts, Some(ctx));
     match runtime.execute() {
       Err(e) => match e {
         ExecutionError::HostCallFailed(code) => {
@@ -1111,13 +1089,8 @@ pub mod tests {
 
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(
-      program,
-      Some(Arc::new(RefCell::new(MockHost::new()))),
-      opts,
-      Some(ctx),
-    );
+    let mut host = Some(MockHost::new());
+    let mut runtime = Runtime::new(program, host.as_mut(), opts, Some(ctx));
     let gas_left = runtime.execute().expect("execution failed");
     assert!(gas_left.is_some());
 

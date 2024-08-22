@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use super::Runtime;
 
-impl<T> Read for Runtime<T>
+impl<'host, T> Read for Runtime<'host, T>
 where
   T: HostInterface,
 {
@@ -16,7 +16,7 @@ where
   }
 }
 
-impl<T> Runtime<T>
+impl<'host, T> Runtime<'host, T>
 where
   T: HostInterface,
 {

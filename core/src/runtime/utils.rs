@@ -9,7 +9,7 @@ pub const fn align(addr: u32) -> u32 {
   addr - addr % 4
 }
 
-impl<T> Runtime<T>
+impl<'h, T> Runtime<'h, T>
 where
   T: HostInterface,
 {

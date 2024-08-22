@@ -85,20 +85,20 @@ pub trait Syscall<T: HostInterface>: Send + Sync {
 }
 
 /// A runtime for syscalls that is protected so that developers cannot arbitrarily modify the runtime.
-pub struct SyscallContext<'a, T: HostInterface> {
+pub struct SyscallContext<'a, 'h, T: HostInterface> {
   pub clk: u32,
 
   pub(crate) next_pc: u32,
   /// This is the exit_code used for the HALT syscall
   pub(crate) exit_code: u32,
-  pub(crate) rt: &'a mut Runtime<T>,
+  pub(crate) rt: &'a mut Runtime<'h, T>,
 }
 
-impl<'a, T> SyscallContext<'a, T>
+impl<'a, 'h, T> SyscallContext<'a, 'h, T>
 where
   T: HostInterface,
 {
-  pub fn new(runtime: &'a mut Runtime<T>) -> Self {
+  pub fn new(runtime: &'a mut Runtime<'h, T>) -> Self {
     let clk = runtime.state.clk;
     Self {
       clk,
