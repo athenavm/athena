@@ -1,4 +1,3 @@
-extern crate enum_primitive;
 pub mod host;
 pub mod types;
 use crate::types::*;

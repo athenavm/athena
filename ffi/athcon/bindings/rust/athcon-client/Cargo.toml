@@ -11,8 +11,6 @@ edition.workspace = true
 athena-vmlib = { path = "../../../../vmlib" }
 athcon-sys = { path = "../athcon-sys" }
 athcon-vm = { path = "../athcon-vm" }
-enum_primitive = "0.1.1"
-num = "0.4"
 
 [dev-dependencies]
 hex = "0.4.3"
