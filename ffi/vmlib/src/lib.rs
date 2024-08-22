@@ -3,7 +3,7 @@ use std::{cell::RefCell, panic, sync::Arc};
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
 use athcon_vm::{
-  AthconVm, ExecutionContext as AthconExecutionContext, ExecutionMessage as AthconExecutionMessage,
+  AthconVm, ExecutionContext, ExecutionMessage as AthconExecutionMessage,
   ExecutionResult as AthconExecutionResult, MessageKind as AthconMessageKind, Revision,
   SetOptionError,
 };
@@ -32,20 +32,20 @@ impl AthconVm for AthenaVMWrapper {
   }
 
   /// `execute` is the main entrypoint from FFI. It's called from the macro-generated `__athcon_execute` fn.
-  /// Note that we have to pass in raw `host` and `context` pointers here. If we wrap them into the
+  /// Note that we have to pass in raw `context` pointer here. If we wrap it into the
   /// `AthenaExecutionContext` object inside the top-level FFI function and pass it in here, it causes
   /// lifetime issues.
-  unsafe fn execute<'a>(
+  fn execute(
     &self,
     rev: Revision,
     code: &[u8],
     message: &AthconExecutionMessage,
-    host: *const ffi::athcon_host_interface,
+    host: &ffi::athcon_host_interface,
     context: *mut ffi::athcon_host_context,
   ) -> AthconExecutionResult {
     // note that host context is allowed to be null. it's opaque and totally up to the host
-    // whether and how to use it. but we require the host interface to be non-null.
-    if host.is_null() || message.kind() != AthconMessageKind::ATHCON_CALL || code.is_empty() {
+    // whether and how to use it.
+    if message.kind() != AthconMessageKind::ATHCON_CALL || code.is_empty() {
       return AthconExecutionResult::failure();
     }
 
@@ -53,8 +53,7 @@ impl AthconVm for AthenaVMWrapper {
     let athena_msg = AthenaMessageWrapper::from(message);
 
     // Unpack the context
-    let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
-    let execution_context = AthconExecutionContext::new(host_interface, context);
+    let execution_context = ExecutionContext::new(host, context);
     let host = WrappedHostInterface::new(execution_context);
     #[allow(clippy::arc_with_non_send_sync)]
     let host = Arc::new(RefCell::new(host));
@@ -442,11 +441,11 @@ impl From<TransactionContextWrapper> for TransactionContext {
 }
 
 struct WrappedHostInterface<'a> {
-  context: AthconExecutionContext<'a>,
+  context: ExecutionContext<'a>,
 }
 
 impl<'a> WrappedHostInterface<'a> {
-  fn new(context: AthconExecutionContext<'a>) -> Self {
+  fn new(context: ExecutionContext<'a>) -> Self {
     WrappedHostInterface { context }
   }
 }

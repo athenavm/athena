@@ -22,7 +22,7 @@
 //!       revision: athcon_vm::ffi::athcon_revision,
 //!       code: &[u8],
 //!       message: &athcon_vm::ExecutionMessage,
-//!       host: *const athcon_vm::ffi::athcon_host_interface,
+//!       host: &athcon_vm::ffi::athcon_host_interface,
 //!       context: *mut athcon_vm::ffi::athcon_host_context,
 //!     ) -> athcon_vm::ExecutionResult {
 //!       athcon_vm::ExecutionResult::success(1337, None)
@@ -336,16 +336,21 @@ fn build_execute_fn(name: &VMName) -> proc_macro2::TokenStream {
           use athcon_vm::AthconVm;
 
           // TODO: context is optional in case of the "precompiles" capability
-          if instance.is_null() || msg.is_null() || (code.is_null() && code_size != 0) {
+          if instance.is_null() || (code.is_null() && code_size != 0) {
               // These are irrecoverable errors that violate the athcon spec.
               std::process::abort();
           }
 
-          assert!(!instance.is_null());
-          assert!(!msg.is_null());
+          let host = if let Some(host) = unsafe { host.as_ref() } {
+            host
+          } else {
+            std::process::abort()
+          };
 
-          let execution_message: ::athcon_vm::ExecutionMessage = unsafe {
-              msg.as_ref().expect("athcon message is null").into()
+          let execution_message: ::athcon_vm::ExecutionMessage = if let Some(msg) = unsafe { msg.as_ref() } {
+            msg.into()
+          } else {
+            std::process::abort()
           };
 
           let empty_code = [0u8;0];

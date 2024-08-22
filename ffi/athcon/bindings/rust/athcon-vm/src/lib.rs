@@ -18,16 +18,12 @@ pub trait AthconVm {
   }
 
   /// This is called for every incoming message.
-  ///
-  /// # Safety
-  ///
-  /// The caller must ensure the `host` pointer is valid.
-  unsafe fn execute<'a>(
+  fn execute(
     &self,
     revision: Revision,
-    code: &'a [u8],
-    message: &'a ExecutionMessage,
-    host: *const ffi::athcon_host_interface,
+    code: &[u8],
+    message: &ExecutionMessage,
+    host: &ffi::athcon_host_interface,
     context: *mut ffi::athcon_host_context,
   ) -> ExecutionResult;
 }
@@ -185,19 +181,13 @@ impl ExecutionMessage {
 }
 
 impl<'a> ExecutionContext<'a> {
-  pub fn new(
-    host: &'a ffi::athcon_host_interface,
-    _context: *mut ffi::athcon_host_context,
-  ) -> Self {
-    let _tx_context = unsafe {
-      assert!(host.get_tx_context.is_some());
-      host.get_tx_context.unwrap()(_context)
-    };
+  pub fn new(host: &'a ffi::athcon_host_interface, context: *mut ffi::athcon_host_context) -> Self {
+    let tx_context = unsafe { host.get_tx_context.unwrap()(context) };
 
     ExecutionContext {
       host,
-      context: _context,
-      tx_context: _tx_context,
+      context,
+      tx_context,
     }
   }
 
@@ -208,16 +198,12 @@ impl<'a> ExecutionContext<'a> {
 
   /// Check if an account exists.
   pub fn account_exists(&self, address: &Address) -> bool {
-    unsafe {
-      assert!(self.host.account_exists.is_some());
-      self.host.account_exists.unwrap()(self.context, address as *const Address)
-    }
+    unsafe { self.host.account_exists.unwrap()(self.context, address as *const Address) }
   }
 
   /// Read from a storage key.
   pub fn get_storage(&self, address: &Address, key: &Bytes32) -> Bytes32 {
     unsafe {
-      assert!(self.host.get_storage.is_some());
       self.host.get_storage.unwrap()(
         self.context,
         address as *const Address,
