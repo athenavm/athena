@@ -853,20 +853,18 @@ pub mod tests {
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
     // failure
-    let mut host = MockHost::new();
     let mut runtime = Runtime::new(
       program.clone(),
-      Some(&mut host),
+      None,
       AthenaCoreOpts::default().with_options(vec![with_max_gas(543)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
 
     // success
-    let mut host = MockHost::new();
     let mut runtime = Runtime::new(
       program.clone(),
-      Some(&mut host),
+      None,
       AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
       Some(ctx.clone()),
     );
@@ -874,10 +872,9 @@ pub mod tests {
     assert_eq!(gas_left, Some(0));
 
     // success
-    let mut host = MockHost::new();
     let mut runtime = Runtime::new(
       program.clone(),
-      Some(&mut host),
+      None,
       AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
       Some(ctx.clone()),
     );
