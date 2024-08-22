@@ -17,7 +17,7 @@
 //!       ExampleVM {}
 //!     }
 //!
-//!     unsafe fn execute(
+//!     fn execute(
 //!       &self,
 //!       revision: athcon_vm::ffi::athcon_revision,
 //!       code: &[u8],
@@ -344,10 +344,10 @@ fn build_execute_fn(name: &VMName) -> proc_macro2::TokenStream {
           let host = if let Some(host) = unsafe { host.as_ref() } {
             host
           } else {
-            std::process::abort()
+            return athcon_vm::ExecutionResult::failure().into();
           };
 
-          let execution_message: ::athcon_vm::ExecutionMessage = if let Some(msg) = unsafe { msg.as_ref() } {
+          let execution_message = if let Some(msg) = unsafe { msg.as_ref() } {
             msg.into()
           } else {
             std::process::abort()
