@@ -1,0 +1,167 @@
+use std::collections::BTreeMap;
+
+use athcon_client::host::HostContext as HostInterface;
+use athcon_client::{
+  create,
+  types::{Address, Bytes, Bytes32, ADDRESS_LENGTH, BYTES32_LENGTH},
+  AthconVm,
+};
+use athcon_vm::{MessageKind, Revision, StatusCode, StorageStatus};
+use athena_interface::ADDRESS_ALICE;
+
+const CONTRACT_CODE: &[u8] =
+  include_bytes!("../../../../../../tests/recursive_call/elf/recursive-call-test");
+
+struct HostContext {
+  storage: BTreeMap<Bytes32, Bytes32>,
+  vm: AthconVm,
+}
+
+impl HostContext {
+  fn new(vm: AthconVm) -> HostContext {
+    HostContext {
+      storage: BTreeMap::new(),
+      vm,
+    }
+  }
+}
+
+// An extremely simplistic host implementation. Note that we cannot use the MockHost
+// from athena-interface because we need to work with FFI types here.
+impl HostInterface for HostContext {
+  fn account_exists(&self, _addr: &Address) -> bool {
+    println!("Host: account_exists");
+    true
+  }
+
+  fn get_storage(&self, _addr: &Address, key: &Bytes32) -> Bytes32 {
+    println!("Host: get_storage");
+    let value = self.storage.get(key);
+    let ret: Bytes32 = match value {
+      Some(value) => value.to_owned(),
+      None => [0u8; BYTES32_LENGTH],
+    };
+    println!("{:?} -> {:?}", hex::encode(key), hex::encode(ret));
+    ret
+  }
+
+  fn set_storage(&mut self, _addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+    println!("Host: set_storage");
+    println!("{:?} -> {:?}", hex::encode(key), hex::encode(value));
+    self.storage.insert(key.to_owned(), value.to_owned());
+    StorageStatus::ATHCON_STORAGE_MODIFIED
+  }
+
+  fn get_balance(&self, _addr: &Address) -> Bytes32 {
+    println!("Host: get_balance");
+    [0u8; BYTES32_LENGTH]
+  }
+
+  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32) {
+    println!("Host: get_tx_context");
+    (
+      [0u8; BYTES32_LENGTH],
+      [0u8; ADDRESS_LENGTH],
+      0,
+      0,
+      0,
+      [0u8; BYTES32_LENGTH],
+    )
+  }
+
+  fn get_block_hash(&self, _number: i64) -> Bytes32 {
+    println!("Host: get_block_hash");
+    [0u8; BYTES32_LENGTH]
+  }
+
+  fn call(
+    &mut self,
+    kind: MessageKind,
+    destination: &Address,
+    sender: &Address,
+    value: &Bytes32,
+    input: &Bytes,
+    gas: i64,
+    depth: i32,
+  ) -> (Vec<u8>, i64, Address, StatusCode) {
+    println!("Host: call");
+    // check depth
+    if depth > 10 {
+      return (
+        vec![0u8; BYTES32_LENGTH],
+        0,
+        [0u8; ADDRESS_LENGTH],
+        StatusCode::ATHCON_CALL_DEPTH_EXCEEDED,
+      );
+    }
+
+    // we recognize one destination address
+    if destination != &ADDRESS_ALICE {
+      return (
+        vec![0u8; BYTES32_LENGTH],
+        0,
+        [0u8; ADDRESS_LENGTH],
+        StatusCode::ATHCON_CONTRACT_VALIDATION_FAILURE,
+      );
+    }
+
+    // Create an owned copy of VM here to avoid borrow issues when passing self into execute
+    // Note: this clone duplicates the FFI handles, but we don't attempt to destroy them here.
+    // That'll be done using the original handles.
+    let vm = self.vm.clone();
+    let res = vm.execute(
+      self,
+      Revision::ATHCON_FRONTIER,
+      kind,
+      depth + 1,
+      gas,
+      destination,
+      sender,
+      input,
+      value,
+      CONTRACT_CODE,
+    );
+    (res.0.to_vec(), res.1, [0u8; ADDRESS_LENGTH], res.2)
+  }
+}
+
+impl Drop for HostContext {
+  fn drop(&mut self) {
+    println!("Dump storage:");
+    for (key, value) in &self.storage {
+      println!("{:?} -> {:?}", hex::encode(key), hex::encode(value));
+    }
+  }
+}
+
+/// Test the Rust host interface to athcon
+/// We don't use this in production since Athena provides only the VM, not the Host, but
+/// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
+#[test]
+fn test_rust_host() {
+  let vm = create();
+  println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
+
+  // Same proviso as above: we're cloning the pointers here, which is fine as long as we
+  // don't attempt to destroy them twice, or use the clone after we destroy the original.
+  let mut host = HostContext::new(vm.clone());
+  let (output, gas_left, status_code) = vm.execute(
+    &mut host,
+    Revision::ATHCON_FRONTIER,
+    MessageKind::ATHCON_CALL,
+    0,
+    50000000,
+    &ADDRESS_ALICE,
+    &[128u8; ADDRESS_LENGTH],
+    // the value 3 as little-endian u32
+    3u32.to_le_bytes().as_slice(),
+    &[0u8; BYTES32_LENGTH],
+    CONTRACT_CODE,
+  );
+  println!("Output:  {:?}", hex::encode(output));
+  println!("GasLeft: {:?}", gas_left);
+  println!("Status:  {:?}", status_code);
+  assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
+  assert_eq!(output, 2u32.to_le_bytes().to_vec().as_slice());
+  vm.destroy();
+}

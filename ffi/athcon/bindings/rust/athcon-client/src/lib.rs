@@ -5,10 +5,6 @@ use crate::types::*;
 use athcon_sys as ffi;
 use std::ffi::CStr;
 
-extern "C" {
-  fn athcon_create_athenavmwrapper() -> *mut ffi::athcon_vm;
-}
-
 // In principle it's safe to clone these handles, but the caller needs to be very careful to
 // ensure the memory is freed properly, isn't double-freed, etc.
 #[derive(Clone)]
@@ -95,10 +91,8 @@ impl AthconVm {
 }
 
 pub fn create() -> AthconVm {
-  unsafe {
-    AthconVm {
-      handle: athcon_create_athenavmwrapper(),
-      host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
-    }
+  AthconVm {
+    handle: athena_vmlib::athcon_create_athenavmwrapper(),
+    host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
   }
 }
