@@ -70,11 +70,11 @@ pub struct ExecutionContext<'a> {
 
 impl ExecutionResult {
   /// Manually create a result.
-  pub fn new(_status_code: StatusCode, _gas_left: i64, _output: Option<&[u8]>) -> Self {
+  pub fn new(status_code: StatusCode, gas_left: i64, output: Option<&[u8]>) -> Self {
     ExecutionResult {
-      status_code: _status_code,
-      gas_left: _gas_left,
-      output: _output.map(|s| s.to_vec()),
+      status_code,
+      gas_left,
+      output: output.map(|s| s.to_vec()),
       create_address: None,
     }
   }
@@ -85,13 +85,13 @@ impl ExecutionResult {
   }
 
   /// Create a revert result.
-  pub fn revert(_gas_left: i64, _output: Option<&[u8]>) -> Self {
-    ExecutionResult::new(StatusCode::ATHCON_REVERT, _gas_left, _output)
+  pub fn revert(gas_left: i64, output: Option<&[u8]>) -> Self {
+    ExecutionResult::new(StatusCode::ATHCON_REVERT, gas_left, output)
   }
 
   /// Create a successful result.
-  pub fn success(_gas_left: i64, _output: Option<&[u8]>) -> Self {
-    ExecutionResult::new(StatusCode::ATHCON_SUCCESS, _gas_left, _output)
+  pub fn success(gas_left: i64, output: Option<&[u8]>) -> Self {
+    ExecutionResult::new(StatusCode::ATHCON_SUCCESS, gas_left, output)
   }
 
   /// Read the status code.
