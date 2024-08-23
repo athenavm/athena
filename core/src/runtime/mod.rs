@@ -902,7 +902,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &2102260
+      &2106584
     );
     assert_eq!(
       runtime
@@ -911,7 +911,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &2102288
+      &2106612
     );
 
     // now attempt to execute each function in turn

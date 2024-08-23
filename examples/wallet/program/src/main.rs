@@ -38,7 +38,8 @@ impl WalletProgram for Wallet {
     let owner = athena_vm::io::read::<Pubkey>();
     let wallet = Wallet::new(owner);
     let serialized = to_vec(&wallet).expect("serializing wallet");
-    spawn(serialized);
+    let address = spawn(serialized);
+    athena_vm::io::write(&address);
   }
 
   #[callable]

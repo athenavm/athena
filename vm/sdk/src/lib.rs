@@ -3,7 +3,9 @@ use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "zkvm")]
 mod spawn;
+#[cfg(target_os = "zkvm")]
 pub use spawn::spawn;
 
 // This type needs to be serializable

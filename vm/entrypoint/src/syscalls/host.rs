@@ -98,19 +98,24 @@ pub extern "C" fn get_balance(value: *mut u32) {
 ///
 /// The blob is a pointer to a serialized version of the instantiated template (struct) state.
 /// The len is the number of **bytes** to read from the blob.
-#[allow(unused_variables)]
+///
+/// The address of spawned program is obtained via sharing a
+/// variable located on the stack. The host must write the address,
+/// initializing the variable.
 #[no_mangle]
-pub extern "C" fn spawn(blob: *const u32, len: usize) {
-  #[cfg(target_os = "zkvm")]
+#[cfg(target_os = "zkvm")]
+pub fn spawn(blob: *const u32, len: usize) -> athena_interface::Address {
+  let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
+
   unsafe {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_SPAWN,
         in("a0") blob,
         in("a1") len,
+        in("a2") result.as_mut_ptr(),
     )
   }
 
-  #[cfg(not(target_os = "zkvm"))]
-  unreachable!()
+  unsafe { result.assume_init() }
 }

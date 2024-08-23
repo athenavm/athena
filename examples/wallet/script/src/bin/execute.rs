@@ -6,8 +6,8 @@
 //! ```
 
 use athena_interface::{
-  AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost, ADDRESS_ALICE,
-  ADDRESS_BOB, ADDRESS_CHARLIE,
+  Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost,
+  ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use athena_vm_sdk::Pubkey;
@@ -58,18 +58,16 @@ fn main() {
   );
 
   // spawn the wallet
-  client
+  let (mut result, _) = client
     .execute_function(ELF, "athexp_spawn", stdin, Some(&mut host), None, None)
     .expect("spawning wallet");
-  let result = host
-    .get_spawn_result()
-    .expect("getting spawn result")
-    .clone();
+
+  let address: Address = result.read();
 
   println!(
-    "spawned a wallet program {}: {:?}",
+    "spawned a wallet program at {} for {}",
+    hex::encode(address),
     hex::encode(args.owner.0),
-    result,
   );
 
   // send some coins
@@ -77,7 +75,7 @@ fn main() {
 
   let mut stdin = AthenaStdin::new();
   let wallet = host
-    .get_program(&result.address)
+    .get_program(&address)
     .expect("getting wallet program instance")
     .clone();
   stdin.write_vec(wallet);

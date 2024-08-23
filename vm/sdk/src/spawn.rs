@@ -1,7 +1,9 @@
+use athena_interface::Address;
+
 // Template address is read from context
-pub fn spawn(blob: Vec<u8>) {
+pub fn spawn(blob: Vec<u8>) -> Address {
   let blob_u32 = bytes_to_u32_vec(&blob);
-  athena_vm::syscalls::spawn(blob_u32.as_ptr(), blob.len());
+  Address::from(athena_vm::syscalls::spawn(blob_u32.as_ptr(), blob.len()))
 }
 
 /// Convert a slice of bytes to a vector of u32 little-endian values.
