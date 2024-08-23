@@ -675,7 +675,7 @@ where
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
-    log::info!("Executing cycle with instruction: {:?}", instruction);
+    log::debug!("Executing cycle with instruction: {:?}", instruction);
 
     // Log the current state of the runtime.
     self.log(&instruction);
@@ -913,7 +913,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &0x002016bc
+      &2102260
     );
     assert_eq!(
       runtime
@@ -922,7 +922,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &0x002016d8
+      &2102288
     );
 
     // now attempt to execute each function in turn

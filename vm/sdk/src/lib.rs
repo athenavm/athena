@@ -3,8 +3,11 @@ use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+mod spawn;
+pub use spawn::spawn;
+
 // This type needs to be serializable
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct Pubkey(pub Bytes32);
 pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
@@ -14,41 +17,25 @@ pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
 
   // for now, require input to be word-aligned
   // we can pad the input but need to know more about the contents
-  let (input, input_len) = if let Some(input) = input {
+  let input32 = if let Some(input) = input {
     assert!(input.len() % 4 == 0, "input is not byte-aligned");
-    (
-      input
-        .chunks(4)
-        .map(|chunk| {
-          let mut bytes = [0u8; 4];
-          bytes.copy_from_slice(chunk);
-          u32::from_le_bytes(bytes)
-        })
-        .collect::<Vec<u32>>()
-        .as_ptr(),
-      input.len(),
-    )
+
+    let v = input
+      .chunks(4)
+      .map(|chunk| {
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(chunk);
+        u32::from_le_bytes(bytes)
+      })
+      .collect::<Vec<u32>>();
+    Some(v)
   } else {
-    (std::ptr::null(), 0)
+    None
   };
 
+  let (input, input_len) = input32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len()));
+
   athena_vm::syscalls::call(address.as_ptr(), input, input_len, amount.as_ptr());
-}
-
-// Template address is read from context
-pub fn spawn(state_blob: Vec<u8>) {
-  let state_blob_len = state_blob.len();
-  let state_blob = state_blob
-    .chunks(4)
-    .map(|chunk| {
-      let mut bytes = [0u8; 4];
-      bytes.copy_from_slice(chunk);
-      u32::from_le_bytes(bytes)
-    })
-    .collect::<Vec<u32>>()
-    .as_ptr();
-
-  athena_vm::syscalls::spawn(state_blob, state_blob_len);
 }
 
 // These traits define the reference wallet interface.

@@ -1,6 +1,5 @@
 //! The Spacemesh standard wallet template.
 #![no_main]
-#![no_std]
 
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
@@ -10,7 +9,7 @@ use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use wallet_common::SendArguments;
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct Wallet {
   nonce: u64,
   balance: u64,
@@ -36,19 +35,16 @@ impl WalletProgram for Wallet {
   #[callable]
   fn spawn() {
     let owner = athena_vm::io::read::<Pubkey>();
-    spawn(to_vec(&Wallet::new(owner)).expect("failed to serialize wallet"));
+    let wallet = Wallet::new(owner);
+    let serialized = to_vec(&wallet).expect("serializing wallet");
+    spawn(serialized);
   }
 
   #[callable]
   fn send(&self) {
-    // let args_len = athena_vm::io::read::<u32>() as usize;
-    // let mut buffer = [0u8; 1024];
-    // if args_len > buffer.len() {
-    //   panic!("send arguments exceed buffer size");
-    // }
     let buffer = athena_vm::io::read_vec();
     let send_arguments =
-      from_slice::<SendArguments>(&buffer).expect("failed to deserialize send arguments");
+      from_slice::<SendArguments>(&buffer).expect("deserializing send arguments");
     // Send coins
     // Note: error checking happens inside the host
     call(send_arguments.recipient, None, send_arguments.amount);
