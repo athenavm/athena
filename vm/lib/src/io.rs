@@ -1,4 +1,3 @@
-#![allow(unused_unsafe)]
 use crate::syscall_write;
 use crate::{syscall_hint_len, syscall_hint_read};
 use serde::de::DeserializeOwned;
@@ -156,4 +155,29 @@ pub fn hint<T: Serialize>(value: &T) {
 pub fn hint_slice(buf: &[u8]) {
   let mut my_reader = SyscallWriter { fd: FD_HINT };
   my_reader.write_all(buf).unwrap();
+}
+
+#[derive(Default)]
+pub struct Io {
+  read_remainder: std::collections::VecDeque<u8>,
+}
+
+impl std::io::Read for Io {
+  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    if self.read_remainder.is_empty() {
+      self.read_remainder.extend(crate::io::read_vec());
+    }
+    self.read_remainder.read(buf)
+  }
+}
+
+impl std::io::Write for Io {
+  fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    crate::io::write_slice(buf);
+    Ok(buf.len())
+  }
+
+  fn flush(&mut self) -> std::io::Result<()> {
+    Ok(())
+  }
 }

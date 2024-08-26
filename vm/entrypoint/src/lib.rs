@@ -10,6 +10,11 @@ pub mod host {
 pub mod io {
   pub use athena_lib::io::*;
 }
+
+#[cfg(feature = "lib")]
+pub mod program {
+  pub use athena_lib::program::*;
+}
 #[cfg(feature = "lib")]
 pub mod lib {
   pub use athena_lib::*;

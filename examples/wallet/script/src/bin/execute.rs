@@ -10,10 +10,9 @@ use athena_interface::{
   ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use athena_vm_sdk::Pubkey;
+use athena_vm_sdk::{Pubkey, SendArguments};
 use borsh::to_vec;
 use clap::Parser;
-use wallet_common::SendArguments;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
 ///

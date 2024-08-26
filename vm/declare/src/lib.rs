@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, LitStr, Pat};
+use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, LitStr};
 
 #[proc_macro_attribute]
 pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -20,38 +20,18 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let method_name = &method.sig.ident;
         let c_func_name = format_ident!("athexp_{}", method_name);
 
-        let (params, args): (Vec<_>, Vec<_>) = method
-          .sig
-          .inputs
-          .iter()
-          .filter_map(|arg| {
-            if let FnArg::Typed(pat_type) = arg {
-              if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                let ident = &pat_ident.ident;
-                let ty = &pat_type.ty;
-                return Some((quote!(#ident: #ty), quote!(#ident)));
-              }
-            }
-            None
-          })
-          .unzip();
-
         // TODO: do we want to allow any args here at all?
         // or do we strictly want to allow input using io syscalls?
-        let (self_param, call) = if is_static_method(&method.sig) {
-          (None, quote! { #struct_name::#method_name(#(#args),*) })
+        let call = if is_static_method(&method.sig) {
+          quote! {
+            athena_vm::program::Function::call_func(#struct_name::#method_name, &mut athena_vm::io::Io::default())
+          }
         } else {
-          (
-            None,
-            quote! {
-              let obj = athena_vm::io::read_vec();
-              let mut program = from_slice::<#struct_name>(&obj.as_slice()).expect("failed to deserialize program");
-              program.#method_name(#(#args),*)
-            },
-          )
+          quote! {
+            athena_vm::program::Method::call_method(#struct_name::#method_name, &mut athena_vm::io::Io::default())
+          }
         };
 
-        let all_params = self_param.into_iter().chain(params).collect::<Vec<_>>();
         let section_name =
           LitStr::new(&format!(".text.athexp.{}", method_name), method_name.span());
         let static_name = format_ident!("DUMMY_{}", method_name.to_string().to_uppercase());
@@ -60,7 +40,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           #[cfg(all(any(target_arch = "riscv32", target_arch = "riscv64"), target_feature = "e"))]
           #[link_section = #section_name]
           #[no_mangle]
-          pub unsafe extern "C" fn #c_func_name(#(#all_params),*) {
+          pub unsafe extern "C" fn #c_func_name() {
             #call;
             syscall_halt(0);
           }
@@ -68,7 +48,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           // This black magic ensures the function symbol makes it into the final binary.
           #[used]
           #[link_section = ".init_array"]
-          static #static_name: unsafe extern "C" fn(#(#all_params),*) = #c_func_name;
+          static #static_name: unsafe extern "C" fn() = #c_func_name;
         });
       }
     }
