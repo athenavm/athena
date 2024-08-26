@@ -104,15 +104,15 @@ pub extern "C" fn get_balance(value: *mut u32) {
 /// initializing the variable.
 #[no_mangle]
 #[cfg(target_os = "zkvm")]
-pub fn spawn(blob: *const u32, len: usize) -> athena_interface::Address {
+pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
   let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
 
   unsafe {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_SPAWN,
-        in("a0") blob,
-        in("a1") len,
+        in("a0") blob.as_ptr(),
+        in("a1") bytes_len,
         in("a2") result.as_mut_ptr(),
     )
   }
