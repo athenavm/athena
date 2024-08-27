@@ -14,7 +14,7 @@ extern "C" {
 #[derive(Clone)]
 pub struct AthconVm {
   handle: *mut ffi::athcon_vm,
-  host_interface: *mut ffi::athcon_host_interface,
+  host_interface: ffi::athcon_host_interface,
 }
 
 impl AthconVm {
@@ -53,43 +53,44 @@ impl AthconVm {
     gas: i64,
     destination: &Address,
     sender: &Address,
-    input: &Bytes,
-    value: &Bytes32,
-    code: &Bytes,
-  ) -> (&Bytes, i64, StatusCode) {
+    input: &[u8],
+    value: &[u8; 32],
+    code: &[u8],
+  ) -> (Vec<u8>, i64, StatusCode) {
     let ext_ctx = host::ExtendedContext { hctx: ctx };
-    let athcon_message = Box::into_raw(Box::new({
-      ffi::athcon_message {
-        kind,
-        depth,
-        gas,
-        recipient: ffi::athcon_address {
-          bytes: *destination,
-        },
-        sender: ffi::athcon_address { bytes: *sender },
-        input_data: input.as_ptr(),
-        input_size: input.len(),
-        value: ffi::athcon_uint256be { bytes: *value },
-        code: code.as_ptr(),
-        code_size: code.len(),
-      }
-    }));
+    let athcon_message = ffi::athcon_message {
+      kind,
+      depth,
+      gas,
+      recipient: ffi::athcon_address {
+        bytes: *destination,
+      },
+      sender: ffi::athcon_address { bytes: *sender },
+      input_data: input.as_ptr(),
+      input_size: input.len(),
+      value: ffi::athcon_uint256be { bytes: *value },
+      code: code.as_ptr(),
+      code_size: code.len(),
+    };
+
     unsafe {
-      let result = ((*self.handle).execute.unwrap())(
+      let execute_func = (*self.handle).execute.unwrap();
+      let result = execute_func(
         self.handle,
-        self.host_interface,
+        &self.host_interface,
         // ext_ctx as *mut ffi::athcon_host_context,
         std::mem::transmute::<&host::ExtendedContext, *mut ffi::athcon_host_context>(&ext_ctx),
         rev,
-        athcon_message,
+        &athcon_message,
         code.as_ptr(),
         code.len(),
       );
-      return (
-        std::slice::from_raw_parts(result.output_data, result.output_size),
-        result.gas_left,
-        result.status_code,
-      );
+      let data = std::slice::from_raw_parts(result.output_data, result.output_size);
+      let output = data.to_vec();
+      if let Some(release) = result.release {
+        release(&result);
+      }
+      (output, result.gas_left, result.status_code)
     }
   }
 }
@@ -98,7 +99,7 @@ pub fn create() -> AthconVm {
   unsafe {
     AthconVm {
       handle: athcon_create_athenavmwrapper(),
-      host_interface: Box::into_raw(Box::new(host::get_athcon_host_interface())),
+      host_interface: host::get_athcon_host_interface(),
     }
   }
 }

@@ -179,11 +179,11 @@ mod ffi_tests {
       &[0u8; BYTES32_LENGTH],
       CONTRACT_CODE,
     );
-    println!("Output:  {:?}", hex::encode(output));
+    println!("Output:  {:?}", hex::encode(&output));
     println!("GasLeft: {:?}", gas_left);
     println!("Status:  {:?}", status_code);
     assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
-    assert_eq!(output, 2u32.to_le_bytes().to_vec().as_slice());
+    assert_eq!(u32::from_le_bytes(output.as_slice().try_into().unwrap()), 2);
     vm.destroy();
   }
 }
