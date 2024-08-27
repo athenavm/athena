@@ -9,20 +9,28 @@ extern "C" {
   fn athcon_create_athenavmwrapper() -> *mut ffi::athcon_vm;
 }
 
-// In principle it's safe to clone these handles, but the caller needs to be very careful to
-// ensure the memory is freed properly, isn't double-freed, etc.
-#[derive(Clone)]
+/// Athena VM wrapper
+/// It owns the VM handle and provides a high-level interface to interact with the VM
+/// It also provides a host interface to the VM
+/// The VM is automatically destroyed when the wrapper is dropped
 pub struct AthconVm {
   handle: *mut ffi::athcon_vm,
   host_interface: ffi::athcon_host_interface,
 }
 
 impl AthconVm {
-  pub fn get_abi_version(&self) -> i32 {
-    unsafe {
-      let version: i32 = (*self.handle).abi_version;
-      version
+  pub fn new() -> Self {
+    let handle = unsafe { athcon_create_athenavmwrapper() };
+    assert!(!handle.is_null(), "Failed to create athena vm");
+
+    AthconVm {
+      handle,
+      host_interface: host::get_athcon_host_interface(),
     }
+  }
+
+  pub fn get_abi_version(&self) -> i32 {
+    unsafe { (*self.handle).abi_version }
   }
 
   pub fn get_name(&self) -> &str {
@@ -37,10 +45,6 @@ impl AthconVm {
       let c_str: &CStr = CStr::from_ptr((*self.handle).version);
       c_str.to_str().unwrap()
     }
-  }
-
-  pub fn destroy(&self) {
-    unsafe { ((*self.handle).destroy.unwrap())(self.handle) }
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -95,11 +99,14 @@ impl AthconVm {
   }
 }
 
-pub fn create() -> AthconVm {
-  unsafe {
-    AthconVm {
-      handle: athcon_create_athenavmwrapper(),
-      host_interface: host::get_athcon_host_interface(),
-    }
+impl Drop for AthconVm {
+  fn drop(&mut self) {
+    unsafe { ((*self.handle).destroy.unwrap())(self.handle) }
+  }
+}
+
+impl Default for AthconVm {
+  fn default() -> Self {
+    Self::new()
   }
 }
