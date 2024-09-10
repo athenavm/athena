@@ -126,8 +126,8 @@ impl BuildToolchainCmd {
         toolchain_dir.join("patches/rust.patch").to_str().unwrap(),
       ])
       .current_dir(&rust_dir)
-      .output()
-      .expect("Failed to run patch command");
+      .output()?;
+
     if !patch_output.status.success() {
       let stdout = str::from_utf8(&patch_output.stdout).unwrap_or("Failed to read stdout");
       let stderr = str::from_utf8(&patch_output.stderr).unwrap_or("Failed to read stderr");
