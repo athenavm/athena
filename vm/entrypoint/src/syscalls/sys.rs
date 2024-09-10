@@ -1,6 +1,5 @@
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
-use lazy_static::lazy_static;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use crate::syscalls::{syscall_halt, syscall_write};
@@ -10,10 +9,8 @@ use crate::syscalls::{syscall_halt, syscall_write};
 /// In the future, we can pass in this seed from the host or have the verifier generate it.
 const PRNG_SEED: u64 = 0x123456789abcdef0;
 
-lazy_static! {
-    /// A lazy static to generate a global random number generator.
-    static ref RNG: Mutex<StdRng> = Mutex::new(StdRng::seed_from_u64(PRNG_SEED));
-}
+static RNG: LazyLock<Mutex<StdRng>> =
+  LazyLock::new(|| Mutex::new(StdRng::seed_from_u64(PRNG_SEED)));
 
 /// A lazy static to print a warning once for using the `sys_rand` system call.
 static SYS_RAND_WARNING: std::sync::Once = std::sync::Once::new();
