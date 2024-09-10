@@ -28,7 +28,16 @@ impl CommandExecutor for Command {
       .stdin(Stdio::inherit())
       .output()
       .with_context(|| format!("while executing `{:?}`", &self))
-      .map(|_| ())
+      .and_then(|output| {
+        if output.status.success() {
+          Ok(())
+        } else {
+          Err(anyhow::anyhow!(
+            "Command failed with exit code: {}",
+            output.status
+          ))
+        }
+      })
   }
 }
 
