@@ -1,7 +1,5 @@
 use std::io::Write;
 
-use athena_interface::HostInterface;
-
 use super::{Instruction, Runtime};
 use crate::runtime::Register;
 
@@ -9,10 +7,7 @@ pub const fn align(addr: u32) -> u32 {
   addr - addr % 4
 }
 
-impl<T> Runtime<T>
-where
-  T: HostInterface,
-{
+impl<'h> Runtime<'h> {
   #[inline]
   pub fn log(&mut self, instruction: &Instruction) {
     // Write the current program counter to the trace buffer for the cycle tracer.

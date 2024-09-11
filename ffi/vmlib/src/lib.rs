@@ -1,4 +1,4 @@
-use std::{cell::RefCell, panic, sync::Arc};
+use std::panic;
 
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
@@ -54,15 +54,13 @@ impl AthconVm for AthenaVMWrapper {
 
     // Unpack the context
     let execution_context = ExecutionContext::new(host, context);
-    let host = WrappedHostInterface::new(execution_context);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(host));
+    let mut host = WrappedHostInterface::new(execution_context);
 
     // Execute the code and proxy the result back to the caller
     let execution_result =
       self
         .athena_vm
-        .execute(host, RevisionWrapper::from(rev).0, athena_msg.0, code);
+        .execute(&mut host, RevisionWrapper::from(rev).0, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
   }
 }
