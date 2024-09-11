@@ -332,20 +332,21 @@ impl From<ffi::athcon_result> for ExecutionResult {
 }
 
 fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
-  if let Some(buf) = output {
-    let buf_len = buf.len();
+  match output {
+    Some(buf) if !buf.is_empty() => {
+      let buf_len = buf.len();
 
-    // Manually allocate heap memory for the new home of the output buffer.
-    let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
-    let new_buf = unsafe { std::alloc::alloc(memlayout) };
-    unsafe {
-      // Copy the data into the allocated buffer.
-      std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
+      // Manually allocate heap memory for the new home of the output buffer.
+      let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
+      let new_buf = unsafe { std::alloc::alloc(memlayout) };
+      unsafe {
+        // Copy the data into the allocated buffer.
+        std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
+      }
+
+      (new_buf as *const u8, buf_len)
     }
-
-    (new_buf as *const u8, buf_len)
-  } else {
-    (core::ptr::NonNull::<u8>::dangling().as_ptr(), 0)
+    _ => (core::ptr::null(), 0),
   }
 }
 
@@ -526,10 +527,7 @@ mod tests {
     unsafe {
       assert_eq!((*f).status_code, StatusCode::ATHCON_FAILURE);
       assert_eq!((*f).gas_left, 420);
-      assert_eq!(
-        (*f).output_data,
-        core::ptr::NonNull::<u8>::dangling().as_ptr()
-      );
+      assert!((*f).output_data.is_null(),);
       assert_eq!((*f).output_size, 0);
       assert_eq!((*f).create_address.bytes, [0u8; 24]);
       if (*f).release.is_some() {
@@ -571,7 +569,7 @@ mod tests {
     unsafe {
       assert_eq!(f.status_code, StatusCode::ATHCON_FAILURE);
       assert_eq!(f.gas_left, 420);
-      assert_eq!(f.output_data, core::ptr::NonNull::<u8>::dangling().as_ptr());
+      assert!(f.output_data.is_null());
       assert_eq!(f.output_size, 0);
       assert_eq!(f.create_address.bytes, [0u8; 24]);
       if f.release.is_some() {

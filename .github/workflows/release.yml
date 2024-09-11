@@ -95,21 +95,21 @@ jobs:
             svm_target_platform: linux-amd64
             platform: linux
             arch: amd64
-          # - runner: warp-ubuntu-latest-arm64-4x
-          #   target: aarch64-unknown-linux-gnu
-          #   svm_target_platform: linux-aarch64
-          #   platform: linux
-          #   arch: arm64
-          # - runner: macos-latest-large
-          #   target: x86_64-apple-darwin
-          #   svm_target_platform: macosx-amd64
-          #   platform: darwin
-          #   arch: amd64
-          # - runner: macos-latest-xlarge
-          #   target: aarch64-apple-darwin
-          #   svm_target_platform: macosx-aarch64
-          #   platform: darwin
-          #   arch: arm64
+          - runner: [runs-on, runner=8cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+            target: aarch64-unknown-linux-gnu
+            svm_target_platform: linux-aarch64
+            platform: linux
+            arch: arm64
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            svm_target_platform: macosx-aarch64
+            platform: darwin
+            arch: arm64
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            svm_target_platform: macosx-amd64
+            platform: darwin
+            arch: amd64
           # - runner: windows-latest
           #   target: x86_64-pc-windows-msvc
           #   svm_target_platform: windows-amd64
@@ -122,7 +122,6 @@ jobs:
         id: rustc-toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-05-29
           target: ${{ matrix.target }}
 
       - name: Apple M1 setup
@@ -187,17 +186,18 @@ jobs:
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
             # We need to use gtar here otherwise the archive is corrupt.
             # See: https://github.com/actions/virtual-environments/issues/2619
-            # TODO: add vmlib
             gtar -czvf "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release cargo-athena
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-            gtar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release libathena_vmlib.dylib
+            gtar -czvf "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" \
+            -C $GITHUB_WORKSPACE/target/${TARGET}/release libathena_vmlib.dylib \
+            -C $GITHUB_WORKSPACE/ffi/athcon include
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           else
-            # TODO: add vmlib
             cd ./target/${TARGET}/release
             7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-athena.exe
             mv "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
+            # TODO: add athcon headers
             7z a -tzip "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" libathena_vmlib.dll
             mv "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT

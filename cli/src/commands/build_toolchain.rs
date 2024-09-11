@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use core::str;
 use std::{path::PathBuf, process::Command};
 
 use crate::{get_target, CommandExecutor, RUSTUP_TOOLCHAIN_NAME};
@@ -61,18 +62,22 @@ impl BuildToolchainCmd {
         "https://github.com/rust-lang/rust.git".to_string()
       }
     };
-    Command::new("git")
-      .args(["clone", &rust_repo_url, "--depth=1"])
-      .current_dir(&toolchain_dir)
-      .run()?;
+
     let rust_dir = toolchain_dir.join("rust");
+    if !rust_dir.exists() {
+      Command::new("git")
+        .args(["clone", &rust_repo_url, "--depth=1"])
+        .current_dir(&toolchain_dir)
+        .run()?;
+    }
+
+    // Read the Rust commit hash
+    let rust_commit = std::fs::read_to_string(toolchain_dir.join("rust_commit.txt"))?
+      .trim()
+      .to_string();
+
     Command::new("git")
-      .args([
-        "fetch",
-        "--depth=1",
-        "origin",
-        "9b00956e56009bab2aa15d7bff10916599e3d6d6",
-      ])
+      .args(["fetch", "--depth=1", "origin", &rust_commit])
       .current_dir(&rust_dir)
       .run()?;
     Command::new("git")
@@ -111,22 +116,48 @@ impl BuildToolchainCmd {
     })?;
 
     // Apply patches
-    Command::new("patch")
+    // We allow this to fail, but want to warn the user if it did.
+    let patch_output = Command::new("patch")
       .args([
         "-f",
+        "-N",
         "-p1",
         "-i",
         toolchain_dir.join("patches/rust.patch").to_str().unwrap(),
       ])
       .current_dir(&rust_dir)
+      .output()?;
+
+    if !patch_output.status.success() {
+      let stdout = str::from_utf8(&patch_output.stdout).unwrap_or("Failed to read stdout");
+      let stderr = str::from_utf8(&patch_output.stderr).unwrap_or("Failed to read stderr");
+      println!("Failed to apply patches to rust with code: {:?}. This is expected if the patches have already been applied.", patch_output.status.code().unwrap());
+      println!("stdout: {}", stdout);
+      println!("stderr: {}", stderr);
+    }
+
+    // Create the custom target file.
+    // Note: Rust doesn't actually read this file, it just needs to see that it exists
+    // to get past the bootstrap phase.
+    Command::new("touch")
+      .arg(toolchain_dir.join("riscv32em-athena-zkvm-elf.json"))
       .run()?;
 
     // Build the toolchain (stage 1).
     Command::new("python3")
       .env(
-        "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
-        "-Cpasses=loweratomic",
+        "CFLAGS_riscv32em_athena_zkvm_elf",
+        "-ffunction-sections -fdata-sections -fPIC -target riscv32-unknown-elf",
       )
+      .env(
+        "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
+        "-Cpasses=loweratomic -Clink-arg=-march=rv32em -Clink-arg=-mabi=ilp32e",
+      )
+      .env("COMPILER_RT_DEFAULT_TARGET_TRIPLE", "riscv32-unknown-elf")
+      .env("CC_riscv32em_athena_zkvm_elf", "clang")
+      .env("CXX_riscv32em_athena_zkvm_elf", "clang++")
+      .env("RUSTC_TARGET_ARG", "")
+      .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build"])
       .current_dir(&rust_dir)
       .run()?;
@@ -134,9 +165,18 @@ impl BuildToolchainCmd {
     // Build the toolchain (stage 2).
     Command::new("python3")
       .env(
-        "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
-        "-Cpasses=loweratomic",
+        "CFLAGS_riscv32em_athena_zkvm_elf",
+        "-ffunction-sections -fdata-sections -fPIC -target riscv32-unknown-elf",
       )
+      .env(
+        "CARGO_TARGET_RISCV32EM_ATHENA_ZKVM_ELF_RUSTFLAGS",
+        "-Cpasses=loweratomic -Clink-arg=-march=rv32em -Clink-arg=-mabi=ilp32e",
+      )
+      .env("COMPILER_RT_DEFAULT_TARGET_TRIPLE", "riscv32-unknown-elf")
+      .env("CC_riscv32em_athena_zkvm_elf", "clang")
+      .env("CXX_riscv32em_athena_zkvm_elf", "clang++")
+      .env("RUSTC_TARGET_ARG", "")
+      .env("RUST_TARGET_PATH", &toolchain_dir)
       .args(["x.py", "build", "--stage", "2"])
       .current_dir(&rust_dir)
       .run()?;
@@ -160,7 +200,7 @@ impl BuildToolchainCmd {
         break;
       }
     }
-    let toolchain_dir = toolchain_dir.unwrap();
+    let toolchain_dir = toolchain_dir.expect("Missing Rust toolchain directory");
     println!(
       "Found built toolchain directory at {}.",
       toolchain_dir.as_path().to_str().unwrap()

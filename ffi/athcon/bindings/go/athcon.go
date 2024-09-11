@@ -202,9 +202,11 @@ func (vm *VM) Execute(
 	}
 
 	ctxHandle := cgo.NewHandle(ctx)
+
+	hostInterface := newHostInterface()
 	result := C.athcon_execute(
 		vm.handle,
-		&C.athcon_go_host,
+		hostInterface,
 		(*C.struct_athcon_host_context)(unsafe.Pointer(uintptr(ctxHandle))),
 		uint32(rev),
 		&msg,

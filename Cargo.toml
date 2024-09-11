@@ -26,5 +26,3 @@ repository = "https://github.com/athenavm/athena"
 homepage = "https://www.athenavm.org/"
 license = "MIT OR Apache-2.0"
 edition = "2021"
-
-[workspace.dependencies]

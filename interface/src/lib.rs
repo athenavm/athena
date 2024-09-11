@@ -5,14 +5,7 @@
 mod context;
 pub use context::*;
 
-use std::{
-  cell::RefCell,
-  collections::BTreeMap,
-  convert::TryFrom,
-  fmt,
-  ops::{Deref, DerefMut},
-  sync::Arc,
-};
+use std::{collections::BTreeMap, convert::TryFrom, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -318,43 +311,6 @@ pub trait HostInterface {
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
 }
 
-// provide a trait-bound generic struct to represent the host interface
-// this is better, and more performant, than using a trait object
-// since it allows more compile-time checks, and we don't need polymorphism.
-pub struct HostProvider<T: HostInterface> {
-  host: T,
-}
-
-impl<T> HostProvider<T>
-where
-  T: HostInterface,
-{
-  pub fn new(host: T) -> Self {
-    HostProvider { host }
-  }
-}
-
-// pass calls directly to the underlying host instance
-impl<T> Deref for HostProvider<T>
-where
-  T: HostInterface,
-{
-  type Target = T;
-
-  fn deref(&self) -> &Self::Target {
-    &self.host
-  }
-}
-
-impl<T> DerefMut for HostProvider<T>
-where
-  T: HostInterface,
-{
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    &mut self.host
-  }
-}
-
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
@@ -500,23 +456,8 @@ impl<'a> HostInterface for MockHost<'a> {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
 
-      // HostProvider requires an owned instance, so we need to take it from self
-      let provider = HostProvider::new(std::mem::take(self));
-      #[allow(clippy::arc_with_non_send_sync)]
-      let host = Arc::new(RefCell::new(provider));
-      let res = vm.expect("missing VM instance").execute(
-        host.clone(),
-        AthenaRevision::AthenaFrontier,
-        msg,
-        code,
-      );
-
-      // Restore self
-      *self = Arc::try_unwrap(host)
-        .unwrap_or_else(|_| panic!("Arc still has multiple strong references"))
-        .into_inner()
-        .host;
-      res
+      vm.expect("missing VM instance")
+        .execute(self, AthenaRevision::AthenaFrontier, msg, code)
     } else {
       // otherwise, pass a call to Charlie, fail all other calls
       let status_code = if msg.recipient == ADDRESS_CHARLIE {
@@ -577,7 +518,7 @@ pub trait VmInterface<T: HostInterface> {
   fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
   fn execute(
     &self,
-    host: Arc<RefCell<HostProvider<T>>>,
+    host: &mut T,
     rev: AthenaRevision,
     msg: AthenaMessage,
     code: &[u8],

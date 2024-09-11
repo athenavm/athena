@@ -1,4 +1,4 @@
-use std::{cell::RefCell, panic, sync::Arc};
+use std::panic;
 
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
@@ -9,8 +9,7 @@ use athcon_vm::{
 };
 use athena_interface::{
   Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
-  HostInterface, HostProvider, MessageKind, StatusCode, StorageStatus, TransactionContext,
-  VmInterface,
+  HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
 use athena_runner::AthenaVm;
 
@@ -56,16 +55,13 @@ impl AthconVm for AthenaVMWrapper {
     // Unpack the context
     let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
     let execution_context = AthconExecutionContext::new(host_interface, context);
-    let host = WrappedHostInterface::new(execution_context);
-    let provider = HostProvider::new(host);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(provider));
+    let mut host = WrappedHostInterface::new(execution_context);
 
     // Execute the code and proxy the result back to the caller
     let execution_result =
       self
         .athena_vm
-        .execute(host, RevisionWrapper::from(rev).0, athena_msg.0, code);
+        .execute(&mut host, RevisionWrapper::from(rev).0, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
   }
 }
@@ -537,8 +533,8 @@ pub unsafe fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert_eq!(
       vm.set_option.unwrap()(
         vm_ptr,
-        "foo\0".as_ptr() as *const i8,
-        "bar\0".as_ptr() as *const i8
+        "foo\0".as_ptr() as *const std::os::raw::c_char,
+        "bar\0".as_ptr() as *const std::os::raw::c_char
       ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
@@ -656,8 +652,8 @@ pub unsafe fn vm_tests(vm_ptr: *mut ffi::athcon_vm) {
     assert_eq!(
       wrapper.base.set_option.unwrap()(
         vm_ptr,
-        "foo\0".as_ptr() as *const i8,
-        "bar\0".as_ptr() as *const i8
+        "foo\0".as_ptr() as *const std::os::raw::c_char,
+        "bar\0".as_ptr() as *const std::os::raw::c_char
       ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
