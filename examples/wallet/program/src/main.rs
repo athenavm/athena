@@ -1,5 +1,6 @@
 //! The Spacemesh standard wallet template.
 #![no_main]
+#![no_std]
 
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};

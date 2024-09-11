@@ -4,6 +4,9 @@ pub fn spawn(blob: Vec<u8>) {
   athena_vm::syscalls::spawn(blob_u32.as_ptr(), blob.len());
 }
 
+/// Convert a slice of bytes to a vector of u32 little-endian values.
+/// In case the length of the input slice is not a multiple of 4, the remaining bytes are
+/// zero-padded and appended as the last u32 value.
 fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
   let mut chunks = bytes.as_ref().chunks_exact(4);
   let mut result = chunks
@@ -50,6 +53,6 @@ mod tests {
   #[test]
   fn convert_single_byte() {
     let result = bytes_to_u32_vec([1]);
-    assert_eq!(result, vec![0x01]);
+    assert_eq!(result, vec![0x00_00_00_01]);
   }
 }
