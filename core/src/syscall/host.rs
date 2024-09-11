@@ -1,7 +1,6 @@
 use crate::runtime::{Register, Syscall, SyscallContext};
 use athena_interface::{
-  AddressWrapper, AthenaMessage, Bytes32Wrapper, HostInterface, MessageKind, ADDRESS_LENGTH,
-  BYTES32_LENGTH,
+  AddressWrapper, AthenaMessage, Bytes32Wrapper, MessageKind, ADDRESS_LENGTH, BYTES32_LENGTH,
 };
 
 pub struct SyscallHostRead;
@@ -12,11 +11,8 @@ impl SyscallHostRead {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostRead
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostRead {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
       .rt
       .context
@@ -28,9 +24,7 @@ where
 
     // read value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    let value = host
-      .borrow()
-      .get_storage(athena_ctx.address(), &Bytes32Wrapper::from(key).into());
+    let value = host.get_storage(athena_ctx.address(), &Bytes32Wrapper::from(key).into());
 
     // set return value
     let value_vec: Vec<u32> = Bytes32Wrapper::new(value).into();
@@ -47,11 +41,8 @@ impl SyscallHostWrite {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostWrite
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostWrite {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
       .rt
       .context
@@ -63,8 +54,8 @@ where
     let value = ctx.slice(arg2, BYTES32_LENGTH / 4);
 
     // write value to host
-    let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    let status_code = host.borrow_mut().set_storage(
+    let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
+    let status_code = host.set_storage(
       athena_ctx.address(),
       &Bytes32Wrapper::from(key).into(),
       &Bytes32Wrapper::from(value).into(),
@@ -86,23 +77,14 @@ impl SyscallHostCall {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostCall
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostCall {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     // make sure we have a runtime context
     let athena_ctx = ctx
       .rt
       .context
       .as_ref()
       .expect("Missing Athena runtime context");
-    let mut host = ctx
-      .rt
-      .host
-      .as_ref()
-      .expect("Missing host interface")
-      .borrow_mut();
 
     // get remaining gas
     // note: this does not factor in the cost of the current instruction
@@ -160,7 +142,12 @@ where
       amount,
       Vec::new(),
     );
-    let res = host.call(msg);
+    let res = ctx
+      .rt
+      .host
+      .as_deref_mut()
+      .expect("Missing host interface")
+      .call(msg);
 
     // calculate gas spent
     // TODO: should this be a panic or should it just return an out of gas error?
@@ -182,11 +169,8 @@ impl SyscallHostGetBalance {
   }
 }
 
-impl<T> Syscall<T> for SyscallHostGetBalance
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, _arg2: u32) -> Option<u32> {
+impl Syscall for SyscallHostGetBalance {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
       .rt
       .context
@@ -194,8 +178,8 @@ where
       .expect("Missing Athena runtime context");
 
     // get value from host
-    let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    let balance = host.borrow_mut().get_balance(athena_ctx.address());
+    let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
+    let balance = host.get_balance(athena_ctx.address());
     let balance_high = (balance >> 32) as u32;
     let balance_low = balance as u32;
     let balance_slice = [balance_low, balance_high];
