@@ -4,18 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches:
-      - "**"
-    paths:
-      - "cli/**"
-      - "core/**"
-      - "ffi/**"
-      - "sdk/**"
-      - "vm/**"
-      - "tests/**"
-      - "examples/**"
-      - "Cargo.toml"
-      - ".github/workflows/**"
   merge_group:
 
 concurrency:
