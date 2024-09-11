@@ -113,4 +113,5 @@ fn build_program_internal(path: &str, args: Option<BuildArgs>) {
   cargo_rerun_if_changed(&metadata, program_dir);
 
   execute_build_cmd(&program_dir, args);
+  println!("cargo:warning={root_package_name} built successfully");
 }
