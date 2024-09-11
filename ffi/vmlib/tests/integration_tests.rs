@@ -26,6 +26,7 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
     get_tx_context: Some(get_dummy_tx_context),
     get_block_hash: None,
     spawn: None,
+    deploy: None,
   }
 }
 

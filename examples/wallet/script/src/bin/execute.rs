@@ -5,6 +5,8 @@
 //! RUST_LOG=info cargo run --package wallet-script --bin execute --release
 //! ```
 
+use std::error::Error;
+
 use athena_interface::{
   Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost,
   ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
@@ -37,32 +39,28 @@ fn parse_owner(data: &str) -> Result<Pubkey, hex::FromHexError> {
   Ok(key)
 }
 
+fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> {
+  let mut stdin = AthenaStdin::new();
+  stdin.write(&owner.0);
+
+  let client = ExecutionClient::new();
+  let (mut result, _) =
+    client.execute_function(ELF, "athexp_spawn", stdin, Some(host), None, None)?;
+
+  Ok(result.read())
+}
+
 fn main() {
   // Setup the logger.
   athena_sdk::utils::setup_logger();
 
-  // Parse the command line arguments.
   let args = RunArgs::parse();
-
-  // Setup the execution client.
-  let client = ExecutionClient::new();
-
-  // Setup the inputs.
-  let mut stdin = AthenaStdin::new();
-  stdin.write(&args.owner.0);
 
   let mut host = MockHost::new_with_context(
     HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
     HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
   );
-
-  // spawn the wallet
-  let (mut result, _) = client
-    .execute_function(ELF, "athexp_spawn", stdin, Some(&mut host), None, None)
-    .expect("spawning wallet");
-
-  let address: Address = result.read();
-
+  let address = spawn(&mut host, args.owner).expect("spawning wallet program");
   println!(
     "spawned a wallet program at {} for {}",
     hex::encode(address),
@@ -77,6 +75,7 @@ fn main() {
     .get_program(&address)
     .expect("getting wallet program instance")
     .clone();
+
   stdin.write_vec(wallet);
 
   let args = SendArguments {
@@ -93,7 +92,7 @@ fn main() {
     hex::encode(context.address()),
     hex::encode(args.recipient),
   );
-  let (_, gas_cost) = client
+  let (_, gas_cost) = ExecutionClient::new()
     .execute_function(
       ELF,
       "athexp_send",
@@ -115,4 +114,44 @@ fn main() {
   assert!(gas_cost.is_some());
   assert_eq!(charlie_balance, 10);
   assert_eq!(new_alice_balance, alice_balance - 10);
+}
+
+#[cfg(test)]
+mod tests {
+  use athena_interface::{Address, HostDynamicContext, HostStaticContext, MockHost, ADDRESS_ALICE};
+  use athena_sdk::{AthenaStdin, ExecutionClient};
+  use athena_vm_sdk::Pubkey;
+
+  #[test]
+  fn deploying_other_contract() {
+    athena_sdk::utils::setup_logger();
+
+    let mut host = MockHost::new_with_context(
+      HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    );
+    let address = super::spawn(&mut host, Pubkey::default()).unwrap();
+
+    // deploy other contract
+    let code = b"some bad really code".to_vec();
+    let mut stdin = AthenaStdin::new();
+    let wallet = host.get_program(&address).unwrap();
+    stdin.write_slice(wallet);
+    stdin.write_vec(borsh::to_vec(&code).unwrap());
+
+    let result = ExecutionClient::new().execute_function(
+      super::ELF,
+      "athexp_deploy",
+      stdin.clone(),
+      Some(&mut host),
+      Some(25000000),
+      None,
+    );
+    let (mut result, gas_cost) = result.unwrap();
+    assert!(gas_cost.is_some());
+
+    let address: Address = result.read();
+    let template = host.template(&address);
+    assert_eq!(template, Some(&code));
+  }
 }

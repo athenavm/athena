@@ -136,6 +136,7 @@ mod tests {
       get_tx_context: Some(get_dummy_tx_context),
       get_block_hash: None,
       spawn: None,
+      deploy: None,
     };
     let host_context = std::ptr::null_mut();
 

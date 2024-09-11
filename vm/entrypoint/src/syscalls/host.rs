@@ -89,7 +89,8 @@ pub extern "C" fn get_balance(value: *mut u32) {
 
 /// Spawn a new instance of a template.
 ///
-/// No return value. It either succeeds or reverts.
+/// It either succeeds or reverts.
+/// Returns the address of the spawned program.
 /// The host calculates the new program address based on the template,
 /// the state blob, and the principal nonce. The template and nonce are
 /// available in its context and don't need to be passed here. The
@@ -111,6 +112,33 @@ pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_SPAWN,
+        in("a0") blob.as_ptr(),
+        in("a1") bytes_len,
+        in("a2") result.as_mut_ptr(),
+    )
+  }
+
+  unsafe { result.assume_init() }
+}
+
+/// Deploy a new template.
+///
+/// Returns the newly-deployed template address, which is calculated as the hash of the template code
+///
+/// The blob contains the template code.
+///
+/// The address of the deployed template is obtained via sharing a
+/// variable located on the stack. The host must write the address,
+/// initializing the variable.
+#[no_mangle]
+#[cfg(target_os = "zkvm")]
+pub fn deploy(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
+  let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
+
+  unsafe {
+    asm!(
+        "ecall",
+        in("t0") crate::syscalls::HOST_DEPLOY,
         in("a0") blob.as_ptr(),
         in("a1") bytes_len,
         in("a2") result.as_mut_ptr(),

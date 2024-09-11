@@ -87,6 +87,7 @@ type HostContext interface {
 	Call(kind CallKind, recipient Address, sender Address, value Bytes32, input []byte, gas int64, depth int) (
 		output []byte, gasLeft int64, createAddr Address, err error)
 	Spawn(blob []byte) Address
+	Deploy(code []byte) Address
 }
 
 //export accountExists
@@ -162,6 +163,13 @@ func spawn(pCtx unsafe.Pointer, pBlob *C.uint8_t, blobSize C.size_t) C.athcon_ad
 	ctx := cgo.Handle(pCtx).Value().(HostContext)
 	blob := goByteSlice(pBlob, blobSize)
 	return athconAddress(ctx.Spawn(blob))
+}
+
+//export deploy
+func deploy(pCtx unsafe.Pointer, pCode *C.uint8_t, codeSize C.size_t) C.athcon_address {
+	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	code := goByteSlice(pCode, codeSize)
+	return athconAddress(ctx.Deploy(code))
 }
 
 func newHostInterface() *C.struct_athcon_host_interface {

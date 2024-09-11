@@ -312,6 +312,7 @@ pub trait HostInterface {
   fn get_balance(&self, addr: &Address) -> Balance;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
   fn spawn(&mut self, blob: Vec<u8>) -> Address;
+  fn deploy(&mut self, code: Vec<u8>) -> Address;
 }
 
 // Calculates a spawned program address on the basis of the template address, state blob,
@@ -463,6 +464,10 @@ impl<'a> MockHost<'a> {
 
   pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
     self.programs.get(address)
+  }
+
+  pub fn template(&self, address: &Address) -> Option<&Vec<u8>> {
+    self.templates.get(address)
   }
 
   pub fn deploy_code(&mut self, address: Address, code: Vec<u8>) {
@@ -653,6 +658,19 @@ impl<'a> HostInterface for MockHost<'a> {
       &static_context.principal.clone(),
       static_context.nonce,
     )
+  }
+
+  fn deploy(&mut self, code: Vec<u8>) -> Address {
+    // template_address := HASH(template_code)
+    let hash = blake3::hash(&code);
+    let hash_bytes = hash.as_bytes().as_slice();
+    let address = Address::try_from(&hash_bytes[..24]).unwrap();
+
+    if self.templates.contains_key(&address) {
+      panic!("template already exists");
+    }
+    self.deploy_code(address, code);
+    address
   }
 }
 

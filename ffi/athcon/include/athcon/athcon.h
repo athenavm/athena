@@ -187,6 +187,19 @@ extern "C"
    */
   typedef athcon_address (*athcon_spawn_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
 
+    /**
+   * Deploy program callback function.
+   *
+   * This callback function is used by a VM to deploy a new program template
+   *
+   * @param context   The pointer to the Host execution context.
+   * @param blob      The program's template (serialized code).
+   * @param blob_size The length of the blob, in bytes.
+   * @return          The newly-created template address or null bytes
+   *                  if the deploy failed.
+   */
+  typedef athcon_address (*athcon_deploy_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
+
   /**
    * The execution status code.
    *
@@ -580,6 +593,9 @@ extern "C"
 
     /** Spawn program callback function. */
     athcon_spawn_fn spawn;
+
+    /** Deploy program template callback function. */
+    athcon_deploy_fn deploy;
   };
 
   /* Forward declaration. */
