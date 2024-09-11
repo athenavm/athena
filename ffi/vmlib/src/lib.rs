@@ -32,7 +32,7 @@ impl AthconVm for AthenaVMWrapper {
   }
 
   /// `execute` is the main entrypoint from FFI. It's called from the macro-generated `__athcon_execute` fn.
-  /// Note that we have to pass in raw `context` pointer here. If we wrap it into the
+  /// Note that we have to pass in a raw `context` pointer here. If we wrap it into the
   /// `AthenaExecutionContext` object inside the top-level FFI function and pass it in here, it causes
   /// lifetime issues.
   fn execute(
