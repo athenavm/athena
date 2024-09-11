@@ -163,7 +163,7 @@ jobs:
 
       - name: Run cargo athena new
         run: |
-          cargo athena new fibonacci --version refactor/execution-client
+          cargo athena new fibonacci
 
       - name: Build program and run script
         run: |
