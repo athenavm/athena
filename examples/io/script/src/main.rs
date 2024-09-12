@@ -1,6 +1,5 @@
 use athena_interface::MockHost;
 use athena_sdk::{utils, AthenaPublicValues, AthenaStdin, ExecutionClient};
-use athena_sdk::{utils, AthenaPublicValues, AthenaStdin, ExecutionClient};
 use serde::{Deserialize, Serialize};
 
 /// The ELF we want to execute inside the zkVM.
