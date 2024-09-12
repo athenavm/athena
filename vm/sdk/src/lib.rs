@@ -18,7 +18,7 @@ pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
   // for now, require input to be word-aligned
   // we can pad the input but need to know more about the contents
   let input32 = if let Some(input) = input {
-    assert!(input.len() % 4 == 0, "input is not byte-aligned");
+    assert!(input.len() % 4 == 0, "input is not 4 byte-aligned");
 
     let v = input
       .chunks(4)

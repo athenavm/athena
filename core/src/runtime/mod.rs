@@ -803,7 +803,6 @@ pub mod tests {
     ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
-  use athena_vm_sdk::{Pubkey, PUBKEY_LENGTH};
   use borsh::to_vec;
   use wallet_common::SendArguments;
 
@@ -864,7 +863,7 @@ pub mod tests {
     let program = wallet_program();
 
     // set up host context
-    let owner_pubkey = [1u8; PUBKEY_LENGTH];
+    let owner_pubkey = [1u8; 32];
     let principal = ADDRESS_ALICE;
     let template = ADDRESS_BOB;
     let callee = ADDRESS_CHARLIE;
@@ -891,7 +890,7 @@ pub mod tests {
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
     let mut stdin = AthenaStdin::new();
-    stdin.write(&Pubkey(owner_pubkey));
+    stdin.write(&owner_pubkey);
     runtime.write_vecs(&stdin.buffer);
 
     // make sure the program loaded correctly
