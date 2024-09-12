@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0.196", features = ["derive"] }
 athena-sdk = { path = "../../../sdk" }
-athena-interface = { path = "../../../interface" }
 
 [build-dependencies]
 athena-helper = { path = "../../../helper" }

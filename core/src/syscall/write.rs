@@ -1,5 +1,3 @@
-use athena_interface::HostInterface;
-
 use crate::{
   runtime::{Register, Syscall, SyscallContext},
   utils::num_to_comma_separated,
@@ -13,11 +11,8 @@ impl SyscallWrite {
   }
 }
 
-impl<T> Syscall<T> for SyscallWrite
-where
-  T: HostInterface,
-{
-  fn execute(&self, ctx: &mut SyscallContext<T>, arg1: u32, arg2: u32) -> Option<u32> {
+impl Syscall for SyscallWrite {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     let a2 = Register::X12;
     let rt = &mut ctx.rt;
     let fd = arg1;
@@ -86,11 +81,7 @@ where
   }
 }
 
-pub fn update_io_buf<T: HostInterface>(
-  ctx: &mut SyscallContext<T>,
-  fd: u32,
-  s: &str,
-) -> Vec<String> {
+pub fn update_io_buf(ctx: &mut SyscallContext, fd: u32, s: &str) -> Vec<String> {
   let rt = &mut ctx.rt;
   let entry = rt.io_buf.entry(fd).or_default();
   entry.push_str(s);

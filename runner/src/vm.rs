@@ -1,5 +1,3 @@
-use std::{cell::RefCell, sync::Arc};
-
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
@@ -39,7 +37,7 @@ where
 
   fn execute(
     &self,
-    host: Arc<RefCell<T>>,
+    host: &mut T,
     _rev: AthenaRevision,
     msg: AthenaMessage,
     // note: ignore msg.code, should only be used on deploy
@@ -84,7 +82,6 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, sync::Arc};
 
   use super::*;
   use athena_interface::{
@@ -96,12 +93,9 @@ mod tests {
   #[test]
   #[should_panic]
   fn test_empty_code() {
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host_interface = Arc::new(RefCell::new(MockHost::new()));
-
     // construct a vm
     AthenaVm::new().execute(
-      host_interface,
+      &mut MockHost::new(),
       AthenaRevision::AthenaFrontier,
       AthenaMessage::new(
         MessageKind::Call,
@@ -127,19 +121,18 @@ mod tests {
     let mut stdin = AthenaStdin::new();
     stdin.write::<u32>(&7);
     let vm = AthenaVm::new();
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
-    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     assert_eq!(
-      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
     let (mut output, _) = client
-      .execute::<MockHost>(
+      .execute(
         elf,
         stdin,
-        Some(host.clone()),
+        Some(&mut host),
         Some(150_000),
         Some(ctx.clone()),
       )
@@ -149,7 +142,7 @@ mod tests {
 
     // expect storage value to also have been updated
     assert_eq!(
-      host.borrow().get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
+      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       [
         13u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0
@@ -164,18 +157,11 @@ mod tests {
     let elf = include_bytes!("../../tests/minimal/getbalance.bin");
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
-    // host.borrow_mut().deploy_code(ADDRESS_ALICE, elf);
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
-      .execute::<MockHost>(
-        elf,
-        stdin,
-        Some(host.clone()),
-        Some(1000),
-        Some(ctx.clone()),
-      )
+      .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
       .unwrap();
     let result = output.read::<Balance>();
     assert_eq!(result, SOME_COINS, "got wrong output value");
@@ -229,11 +215,10 @@ mod tests {
     let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(MockHost::new_with_vm(&vm)));
-    host.borrow_mut().deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
-    let res = client.execute::<MockHost>(elf, stdin, Some(host), Some(1_000_000), Some(ctx));
+    let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     match res {
       Ok(_) => panic!("expected stack depth error"),
       Err(ExecutionError::HostCallFailed(StatusCode::CallDepthExceeded)) => (),

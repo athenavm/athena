@@ -7,7 +7,7 @@ pub use context::*;
 
 use blake3::Hasher;
 
-use std::{cell::RefCell, collections::BTreeMap, convert::TryFrom, fmt, sync::Arc};
+use std::{collections::BTreeMap, convert::TryFrom, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -592,21 +592,8 @@ impl<'a> HostInterface for MockHost<'a> {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
 
-      // host requires an owned instance, so we need to take it from self
-      #[allow(clippy::arc_with_non_send_sync)]
-      let host = Arc::new(RefCell::new(std::mem::take(self)));
-      let res = vm.expect("missing VM instance").execute(
-        host.clone(),
-        AthenaRevision::AthenaFrontier,
-        msg,
-        &code,
-      );
-
-      // Restore self
-      *self = Arc::try_unwrap(host)
-        .unwrap_or_else(|_| panic!("Arc still has multiple strong references"))
-        .into_inner();
-      res
+      vm.expect("missing VM instance")
+        .execute(self, AthenaRevision::AthenaFrontier, msg, &code)
     } else {
       // otherwise, pass a call to Charlie, fail all other calls
       let status_code = if msg.recipient == ADDRESS_CHARLIE {
@@ -693,7 +680,7 @@ pub trait VmInterface<T: HostInterface> {
   fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
   fn execute(
     &self,
-    host: Arc<RefCell<T>>,
+    host: &mut T,
     rev: AthenaRevision,
     msg: AthenaMessage,
     code: &[u8],

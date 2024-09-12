@@ -16,7 +16,6 @@ pub use state::*;
 pub use syscall::*;
 pub use utils::*;
 
-use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs::File;
@@ -36,7 +35,7 @@ use athena_interface::{AthenaContext, HostInterface, StatusCode};
 ///
 /// For more information on the RV32IM instruction set, see the following:
 /// https://www.cs.sfu.ca/~ashriram/Courses/CS295/assets/notebooks/RISCV/RISCV_CARD.pdf
-pub struct Runtime<T: HostInterface> {
+pub struct Runtime<'host> {
   /// The program.
   pub program: Arc<Program>,
 
@@ -47,7 +46,7 @@ pub struct Runtime<T: HostInterface> {
   pub state: ExecutionState,
 
   /// The host interface for host calls.
-  pub host: Option<Arc<RefCell<T>>>,
+  pub host: Option<&'host mut dyn HostInterface>,
 
   /// A counter for the number of cycles that have been executed in certain functions.
   pub cycle_tracker: HashMap<String, (u64, u32)>,
@@ -68,7 +67,7 @@ pub struct Runtime<T: HostInterface> {
   pub max_gas: Option<u32>,
 
   /// The mapping between syscall codes and their implementations.
-  pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall<T>>>,
+  pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall>>,
 
   /// The maximum number of cycles for a syscall.
   pub max_syscall_cycles: u32,
@@ -119,18 +118,15 @@ fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
   }
 }
 
-impl<T> Runtime<T>
-where
-  T: HostInterface,
-{
+impl<'host> Runtime<'host> {
   // Create a new runtime from a program and, optionally, a host.
   pub fn new(
     program: Program,
-    host: Option<Arc<RefCell<T>>>,
+    host: Option<&'host mut dyn HostInterface>,
     opts: AthenaCoreOpts,
     context: Option<AthenaContext>,
   ) -> Self {
-    // Create a shared reference to the program and host.
+    // Create a shared reference to the program.
     let program = Arc::new(program);
 
     // If TRACE_FILE is set, initialize the trace buffer.
@@ -787,15 +783,13 @@ where
     }
   }
 
-  fn get_syscall(&mut self, code: SyscallCode) -> Option<&Arc<dyn Syscall<T>>> {
+  fn get_syscall(&mut self, code: SyscallCode) -> Option<&Arc<dyn Syscall>> {
     self.syscall_map.get(&code)
   }
 }
 
 #[cfg(test)]
 pub mod tests {
-  use borsh::to_vec;
-  use std::{cell::RefCell, sync::Arc};
 
   use crate::{
     io::AthenaStdin,
@@ -810,6 +804,7 @@ pub mod tests {
   };
   use athena_vm::helpers::address_to_32bit_words;
   use athena_vm_sdk::{Pubkey, PUBKEY_LENGTH};
+  use borsh::to_vec;
   use wallet_common::SendArguments;
 
   use crate::{
@@ -851,7 +846,7 @@ pub mod tests {
   #[test]
   fn test_simple_program_run() {
     let program = simple_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 42);
   }
@@ -860,7 +855,7 @@ pub mod tests {
   #[should_panic]
   fn test_panic() {
     let program = panic_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
   }
 
@@ -878,16 +873,12 @@ pub mod tests {
     let nonce = 0;
     let static_context = HostStaticContext::new(principal, nonce, Address::default());
     let dynamic_context = HostDynamicContext::new(template, callee);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(MockHost::new_with_context(
-      static_context,
-      dynamic_context,
-    )));
+    let mut host = MockHost::new_with_context(static_context, dynamic_context);
 
     // check balances: only alice has coins
     let amount_to_send = 1000;
-    assert_eq!(host.borrow().get_balance(&ADDRESS_ALICE), SOME_COINS);
-    assert_eq!(host.borrow().get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
     // set up send arguments
     let send_args = SendArguments {
@@ -898,8 +889,7 @@ pub mod tests {
     // alice initiates the call. initially she calls the wallet template directly.
     let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(program, Some(host.clone()), opts, Some(ctx));
+    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
     let mut stdin = AthenaStdin::new();
     stdin.write(&Pubkey(owner_pubkey));
     runtime.write_vecs(&stdin.buffer);
@@ -928,41 +918,35 @@ pub mod tests {
     // now attempt to execute each function in turn
     // first, the spawn
     runtime.execute_function("athexp_spawn").unwrap();
+    drop(runtime);
 
     // get newly-created wallet address
-    // do this in a separate block so the borrow of host doesn't last too long
-    {
-      let borrowed_host = host.borrow();
-      let spawn_result = borrowed_host.get_spawn_result().unwrap();
-      assert_eq!(principal, spawn_result.principal);
-      assert_eq!(template, spawn_result.template);
-      assert_eq!(nonce, spawn_result.nonce);
-      assert_eq!(
-        calculate_address(&template, &spawn_result.blob, &principal, nonce),
-        spawn_result.address
-      );
-      assert_eq!(
-        host.borrow().get_program(&spawn_result.address).unwrap(),
-        &spawn_result.blob
-      );
+    let spawn_result = host.get_spawn_result().unwrap().clone();
+    assert_eq!(principal, spawn_result.principal);
+    assert_eq!(template, spawn_result.template);
+    assert_eq!(nonce, spawn_result.nonce);
+    assert_eq!(
+      calculate_address(&template, &spawn_result.blob, &principal, nonce),
+      spawn_result.address
+    );
+    assert_eq!(
+      host.get_program(&spawn_result.address).unwrap(),
+      &spawn_result.blob
+    );
 
-      // check balances again
-      // note: Alice hasn't paid for gas since we're not charging for gas yet
-      assert_eq!(borrowed_host.get_balance(&ADDRESS_ALICE), SOME_COINS);
-      assert_eq!(borrowed_host.get_balance(&ADDRESS_CHARLIE), 0);
-      assert_eq!(borrowed_host.get_balance(&spawn_result.address), 0);
+    // check balances again
+    // note: Alice hasn't paid for gas since we're not charging for gas yet
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&spawn_result.address), 0);
 
-      // write the input: serialized state blob, then serialized send args
-      let mut stdin = AthenaStdin::new();
-      stdin.write_vec(spawn_result.blob.clone());
-      stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
-      runtime.write_vecs(&stdin.buffer);
-
-      // update the runtime ctx to reflect the new call
-      // now, Alice calls her newly-spawned wallet
-      let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
-      runtime.context = Some(ctx);
-    }
+    // write the input: serialized state blob, then serialized send args
+    let mut stdin = AthenaStdin::new();
+    let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
+    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
+    stdin.write_vec(spawn_result.blob.clone());
+    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
     let res = runtime.execute_function("athexp_send");
@@ -975,25 +959,23 @@ pub mod tests {
         _ => panic!("expected HostCallFailed error"),
       },
     }
+    drop(runtime);
 
     // transfer some coins to the new wallet
-    let address = host.borrow().get_spawn_result().unwrap().address;
-    host
-      .borrow_mut()
-      .transfer_balance(&ADDRESS_ALICE, &address, amount_to_send);
+    let address = spawn_result.address;
+    host.transfer_balance(&ADDRESS_ALICE, &address, amount_to_send);
     assert_eq!(
-      host.borrow().get_balance(&ADDRESS_ALICE),
+      host.get_balance(&ADDRESS_ALICE),
       SOME_COINS - amount_to_send
     );
-    assert_eq!(host.borrow().get_balance(&ADDRESS_CHARLIE), 0);
-    assert_eq!(host.borrow().get_balance(&address), amount_to_send);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&address), amount_to_send);
 
-    // runtime gas is now zero due to execution failure, gas up
-    runtime.state.clk = 0;
-
-    // set up the stdin again
+    // set up the runtime again
     let mut stdin = AthenaStdin::new();
-    stdin.write_vec(host.borrow().get_spawn_result().unwrap().blob.clone());
+    let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
+    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
+    stdin.write_vec(spawn_result.blob);
     stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
     runtime.write_vecs(&stdin.buffer);
 
@@ -1002,11 +984,11 @@ pub mod tests {
 
     // final balance check: some of alice's coins were sent to Charlie
     assert_eq!(
-      host.borrow().get_balance(&ADDRESS_ALICE),
+      host.get_balance(&ADDRESS_ALICE),
       SOME_COINS - amount_to_send
     );
-    assert_eq!(host.borrow().get_balance(&ADDRESS_CHARLIE), amount_to_send);
-    assert_eq!(host.borrow().get_balance(&address), 0);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), amount_to_send);
+    assert_eq!(host.get_balance(&address), 0);
   }
 
   #[test]
@@ -1015,13 +997,8 @@ pub mod tests {
     let program = host_program();
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(
-      program,
-      Some(Arc::new(RefCell::new(MockHost::new()))),
-      opts,
-      Some(ctx),
-    );
+    let mut host = MockHost::new();
+    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     let gas_left = runtime.execute().unwrap();
 
     // don't bother checking exact gas value, that's checked in the following test
@@ -1033,25 +1010,19 @@ pub mod tests {
     let program = fibonacci_program();
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
-    // we need a new host provider for each test to reset state
-    fn get_provider<'a>() -> Arc<RefCell<MockHost<'a>>> {
-      #[allow(clippy::arc_with_non_send_sync)]
-      Arc::new(RefCell::new(MockHost::new()))
-    }
-
     // failure
-    let mut runtime = Runtime::<MockHost>::new(
+    let mut runtime = Runtime::new(
       program.clone(),
-      Some(get_provider()),
+      None,
       AthenaCoreOpts::default().with_options(vec![with_max_gas(543)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
 
     // success
-    runtime = Runtime::<MockHost>::new(
+    let mut runtime = Runtime::new(
       program.clone(),
-      Some(get_provider()),
+      None,
       AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
       Some(ctx.clone()),
     );
@@ -1059,9 +1030,9 @@ pub mod tests {
     assert_eq!(gas_left, Some(0));
 
     // success
-    runtime = Runtime::<MockHost>::new(
+    let mut runtime = Runtime::new(
       program.clone(),
-      Some(get_provider()),
+      None,
       AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
       Some(ctx.clone()),
     );
@@ -1175,28 +1146,22 @@ pub mod tests {
     instructions.push(Instruction::new(Opcode::ECALL, 0, 0, 0, false, false));
     let program = Program::new(instructions, 0, 0);
 
-    let host = MockHost::new();
-    #[allow(clippy::arc_with_non_send_sync)]
-    let provider = Arc::new(RefCell::new(host));
+    let mut host = MockHost::new();
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    let mut runtime = Runtime::<MockHost>::new(program, Some(provider.clone()), opts, Some(ctx));
-
     // balances before execution
-    assert_eq!(provider.borrow().get_balance(&ADDRESS_ALICE), SOME_COINS);
-    assert_eq!(provider.borrow().get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
+    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     assert!(runtime.execute().unwrap().is_some());
 
     // balances after execution
     assert_eq!(
-      provider.borrow().get_balance(&ADDRESS_ALICE),
+      host.get_balance(&ADDRESS_ALICE),
       SOME_COINS - amount_to_send as u64
     );
-    assert_eq!(
-      provider.borrow().get_balance(&ADDRESS_CHARLIE),
-      amount_to_send as u64
-    );
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), amount_to_send as u64);
   }
 
   #[test]
@@ -1237,13 +1202,8 @@ pub mod tests {
 
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(
-      program,
-      Some(Arc::new(RefCell::new(MockHost::new()))),
-      opts,
-      Some(ctx),
-    );
+    let mut host = MockHost::new();
+    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     match runtime.execute() {
       Err(e) => match e {
         ExecutionError::HostCallFailed(code) => {
@@ -1281,13 +1241,8 @@ pub mod tests {
 
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let mut runtime = Runtime::new(
-      program,
-      Some(Arc::new(RefCell::new(MockHost::new()))),
-      opts,
-      Some(ctx),
-    );
+    let mut host = MockHost::new();
+    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     let gas_left = runtime.execute().expect("execution failed");
     assert!(gas_left.is_some());
 
@@ -1312,7 +1267,7 @@ pub mod tests {
       Instruction::new(Opcode::ADD, 31, 30, 29, false, false),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 42);
   }
@@ -1329,7 +1284,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 32);
   }
@@ -1346,7 +1301,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 32);
   }
@@ -1363,7 +1318,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
 
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 37);
@@ -1381,7 +1336,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 5);
   }
@@ -1398,7 +1353,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1184);
   }
@@ -1415,7 +1370,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1);
   }
@@ -1432,7 +1387,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 1);
   }
@@ -1449,7 +1404,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1466,7 +1421,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1483,7 +1438,7 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 84);
   }
@@ -1499,7 +1454,7 @@ pub mod tests {
       Instruction::new(Opcode::ADD, 31, 30, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 5 - 1 + 4);
   }
@@ -1515,7 +1470,7 @@ pub mod tests {
       Instruction::new(Opcode::XOR, 31, 30, 42, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 10);
   }
@@ -1531,7 +1486,7 @@ pub mod tests {
       Instruction::new(Opcode::OR, 31, 30, 42, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 47);
   }
@@ -1547,7 +1502,7 @@ pub mod tests {
       Instruction::new(Opcode::AND, 31, 30, 42, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1561,7 +1516,7 @@ pub mod tests {
       Instruction::new(Opcode::SLL, 31, 29, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 80);
   }
@@ -1575,7 +1530,7 @@ pub mod tests {
       Instruction::new(Opcode::SRL, 31, 29, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 2);
   }
@@ -1589,7 +1544,7 @@ pub mod tests {
       Instruction::new(Opcode::SRA, 31, 29, 4, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 2);
   }
@@ -1603,7 +1558,7 @@ pub mod tests {
       Instruction::new(Opcode::SLT, 31, 29, 37, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1617,7 +1572,7 @@ pub mod tests {
       Instruction::new(Opcode::SLTU, 31, 29, 37, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.register(Register::X31), 0);
   }
@@ -1636,7 +1591,7 @@ pub mod tests {
       Instruction::new(Opcode::JALR, 5, 11, 8, false, true),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.registers()[Register::X5 as usize], 8);
     assert_eq!(runtime.registers()[Register::X11 as usize], 100);
@@ -1650,7 +1605,7 @@ pub mod tests {
       Instruction::new(opcode, 12, 10, 11, false, false),
     ];
     let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
     assert_eq!(runtime.registers()[Register::X12 as usize], expected);
   }
@@ -1868,7 +1823,7 @@ pub mod tests {
   #[test]
   fn test_simple_memory_program_run() {
     let program = simple_memory_program();
-    let mut runtime = Runtime::<MockHost>::new(program, None, AthenaCoreOpts::default(), None);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
 
     // Assert SW & LW case

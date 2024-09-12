@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-x86:
+  test-rust:
     name: Test
     strategy:
       matrix:
@@ -33,7 +33,7 @@ jobs:
           - macos-latest
           - macos-13
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
@@ -47,14 +47,12 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          toolchain: nightly-2024-04-17
           args: --all-targets --all-features
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          toolchain: nightly-2024-04-17
           args: --release
         env:
           RUSTFLAGS: -Copt-level=3 -Cdebug-assertions -Coverflow-checks=y -Cdebuginfo=0 -C target-cpu=native

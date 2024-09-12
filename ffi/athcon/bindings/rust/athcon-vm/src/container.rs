@@ -74,12 +74,12 @@ mod tests {
     fn init() -> Self {
       TestVm {}
     }
-    unsafe fn execute(
+    fn execute(
       &self,
       _revision: athcon_sys::athcon_revision,
       _code: &[u8],
       _message: &ExecutionMessage,
-      _host: *const athcon_sys::athcon_host_interface,
+      _host: &athcon_sys::athcon_host_interface,
       _context: *mut athcon_sys::athcon_host_context,
     ) -> ExecutionResult {
       ExecutionResult::failure()
@@ -141,17 +141,15 @@ mod tests {
 
     let container = AthconContainer::<TestVm>::new(instance);
     assert_eq!(
-      unsafe {
-        container
-          .execute(
-            athcon_sys::athcon_revision::ATHCON_FRONTIER,
-            &code,
-            &message,
-            &host,
-            host_context,
-          )
-          .status_code()
-      },
+      container
+        .execute(
+          athcon_sys::athcon_revision::ATHCON_FRONTIER,
+          &code,
+          &message,
+          &host,
+          host_context,
+        )
+        .status_code(),
       ::athcon_sys::athcon_status_code::ATHCON_FAILURE
     );
 
@@ -159,17 +157,15 @@ mod tests {
 
     let container = unsafe { AthconContainer::<TestVm>::from_ffi_pointer(ptr) };
     assert_eq!(
-      unsafe {
-        container
-          .execute(
-            athcon_sys::athcon_revision::ATHCON_FRONTIER,
-            &code,
-            &message,
-            &host,
-            host_context,
-          )
-          .status_code()
-      },
+      container
+        .execute(
+          athcon_sys::athcon_revision::ATHCON_FRONTIER,
+          &code,
+          &message,
+          &host,
+          host_context,
+        )
+        .status_code(),
       ::athcon_sys::athcon_status_code::ATHCON_FAILURE
     );
   }

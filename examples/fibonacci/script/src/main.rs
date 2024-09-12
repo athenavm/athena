@@ -1,4 +1,3 @@
-use athena_interface::MockHost;
 use athena_sdk::{utils, AthenaPublicValues, AthenaStdin, ExecutionClient};
 
 /// The ELF we want to execute inside the zkVM.
@@ -14,11 +13,9 @@ fn main() {
   let mut stdin = AthenaStdin::new();
   stdin.write(&n);
 
-  // Generate the proof for the given program and input.
-  let client = ExecutionClient::new();
-  let (mut output, _opt): (AthenaPublicValues, Option<u32>) = client
-    .execute::<MockHost>(ELF, stdin, None, None, None)
-    .expect("execution failed");
+    // Generate the proof for the given program and input.
+    let client = ExecutionClient::new();
+    let (mut output, _opt): (AthenaPublicValues, Option<u32>) = client.execute(ELF, stdin, None, None, None).expect("execution failed");
 
   println!("executed program");
 
