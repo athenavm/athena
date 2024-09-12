@@ -147,17 +147,17 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
 pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
   let mut syscall_map = HashMap::<SyscallCode, Arc<dyn Syscall>>::default();
   syscall_map.insert(SyscallCode::HALT, Arc::new(SyscallHalt {}));
-  syscall_map.insert(SyscallCode::WRITE, Arc::new(SyscallWrite::new()));
-  syscall_map.insert(SyscallCode::HOST_READ, Arc::new(SyscallHostRead::new()));
-  syscall_map.insert(SyscallCode::HOST_WRITE, Arc::new(SyscallHostWrite::new()));
-  syscall_map.insert(SyscallCode::HOST_CALL, Arc::new(SyscallHostCall::new()));
+  syscall_map.insert(SyscallCode::WRITE, Arc::new(SyscallWrite {}));
+  syscall_map.insert(SyscallCode::HOST_READ, Arc::new(SyscallHostRead {}));
+  syscall_map.insert(SyscallCode::HOST_WRITE, Arc::new(SyscallHostWrite {}));
+  syscall_map.insert(SyscallCode::HOST_CALL, Arc::new(SyscallHostCall {}));
   syscall_map.insert(
     SyscallCode::HOST_GETBALANCE,
-    Arc::new(SyscallHostGetBalance::new()),
+    Arc::new(SyscallHostGetBalance {}),
   );
-  syscall_map.insert(SyscallCode::HOST_SPAWN, Arc::new(SyscallHostSpawn::new()));
-  syscall_map.insert(SyscallCode::HINT_LEN, Arc::new(SyscallHintLen::new()));
-  syscall_map.insert(SyscallCode::HINT_READ, Arc::new(SyscallHintRead::new()));
+  syscall_map.insert(SyscallCode::HOST_SPAWN, Arc::new(SyscallHostSpawn {}));
+  syscall_map.insert(SyscallCode::HINT_LEN, Arc::new(SyscallHintLen {}));
+  syscall_map.insert(SyscallCode::HINT_READ, Arc::new(SyscallHintRead {}));
 
   syscall_map
 }

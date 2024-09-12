@@ -5,12 +5,6 @@ use athena_interface::{
 
 pub struct SyscallHostRead;
 
-impl SyscallHostRead {
-  pub const fn new() -> Self {
-    Self
-  }
-}
-
 impl Syscall for SyscallHostRead {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
@@ -34,12 +28,6 @@ impl Syscall for SyscallHostRead {
 }
 
 pub struct SyscallHostWrite;
-
-impl SyscallHostWrite {
-  pub const fn new() -> Self {
-    Self
-  }
-}
 
 impl Syscall for SyscallHostWrite {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
@@ -70,12 +58,6 @@ impl Syscall for SyscallHostWrite {
 }
 
 pub struct SyscallHostCall;
-
-impl SyscallHostCall {
-  pub const fn new() -> Self {
-    Self
-  }
-}
 
 impl Syscall for SyscallHostCall {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
@@ -158,12 +140,6 @@ impl Syscall for SyscallHostCall {
 
 pub struct SyscallHostGetBalance;
 
-impl SyscallHostGetBalance {
-  pub const fn new() -> Self {
-    Self
-  }
-}
-
 impl Syscall for SyscallHostGetBalance {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
     let athena_ctx = ctx
@@ -188,12 +164,6 @@ impl Syscall for SyscallHostGetBalance {
 }
 
 pub struct SyscallHostSpawn;
-
-impl SyscallHostSpawn {
-  pub const fn new() -> Self {
-    Self
-  }
-}
 
 impl Syscall for SyscallHostSpawn {
   fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> Option<u32> {
