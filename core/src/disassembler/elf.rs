@@ -26,6 +26,9 @@ pub struct Elf {
 
   /// The initial memory image, useful for global constants.
   pub memory_image: BTreeMap<u32, u32>,
+
+  /// Symbol table, useful for looking up function addresses.
+  pub symbol_table: BTreeMap<String, u32>,
 }
 
 impl Elf {
@@ -35,12 +38,14 @@ impl Elf {
     pc_start: u32,
     pc_base: u32,
     memory_image: BTreeMap<u32, u32>,
+    symbol_table: BTreeMap<String, u32>,
   ) -> Self {
     Self {
       instructions,
       pc_start,
       pc_base,
       memory_image,
+      symbol_table,
     }
   }
 
@@ -49,6 +54,8 @@ impl Elf {
   /// Reference: https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
   pub fn decode(input: &[u8]) -> Self {
     let mut image: BTreeMap<u32, u32> = BTreeMap::new();
+    let mut symbols: BTreeMap<String, u32> = BTreeMap::new();
+
     // Parse the ELF file assuming that it is little-endian..
     let elf = ElfBytes::<LittleEndian>::minimal_parse(input).expect("failed to parse elf");
 
@@ -151,6 +158,29 @@ impl Elf {
       }
     }
 
-    Elf::new(instructions, entry, base_address, image)
+    // Read the symbol table
+    let (symtab, stringtab) = elf.symbol_table().unwrap().unwrap();
+    symbols.extend(
+      symtab
+        .iter()
+        // we're only interested in global functions
+        .filter(|sym| sym.st_bind() == 1 && sym.st_symtype() == 2)
+        .filter_map(|sym| {
+          // get the name
+          stringtab
+            .get(sym.st_name as usize)
+            .ok()
+            .filter(|name| name.starts_with("athexp_"))
+            .map(|name| {
+              let offset = u32::try_from(sym.st_value).unwrap();
+              if offset % 4 != 0 {
+                panic!("symbol table offset isn't aligned");
+              }
+              (name.to_string(), offset)
+            })
+        }),
+    );
+
+    Elf::new(instructions, entry, base_address, image, symbols)
   }
 }

@@ -13,10 +13,13 @@ members = [
   "interface",
   "runner",
   "sdk",
+  "vm/declare",
   "vm/entrypoint",
   "vm/hostfunctions",
   "vm/lib",
+  "vm/sdk",
 ]
+exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]

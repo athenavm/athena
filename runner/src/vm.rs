@@ -122,7 +122,7 @@ mod tests {
     stdin.write::<u32>(&7);
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
@@ -158,7 +158,7 @@ mod tests {
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
       .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
@@ -179,7 +179,7 @@ mod tests {
 
     // trying to go any higher should result in an out-of-gas error
     let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
@@ -216,7 +216,7 @@ mod tests {
     let stdin = AthenaStdin::new();
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     match res {

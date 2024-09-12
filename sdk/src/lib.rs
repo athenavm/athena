@@ -74,6 +74,32 @@ impl ExecutionClient {
       )
     })
   }
+
+  pub fn execute_function(
+    &self,
+    elf: &[u8],
+    function: &str,
+    stdin: AthenaStdin,
+    host: Option<&mut dyn HostInterface>,
+    max_gas: Option<u32>,
+    context: Option<AthenaContext>,
+  ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
+    let program = Program::from(elf);
+    let opts = match max_gas {
+      None => AthenaCoreOpts::default(),
+      Some(max_gas) => {
+        AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)])
+      }
+    };
+    let mut runtime = Runtime::new(program, host, opts, context);
+    runtime.write_vecs(&stdin.buffer);
+    runtime.execute_function(function).map(|gas_left| {
+      (
+        AthenaPublicValues::from(&runtime.state.public_values_stream),
+        gas_left,
+      )
+    })
+  }
 }
 
 impl Default for ExecutionClient {

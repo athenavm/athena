@@ -100,6 +100,8 @@ pub enum ExecutionError {
   Breakpoint(),
   #[error("got unimplemented as opcode")]
   Unimplemented(),
+  #[error("symbol not found")]
+  UnknownSymbol(),
 }
 
 fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
@@ -669,7 +671,7 @@ impl<'host> Runtime<'host> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
-    log::info!("Executing cycle with instruction: {:?}", instruction);
+    log::debug!("Executing cycle with instruction: {:?}", instruction);
 
     // Log the current state of the runtime.
     self.log(&instruction);
@@ -704,12 +706,26 @@ impl<'host> Runtime<'host> {
   fn initialize(&mut self) {
     self.state.clk = 0;
 
+    // TODO: do we want to load all of the memory when executing a particular function?
     tracing::info!("loading memory image");
     for (addr, value) in self.program.memory_image.iter() {
       self.state.memory.insert(*addr, *value);
     }
 
     tracing::info!("starting execution");
+  }
+
+  /// Execute an exported function. Does the same work as execute().
+  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+    // Make sure the symbol exists, and set the program counter
+    let offset = match self.program.symbol_table.get(symbol_name) {
+      Some(offset) => *offset,
+      None => return Err(ExecutionError::UnknownSymbol()),
+    };
+    self.state.pc = offset;
+
+    // Hand over to execute
+    self.execute()
   }
 
   /// Execute the program, returning remaining gas. Execution will either complete or produce an error.
@@ -776,19 +792,24 @@ impl<'host> Runtime<'host> {
 pub mod tests {
 
   use crate::{
+    io::AthenaStdin,
     runtime::ExecutionError,
     runtime::MemoryAccessPosition,
     utils::{self, with_max_gas},
   };
   use athena_interface::{
-    Address, AthenaContext, HostInterface, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE, SOME_COINS,
+    calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
+    HostStaticContext, MockHost, StatusCode, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+    ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
+  use borsh::to_vec;
+  use wallet_common::SendArguments;
 
   use crate::{
     runtime::Register,
     utils::{
-      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF},
+      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF, WALLET_ELF},
       AthenaCoreOpts,
     },
   };
@@ -817,6 +838,10 @@ pub mod tests {
     Program::from(TEST_HOST)
   }
 
+  pub fn wallet_program() -> Program {
+    Program::from(WALLET_ELF)
+  }
+
   #[test]
   fn test_simple_program_run() {
     let program = simple_program();
@@ -831,6 +856,138 @@ pub mod tests {
     let program = panic_program();
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
+  }
+
+  #[test]
+  fn test_wallet() {
+    let program = wallet_program();
+
+    // set up host context
+    let owner_pubkey = [1u8; 32];
+    let principal = ADDRESS_ALICE;
+    let template = ADDRESS_BOB;
+    let callee = ADDRESS_CHARLIE;
+    // arbitrary template address
+    let wallet_template = [9u8; ADDRESS_LENGTH];
+    let nonce = 0;
+    let static_context = HostStaticContext::new(principal, nonce, Address::default());
+    let dynamic_context = HostDynamicContext::new(template, callee);
+    let mut host = MockHost::new_with_context(static_context, dynamic_context);
+
+    // check balances: only alice has coins
+    let amount_to_send = 1000;
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+
+    // set up send arguments
+    let send_args = SendArguments {
+      amount: amount_to_send,
+      recipient: ADDRESS_CHARLIE,
+    };
+
+    // alice initiates the call. initially she calls the wallet template directly.
+    let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
+    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
+    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
+    let mut stdin = AthenaStdin::new();
+    stdin.write(&owner_pubkey);
+    runtime.write_vecs(&stdin.buffer);
+
+    // make sure the program loaded correctly
+    // riscv32-unknown-linux-gnu-objdump -d -j .text elf/wallet-template | grep athexp
+    assert_eq!(
+      runtime
+        .program
+        .as_ref()
+        .symbol_table
+        .get("athexp_spawn")
+        .unwrap(),
+      &2102260
+    );
+    assert_eq!(
+      runtime
+        .program
+        .as_ref()
+        .symbol_table
+        .get("athexp_send")
+        .unwrap(),
+      &2102288
+    );
+
+    // now attempt to execute each function in turn
+    // first, the spawn
+    runtime.execute_function("athexp_spawn").unwrap();
+    drop(runtime);
+
+    // get newly-created wallet address
+    let spawn_result = host.get_spawn_result().unwrap().clone();
+    assert_eq!(principal, spawn_result.principal);
+    assert_eq!(template, spawn_result.template);
+    assert_eq!(nonce, spawn_result.nonce);
+    assert_eq!(
+      calculate_address(&template, &spawn_result.blob, &principal, nonce),
+      spawn_result.address
+    );
+    assert_eq!(
+      host.get_program(&spawn_result.address).unwrap(),
+      &spawn_result.blob
+    );
+
+    // check balances again
+    // note: Alice hasn't paid for gas since we're not charging for gas yet
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&spawn_result.address), 0);
+
+    // write the input: serialized state blob, then serialized send args
+    let mut stdin = AthenaStdin::new();
+    let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
+    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
+    stdin.write_vec(spawn_result.blob.clone());
+    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    runtime.write_vecs(&stdin.buffer);
+
+    // now attempt the send
+    let res = runtime.execute_function("athexp_send");
+    match res {
+      Ok(_) => panic!("expected execution error"),
+      Err(e) => match e {
+        ExecutionError::HostCallFailed(status) => {
+          assert_eq!(status, StatusCode::InsufficientBalance);
+        }
+        _ => panic!("expected HostCallFailed error"),
+      },
+    }
+    drop(runtime);
+
+    // transfer some coins to the new wallet
+    let address = spawn_result.address;
+    host.transfer_balance(&ADDRESS_ALICE, &address, amount_to_send);
+    assert_eq!(
+      host.get_balance(&ADDRESS_ALICE),
+      SOME_COINS - amount_to_send
+    );
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
+    assert_eq!(host.get_balance(&address), amount_to_send);
+
+    // set up the runtime again
+    let mut stdin = AthenaStdin::new();
+    let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
+    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
+    stdin.write_vec(spawn_result.blob);
+    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    runtime.write_vecs(&stdin.buffer);
+
+    // do the send again
+    runtime.execute_function("athexp_send").unwrap();
+
+    // final balance check: some of alice's coins were sent to Charlie
+    assert_eq!(
+      host.get_balance(&ADDRESS_ALICE),
+      SOME_COINS - amount_to_send
+    );
+    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), amount_to_send);
+    assert_eq!(host.get_balance(&address), 0);
   }
 
   #[test]

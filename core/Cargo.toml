@@ -27,6 +27,8 @@ thiserror = "1.0.60"
 
 [dev-dependencies]
 athena-vm = { path = "../vm/entrypoint" }
+borsh = "1.5.1"
+wallet-common = { path = "../examples/wallet/common" }
 
 [features]
 debug = []
