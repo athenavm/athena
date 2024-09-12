@@ -1,13 +1,7 @@
 use crate::runtime::{Syscall, SyscallContext};
 
-pub struct SyscallHintLen;
-
 /// SyscallHintLen returns the length of the next slice in the hint input stream.
-impl SyscallHintLen {
-  pub const fn new() -> Self {
-    Self
-  }
-}
+pub struct SyscallHintLen;
 
 impl Syscall for SyscallHintLen {
   fn execute(&self, ctx: &mut SyscallContext, _arg1: u32, _arg2: u32) -> Option<u32> {
@@ -22,14 +16,8 @@ impl Syscall for SyscallHintLen {
   }
 }
 
-pub struct SyscallHintRead;
-
 /// SyscallHintRead returns the length of the next slice in the hint input stream.
-impl SyscallHintRead {
-  pub const fn new() -> Self {
-    Self
-  }
-}
+pub struct SyscallHintRead;
 
 impl Syscall for SyscallHintRead {
   fn execute(&self, ctx: &mut SyscallContext, ptr: u32, len: u32) -> Option<u32> {
@@ -76,34 +64,3 @@ impl Syscall for SyscallHintRead {
     None
   }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use rand::RngCore;
-
-//     use crate::{
-//         io::AthenaStdin,
-//         runtime::Program,
-//         utils::{setup_logger, AthenaCoreOpts},
-//     };
-
-//     const HINT_IO_ELF: &[u8] =
-//         include_bytes!("../../../tests/hint-io/elf/riscv32im-succinct-zkvm-elf");
-
-//     #[test]
-//     fn test_hint_io() {
-//         setup_logger();
-
-//         let mut rng = rand::thread_rng();
-//         let mut data = vec![0u8; 1021];
-//         rng.fill_bytes(&mut data);
-
-//         let mut stdin = AthenaStdin::new();
-//         stdin.write(&data);
-//         stdin.write_vec(data);
-
-//         // let program = Program::from(HINT_IO_ELF);
-//         // let config = BabyBearPoseidon2::new();
-//         // prove(program, &stdin, config, AthenaCoreOpts::default()).unwrap();
-//     }
-// }
