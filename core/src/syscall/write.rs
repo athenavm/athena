@@ -5,12 +5,6 @@ use crate::{
 
 pub struct SyscallWrite;
 
-impl SyscallWrite {
-  pub const fn new() -> Self {
-    Self
-  }
-}
-
 impl Syscall for SyscallWrite {
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
     let a2 = Register::X12;
