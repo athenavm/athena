@@ -12,7 +12,7 @@ fn main() {
 
   // Run the given program.
   let client = ExecutionClient::new();
-  let _output = client.execute(ELF, stdin, None, None, None).unwrap();
+  client.execute(ELF, stdin, None, None, None).unwrap();
 
   println!("successful execution")
 }

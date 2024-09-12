@@ -32,7 +32,7 @@ fn main() {
 
   // Run the given program.
   let client = ExecutionClient::new();
-  let (mut output, _opt): (AthenaPublicValues, Option<u32>) = client
+  let (mut output, _) = client
     .execute(ELF, stdin, None, None, None)
     .expect("execution failed");
 

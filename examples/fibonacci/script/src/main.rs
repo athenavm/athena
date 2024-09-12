@@ -1,4 +1,4 @@
-use athena_sdk::{utils, AthenaPublicValues, AthenaStdin, ExecutionClient};
+use athena_sdk::{utils, AthenaStdin, ExecutionClient};
 
 /// The ELF we want to execute inside the zkVM.
 const ELF: &[u8] = include_bytes!("../../program/elf/fibonacci-program");
@@ -15,7 +15,7 @@ fn main() {
 
   // Generate the proof for the given program and input.
   let client = ExecutionClient::new();
-  let (mut output, _opt): (AthenaPublicValues, Option<u32>) = client
+  let (mut output, _) = client
     .execute(ELF, stdin, None, None, None)
     .expect("execution failed");
 

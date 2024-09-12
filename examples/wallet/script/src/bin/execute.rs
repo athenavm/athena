@@ -4,7 +4,6 @@
 //! ```shell
 //! RUST_LOG=info cargo run --package wallet-script --bin execute --release
 //! ```
-use std::{cell::RefCell, sync::Arc};
 
 use athena_interface::{
   AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost, ADDRESS_ALICE,
@@ -53,18 +52,16 @@ fn main() {
   let mut stdin = AthenaStdin::new();
   stdin.write(&args.owner.0);
 
-  #[allow(clippy::arc_with_non_send_sync)]
-  let host = Arc::new(RefCell::new(MockHost::new_with_context(
+  let mut host = MockHost::new_with_context(
     HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
     HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
-  )));
+  );
 
   // spawn the wallet
   client
-    .execute_function(ELF, "athexp_spawn", stdin, Some(host.clone()), None, None)
+    .execute_function(ELF, "athexp_spawn", stdin, Some(&mut host), None, None)
     .expect("spawning wallet");
   let result = host
-    .borrow()
     .get_spawn_result()
     .expect("getting spawn result")
     .clone();
@@ -80,7 +77,6 @@ fn main() {
 
   let mut stdin = AthenaStdin::new();
   let wallet = host
-    .borrow()
     .get_program(&result.address)
     .expect("getting wallet program instance")
     .clone();
@@ -92,7 +88,7 @@ fn main() {
   };
   stdin.write_slice(&to_vec(&args).expect("serializing send arguments"));
 
-  let alice_balance = host.borrow().get_balance(&ADDRESS_ALICE);
+  let alice_balance = host.get_balance(&ADDRESS_ALICE);
   assert!(alice_balance >= 10);
   println!(
     "sending {} coins {} -> {}",
@@ -105,14 +101,14 @@ fn main() {
       ELF,
       "athexp_send",
       stdin,
-      Some(host.clone()),
+      Some(&mut host),
       Some(25000),
       Some(context.clone()),
     )
     .expect("sending coins");
 
-  let new_alice_balance = host.borrow().get_balance(&ADDRESS_ALICE);
-  let charlie_balance = host.borrow().get_balance(&ADDRESS_CHARLIE);
+  let new_alice_balance = host.get_balance(&ADDRESS_ALICE);
+  let charlie_balance = host.get_balance(&ADDRESS_CHARLIE);
   println!(
     "sent coins at gas cost {}, balances: alice: {}, charlie: {}",
     gas_cost.unwrap_or_default(),
