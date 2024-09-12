@@ -10,9 +10,9 @@ fn main() {
   // Create an input stream.
   let stdin = AthenaStdin::new();
 
-    // Run the given program.
-    let client = ExecutionClient::new();
-    let _output = client.execute(ELF, stdin, None, None, None).unwrap();
+  // Run the given program.
+  let client = ExecutionClient::new();
+  let _output = client.execute(ELF, stdin, None, None, None).unwrap();
 
   println!("successful execution")
 }
