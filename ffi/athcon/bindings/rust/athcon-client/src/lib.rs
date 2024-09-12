@@ -1,13 +1,8 @@
-extern crate enum_primitive;
 pub mod host;
 pub mod types;
 use crate::types::*;
 use athcon_sys as ffi;
 use std::ffi::CStr;
-
-extern "C" {
-  fn athcon_create_athenavmwrapper() -> *mut ffi::athcon_vm;
-}
 
 /// Athena VM wrapper
 /// It owns the VM handle and provides a high-level interface to interact with the VM
@@ -20,7 +15,7 @@ pub struct AthconVm {
 
 impl AthconVm {
   pub fn new() -> Self {
-    let handle = unsafe { athcon_create_athenavmwrapper() };
+    let handle = athena_vmlib::athcon_create_athenavmwrapper();
     assert!(!handle.is_null(), "Failed to create athena vm");
 
     AthconVm {
