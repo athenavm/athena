@@ -4,9 +4,17 @@
 //! ```shell
 //! RUST_LOG=info cargo run --package wallet-script --bin execute --release
 //! ```
-use athena_interface::MockHost;
+use std::{cell::RefCell, sync::Arc};
+
+use athena_interface::{
+  AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost, ADDRESS_ALICE,
+  ADDRESS_BOB, ADDRESS_CHARLIE,
+};
 use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_vm_sdk::Pubkey;
+use borsh::to_vec;
 use clap::Parser;
+use wallet_common::SendArguments;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
 ///
@@ -17,8 +25,18 @@ pub const ELF: &[u8] = include_bytes!("../../../program/elf/wallet-template");
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct RunArgs {
-  #[clap(long, default_value = "20")]
-  owner: String,
+  #[arg(
+    long,
+    default_value = "000dfb23b0979b4b000000000000000000000000000000000000000000000000",
+    value_parser(parse_owner)
+  )]
+  owner: Pubkey,
+}
+
+fn parse_owner(data: &str) -> Result<Pubkey, hex::FromHexError> {
+  let mut key = Pubkey::default();
+  hex::decode_to_slice(data, &mut key.0 as &mut [u8])?;
+  Ok(key)
 }
 
 fn main() {
@@ -33,14 +51,75 @@ fn main() {
 
   // Setup the inputs.
   let mut stdin = AthenaStdin::new();
+  stdin.write(&args.owner.0);
 
-  // Convert the owner to a public key.
-  let owner = args.owner.as_bytes().to_vec();
-  stdin.write(&owner);
+  #[allow(clippy::arc_with_non_send_sync)]
+  let host = Arc::new(RefCell::new(MockHost::new_with_context(
+    HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+    HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+  )));
 
-  // Run the program.
+  // spawn the wallet
   client
-    .execute::<MockHost>(ELF, stdin, None, None, None)
-    .expect("failed to run program");
-  println!("Successfully executed program!");
+    .execute_function(ELF, "athexp_spawn", stdin, Some(host.clone()), None, None)
+    .expect("spawning wallet");
+  let result = host
+    .borrow()
+    .get_spawn_result()
+    .expect("getting spawn result")
+    .clone();
+
+  println!(
+    "spawned a wallet program {}: {:?}",
+    hex::encode(args.owner.0),
+    result,
+  );
+
+  // send some coins
+  let context = AthenaContext::new(ADDRESS_ALICE, ADDRESS_BOB, 0);
+
+  let mut stdin = AthenaStdin::new();
+  let wallet = host
+    .borrow()
+    .get_program(&result.address)
+    .expect("getting wallet program instance")
+    .clone();
+  stdin.write_vec(wallet);
+
+  let args = SendArguments {
+    recipient: ADDRESS_CHARLIE,
+    amount: 10,
+  };
+  stdin.write_slice(&to_vec(&args).expect("serializing send arguments"));
+
+  let alice_balance = host.borrow().get_balance(&ADDRESS_ALICE);
+  assert!(alice_balance >= 10);
+  println!(
+    "sending {} coins {} -> {}",
+    args.amount,
+    hex::encode(context.address()),
+    hex::encode(args.recipient),
+  );
+  let (_, gas_cost) = client
+    .execute_function(
+      ELF,
+      "athexp_send",
+      stdin,
+      Some(host.clone()),
+      Some(25000),
+      Some(context.clone()),
+    )
+    .expect("sending coins");
+
+  let new_alice_balance = host.borrow().get_balance(&ADDRESS_ALICE);
+  let charlie_balance = host.borrow().get_balance(&ADDRESS_CHARLIE);
+  println!(
+    "sent coins at gas cost {}, balances: alice: {}, charlie: {}",
+    gas_cost.unwrap_or_default(),
+    new_alice_balance,
+    charlie_balance
+  );
+  assert!(gas_cost.is_some());
+  assert_eq!(charlie_balance, 10);
+  assert_eq!(new_alice_balance, alice_balance - 10);
 }

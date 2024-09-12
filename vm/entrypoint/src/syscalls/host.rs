@@ -95,6 +95,9 @@ pub extern "C" fn get_balance(value: *mut u32) {
 /// available in its context and don't need to be passed here. The
 /// owner of the new program is implicit in the blob, which is just a
 /// serialized version of the instantiated template (struct) state.
+///
+/// The blob is a pointer to a serialized version of the instantiated template (struct) state.
+/// The len is the number of **bytes** to read from the blob.
 #[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn spawn(blob: *const u32, len: usize) {

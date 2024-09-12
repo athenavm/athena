@@ -377,6 +377,7 @@ impl HostDynamicContext {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct SpawnResult {
   pub address: Address,
   pub blob: Vec<u8>,
@@ -443,6 +444,8 @@ impl<'a> MockHost<'a> {
     nonce: u64,
   ) -> Address {
     let address = calculate_address(template, &blob, principal, nonce);
+    log::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
+
     self.programs.insert(address, blob.clone());
     self.spawn_result = Some(SpawnResult {
       address,
@@ -648,23 +651,21 @@ impl<'a> HostInterface for MockHost<'a> {
     let template = self
       .dynamic_context
       .as_ref()
-      .expect("missing host context")
+      .expect("missing dynamic host context")
       .template;
 
-    let principal = self
+    let static_context = self
       .static_context
       .as_ref()
-      .expect("missing host context")
-      .principal;
-
-    let nonce = self
-      .static_context
-      .as_ref()
-      .expect("missing host context")
-      .nonce;
+      .expect("missing static host context");
 
     // Now call spawn_program with the extracted values
-    self.spawn_program(&template, blob, &principal, nonce)
+    self.spawn_program(
+      &template,
+      blob,
+      &static_context.principal.clone(),
+      static_context.nonce,
+    )
   }
 }
 
