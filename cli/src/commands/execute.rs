@@ -3,7 +3,6 @@ use anyhow::Result;
 use athena_builder::{build_program, BuildArgs};
 use athena_core::io::AthenaStdin;
 use athena_core::utils::{setup_logger, setup_tracer};
-use athena_interface::MockHost;
 use athena_sdk::ExecutionClient;
 use clap::Parser;
 use std::time::Instant;
@@ -111,9 +110,7 @@ impl ExecuteCmd {
     let start_time = Instant::now();
     let client = ExecutionClient::new();
     // no host interface needed for direct execution
-    let (output, _gas_left) = client
-      .execute::<MockHost>(&elf, stdin, None, None, None)
-      .unwrap();
+    let (output, _gas_left) = client.execute(&elf, stdin, None, None, None).unwrap();
 
     let elapsed = elapsed(start_time.elapsed());
     let green = AnsiColor::Green.on_default().effects(Effects::BOLD);

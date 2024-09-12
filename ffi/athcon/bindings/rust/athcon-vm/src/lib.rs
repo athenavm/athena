@@ -18,16 +18,12 @@ pub trait AthconVm {
   }
 
   /// This is called for every incoming message.
-  ///
-  /// # Safety
-  ///
-  /// The caller must ensure the `host` pointer is valid.
-  unsafe fn execute<'a>(
+  fn execute(
     &self,
     revision: Revision,
-    code: &'a [u8],
-    message: &'a ExecutionMessage,
-    host: *const ffi::athcon_host_interface,
+    code: &[u8],
+    message: &ExecutionMessage,
+    host: &ffi::athcon_host_interface,
     context: *mut ffi::athcon_host_context,
   ) -> ExecutionResult;
 }
@@ -74,11 +70,11 @@ pub struct ExecutionContext<'a> {
 
 impl ExecutionResult {
   /// Manually create a result.
-  pub fn new(_status_code: StatusCode, _gas_left: i64, _output: Option<&[u8]>) -> Self {
+  pub fn new(status_code: StatusCode, gas_left: i64, output: Option<&[u8]>) -> Self {
     ExecutionResult {
-      status_code: _status_code,
-      gas_left: _gas_left,
-      output: _output.map(|s| s.to_vec()),
+      status_code,
+      gas_left,
+      output: output.map(|s| s.to_vec()),
       create_address: None,
     }
   }
@@ -89,13 +85,13 @@ impl ExecutionResult {
   }
 
   /// Create a revert result.
-  pub fn revert(_gas_left: i64, _output: Option<&[u8]>) -> Self {
-    ExecutionResult::new(StatusCode::ATHCON_REVERT, _gas_left, _output)
+  pub fn revert(gas_left: i64, output: Option<&[u8]>) -> Self {
+    ExecutionResult::new(StatusCode::ATHCON_REVERT, gas_left, output)
   }
 
   /// Create a successful result.
-  pub fn success(_gas_left: i64, _output: Option<&[u8]>) -> Self {
-    ExecutionResult::new(StatusCode::ATHCON_SUCCESS, _gas_left, _output)
+  pub fn success(gas_left: i64, output: Option<&[u8]>) -> Self {
+    ExecutionResult::new(StatusCode::ATHCON_SUCCESS, gas_left, output)
   }
 
   /// Read the status code.
@@ -185,19 +181,13 @@ impl ExecutionMessage {
 }
 
 impl<'a> ExecutionContext<'a> {
-  pub fn new(
-    host: &'a ffi::athcon_host_interface,
-    _context: *mut ffi::athcon_host_context,
-  ) -> Self {
-    let _tx_context = unsafe {
-      assert!(host.get_tx_context.is_some());
-      host.get_tx_context.unwrap()(_context)
-    };
+  pub fn new(host: &'a ffi::athcon_host_interface, context: *mut ffi::athcon_host_context) -> Self {
+    let tx_context = unsafe { host.get_tx_context.unwrap()(context) };
 
     ExecutionContext {
       host,
-      context: _context,
-      tx_context: _tx_context,
+      context,
+      tx_context,
     }
   }
 
@@ -208,16 +198,12 @@ impl<'a> ExecutionContext<'a> {
 
   /// Check if an account exists.
   pub fn account_exists(&self, address: &Address) -> bool {
-    unsafe {
-      assert!(self.host.account_exists.is_some());
-      self.host.account_exists.unwrap()(self.context, address as *const Address)
-    }
+    unsafe { self.host.account_exists.unwrap()(self.context, address as *const Address) }
   }
 
   /// Read from a storage key.
   pub fn get_storage(&self, address: &Address, key: &Bytes32) -> Bytes32 {
     unsafe {
-      assert!(self.host.get_storage.is_some());
       self.host.get_storage.unwrap()(
         self.context,
         address as *const Address,
@@ -301,6 +287,11 @@ impl<'a> ExecutionContext<'a> {
       self.host.get_block_hash.unwrap()(self.context, num)
     }
   }
+
+  /// Spawn a new program from a template
+  pub fn spawn(&self, code: &[u8]) -> Address {
+    unsafe { self.host.spawn.unwrap()(self.context, code.as_ptr(), code.len()) }
+  }
 }
 
 impl From<ffi::athcon_result> for ExecutionResult {
@@ -332,20 +323,21 @@ impl From<ffi::athcon_result> for ExecutionResult {
 }
 
 fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
-  if let Some(buf) = output {
-    let buf_len = buf.len();
+  match output {
+    Some(buf) if !buf.is_empty() => {
+      let buf_len = buf.len();
 
-    // Manually allocate heap memory for the new home of the output buffer.
-    let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
-    let new_buf = unsafe { std::alloc::alloc(memlayout) };
-    unsafe {
-      // Copy the data into the allocated buffer.
-      std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
+      // Manually allocate heap memory for the new home of the output buffer.
+      let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
+      let new_buf = unsafe { std::alloc::alloc(memlayout) };
+      unsafe {
+        // Copy the data into the allocated buffer.
+        std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
+      }
+
+      (new_buf as *const u8, buf_len)
     }
-
-    (new_buf as *const u8, buf_len)
-  } else {
-    (core::ptr::NonNull::<u8>::dangling().as_ptr(), 0)
+    _ => (core::ptr::null(), 0),
   }
 }
 
@@ -526,10 +518,7 @@ mod tests {
     unsafe {
       assert_eq!((*f).status_code, StatusCode::ATHCON_FAILURE);
       assert_eq!((*f).gas_left, 420);
-      assert_eq!(
-        (*f).output_data,
-        core::ptr::NonNull::<u8>::dangling().as_ptr()
-      );
+      assert!((*f).output_data.is_null(),);
       assert_eq!((*f).output_size, 0);
       assert_eq!((*f).create_address.bytes, [0u8; 24]);
       if (*f).release.is_some() {
@@ -571,7 +560,7 @@ mod tests {
     unsafe {
       assert_eq!(f.status_code, StatusCode::ATHCON_FAILURE);
       assert_eq!(f.gas_left, 420);
-      assert_eq!(f.output_data, core::ptr::NonNull::<u8>::dangling().as_ptr());
+      assert!(f.output_data.is_null());
       assert_eq!(f.output_size, 0);
       assert_eq!(f.create_address.bytes, [0u8; 24]);
       if f.release.is_some() {
@@ -790,6 +779,7 @@ mod tests {
       call: Some(execute_call),
       get_tx_context: Some(get_dummy_tx_context),
       get_block_hash: None,
+      spawn: None,
     }
   }
 

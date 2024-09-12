@@ -1,9 +1,7 @@
-use std::{cell::RefCell, sync::Arc};
-
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
 use athcon_vm::{
-  AthconVm, ExecutionContext as AthconExecutionContext, ExecutionMessage as AthconExecutionMessage,
+  AthconVm, ExecutionContext, ExecutionMessage as AthconExecutionMessage,
   ExecutionResult as AthconExecutionResult, MessageKind as AthconMessageKind, Revision,
   SetOptionError,
 };
@@ -32,20 +30,20 @@ impl AthconVm for AthenaVMWrapper {
   }
 
   /// `execute` is the main entrypoint from FFI. It's called from the macro-generated `__athcon_execute` fn.
-  /// Note that we have to pass in raw `host` and `context` pointers here. If we wrap them into the
+  /// Note that we have to pass in a raw `context` pointer here. If we wrap it into the
   /// `AthenaExecutionContext` object inside the top-level FFI function and pass it in here, it causes
   /// lifetime issues.
-  unsafe fn execute<'a>(
+  fn execute(
     &self,
     rev: Revision,
     code: &[u8],
     message: &AthconExecutionMessage,
-    host: *const ffi::athcon_host_interface,
+    host: &ffi::athcon_host_interface,
     context: *mut ffi::athcon_host_context,
   ) -> AthconExecutionResult {
     // note that host context is allowed to be null. it's opaque and totally up to the host
-    // whether and how to use it. but we require the host interface to be non-null.
-    if host.is_null() || message.kind() != AthconMessageKind::ATHCON_CALL || code.is_empty() {
+    // whether and how to use it.
+    if message.kind() != AthconMessageKind::ATHCON_CALL || code.is_empty() {
       return AthconExecutionResult::failure();
     }
 
@@ -53,17 +51,14 @@ impl AthconVm for AthenaVMWrapper {
     let athena_msg = AthenaMessageWrapper::from(message);
 
     // Unpack the context
-    let host_interface: &ffi::athcon_host_interface = unsafe { &*host };
-    let execution_context = AthconExecutionContext::new(host_interface, context);
-    let host = WrappedHostInterface::new(execution_context);
-    #[allow(clippy::arc_with_non_send_sync)]
-    let host = Arc::new(RefCell::new(host));
+    let execution_context = ExecutionContext::new(host, context);
+    let mut host = WrappedHostInterface::new(execution_context);
 
     // Execute the code and proxy the result back to the caller
     let execution_result =
       self
         .athena_vm
-        .execute(host, RevisionWrapper::from(rev).0, athena_msg.0, code);
+        .execute(&mut host, RevisionWrapper::from(rev).0, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
   }
 }
@@ -438,11 +433,11 @@ impl From<TransactionContextWrapper> for TransactionContext {
 }
 
 struct WrappedHostInterface<'a> {
-  context: AthconExecutionContext<'a>,
+  context: ExecutionContext<'a>,
 }
 
 impl<'a> WrappedHostInterface<'a> {
-  fn new(context: AthconExecutionContext<'a>) -> Self {
+  fn new(context: ExecutionContext<'a>) -> Self {
     WrappedHostInterface { context }
   }
 }
@@ -455,6 +450,7 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
       .into();
     value_wrapper.into()
   }
+
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     convert_storage_status(self.context.set_storage(
       &AddressWrapper(*addr).into(),
@@ -462,14 +458,20 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
       &Bytes32Wrapper(*value).into(),
     ))
   }
+
   fn get_balance(&self, addr: &Address) -> Balance {
     let balance = self.context.get_balance(&AddressWrapper(*addr).into());
     Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
   }
+
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
     let execmsg = AthconExecutionMessage::from(AthenaMessageWrapper(msg));
     let res = ExecutionResultWrapper::from(self.context.call(&execmsg));
     // the execution message contains raw pointers that were passed over FFI and now need to be freed
     res.into()
+  }
+
+  fn spawn(&mut self, blob: Vec<u8>) -> Address {
+    AddressWrapper::from(self.context.spawn(&blob)).into()
   }
 }

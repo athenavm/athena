@@ -17,12 +17,12 @@
 //!       ExampleVM {}
 //!     }
 //!
-//!     unsafe fn execute(
+//!     fn execute(
 //!       &self,
 //!       revision: athcon_vm::ffi::athcon_revision,
 //!       code: &[u8],
 //!       message: &athcon_vm::ExecutionMessage,
-//!       host: *const athcon_vm::ffi::athcon_host_interface,
+//!       host: &athcon_vm::ffi::athcon_host_interface,
 //!       context: *mut athcon_vm::ffi::athcon_host_context,
 //!     ) -> athcon_vm::ExecutionResult {
 //!       athcon_vm::ExecutionResult::success(1337, None)
@@ -336,28 +336,24 @@ fn build_execute_fn(name: &VMName) -> proc_macro2::TokenStream {
           use athcon_vm::AthconVm;
 
           // TODO: context is optional in case of the "precompiles" capability
-          if instance.is_null() || msg.is_null() || (code.is_null() && code_size != 0) {
-              // These are irrecoverable errors that violate the athcon spec.
-              std::process::abort();
-          }
-
-          assert!(!instance.is_null());
-          assert!(!msg.is_null());
-
-          let execution_message: ::athcon_vm::ExecutionMessage = unsafe {
-              msg.as_ref().expect("athcon message is null").into()
-          };
-
-          let empty_code = [0u8;0];
-          let code_ref: &[u8] = if code.is_null() {
-              assert_eq!(code_size, 0);
-              &empty_code
+          let host = if let Some(host) = unsafe { host.as_ref() } {
+            host
           } else {
-              unsafe {
-                  ::std::slice::from_raw_parts(code, code_size)
-              }
+            return athcon_vm::ExecutionResult::failure().into();
           };
 
+          assert!(msg.is_aligned(), "msg must be properly aligned");
+          let execution_message = unsafe { msg.as_ref() }.expect("msg must be non-null").into();
+
+          let code_ref = if code.is_null() {
+            assert_eq!(code_size, 0, "code_size must be 0 if code is null");
+            &[]
+          } else {
+            unsafe { ::std::slice::from_raw_parts(code, code_size) }
+          };
+
+          assert!(!instance.is_null(), "instance must be non-null");
+          assert!(instance.is_aligned(), "instance must be properly aligned");
           let container = unsafe {
               // Acquire ownership from athcon.
               ::athcon_vm::AthconContainer::<#type_name_ident>::from_ffi_pointer(instance)

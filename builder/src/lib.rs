@@ -202,6 +202,24 @@ fn copy_elf_to_output_dir(
 ) -> Result<Utf8PathBuf> {
   let root_package = program_metadata.root_package();
   let root_package_name = root_package.as_ref().map(|p| &p.name);
+  println!("Root package name: {:?}", root_package_name.unwrap());
+
+  // Determine which target to use, and choose the artifact name based on the target type.
+  // For simplicity, we only consider the first target, and expect either bin or staticlib.
+  // Our target does not support dylib.
+  // TODO: make this Mac and Windows-compatible.
+  let target = root_package.unwrap().targets.first().unwrap();
+  let artifact_name = if target.is_bin() {
+    root_package_name.unwrap()
+  } else if target.kind.iter().any(|k| k == "staticlib") {
+    &format!("lib{}.a", target.name)
+  } else {
+    panic!("Unsupported target kind");
+  };
+  println!(
+    "Target {:?} artifact path: {:?}",
+    target.name, artifact_name
+  );
 
   // The ELF is written to a target folder specified by the program's package.
   let original_elf_path = program_metadata
@@ -209,7 +227,7 @@ fn copy_elf_to_output_dir(
     .join(HELPER_TARGET_SUBDIR)
     .join(BUILD_TARGET)
     .join("release")
-    .join(root_package_name.unwrap());
+    .join(artifact_name);
 
   // The order of precedence for the ELF name is:
   // 1. --elf_name flag
@@ -222,15 +240,21 @@ fn copy_elf_to_output_dir(
     root_package_name.unwrap().to_string()
   };
 
-  let elf_dir = program_metadata
-    .target_directory
+  let elf_dir = root_package
+    .unwrap()
+    .manifest_path
     .parent()
     .unwrap()
     .join(&args.output_directory);
+  println!("Creating output dir {:?}", elf_dir);
   fs::create_dir_all(&elf_dir)?;
   let result_elf_path = elf_dir.join(elf_name);
 
   // Copy the ELF to the specified output directory.
+  println!(
+    "Copying original artifact {:?} to final path: {:?}",
+    original_elf_path, result_elf_path
+  );
   fs::copy(original_elf_path, &result_elf_path)?;
 
   Ok(result_elf_path)

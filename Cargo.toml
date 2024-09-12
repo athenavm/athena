@@ -12,10 +12,13 @@ members = [
   "interface",
   "runner",
   "sdk",
+  "vm/declare",
   "vm/entrypoint",
   "vm/hostfunctions",
   "vm/lib",
+  "vm/sdk",
 ]
+exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
@@ -25,5 +28,3 @@ repository = "https://github.com/athenavm/athena"
 homepage = "https://www.athenavm.org/"
 license = "MIT OR Apache-2.0"
 edition = "2021"
-
-[workspace.dependencies]

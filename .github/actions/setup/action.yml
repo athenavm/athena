@@ -27,4 +27,3 @@ runs:
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         components: clippy, rustfmt
-        toolchain: nightly-2024-04-17

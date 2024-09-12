@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use athcon_client::host::HostContext as HostInterface;
 use athcon_client::{
-  create,
   types::{Address, Bytes, Bytes32, ADDRESS_LENGTH, BYTES32_LENGTH},
   AthconVm,
 };
@@ -14,14 +14,14 @@ const CONTRACT_CODE: &[u8] =
 
 struct HostContext {
   storage: BTreeMap<Bytes32, Bytes32>,
-  vm: AthconVm,
+  vm: Rc<AthconVm>,
 }
 
 impl HostContext {
   fn new(vm: AthconVm) -> HostContext {
     HostContext {
       storage: BTreeMap::new(),
-      vm,
+      vm: Rc::new(vm),
     }
   }
 }
@@ -105,11 +105,7 @@ impl HostInterface for HostContext {
       );
     }
 
-    // Create an owned copy of VM here to avoid borrow issues when passing self into execute
-    // Note: this clone duplicates the FFI handles, but we don't attempt to destroy them here.
-    // That'll be done using the original handles.
-    let vm = self.vm.clone();
-    let res = vm.execute(
+    let res = self.vm.clone().execute(
       self,
       Revision::ATHCON_FRONTIER,
       kind,
@@ -122,6 +118,10 @@ impl HostInterface for HostContext {
       CONTRACT_CODE,
     );
     (res.0.to_vec(), res.1, [0u8; ADDRESS_LENGTH], res.2)
+  }
+
+  fn spawn(&mut self, _blob: &[u8]) -> Address {
+    todo!()
   }
 }
 
@@ -139,13 +139,11 @@ impl Drop for HostContext {
 /// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
 #[test]
 fn test_rust_host() {
-  let vm = create();
+  let vm = AthconVm::new();
   println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
 
-  // Same proviso as above: we're cloning the pointers here, which is fine as long as we
-  // don't attempt to destroy them twice, or use the clone after we destroy the original.
-  let mut host = HostContext::new(vm.clone());
-  let (output, gas_left, status_code) = vm.execute(
+  let mut host = HostContext::new(vm);
+  let (output, gas_left, status_code) = host.vm.clone().execute(
     &mut host,
     Revision::ATHCON_FRONTIER,
     MessageKind::ATHCON_CALL,
@@ -158,10 +156,9 @@ fn test_rust_host() {
     &[0u8; BYTES32_LENGTH],
     CONTRACT_CODE,
   );
-  println!("Output:  {:?}", hex::encode(output));
+  println!("Output:  {:?}", hex::encode(&output));
   println!("GasLeft: {:?}", gas_left);
   println!("Status:  {:?}", status_code);
   assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
-  assert_eq!(output, 2u32.to_le_bytes().to_vec().as_slice());
-  vm.destroy();
+  assert_eq!(u32::from_le_bytes(output.as_slice().try_into().unwrap()), 2);
 }
