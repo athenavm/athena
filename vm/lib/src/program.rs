@@ -1,3 +1,5 @@
+//! Helpers for converting data (input arguments and result)
+//! between the host IO and the program functions.
 use std::io::{Read, Write};
 
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -14,6 +16,8 @@ pub trait MethodMut<T, R, IO> {
   fn call_method_mut(self, io: &mut IO);
 }
 
+/// IntoArgument allows for creating an argument for a function call
+/// from a reader.
 pub trait IntoArgument<T, R>
 where
   R: Read,
@@ -31,6 +35,8 @@ where
   }
 }
 
+/// IntoResult allows for converting the result of a function call
+/// and writing it to a writer.
 pub trait IntoResult<W>
 where
   W: Write,
@@ -48,6 +54,11 @@ where
   }
 }
 
+/// Implement Function for functions taking 1 argument:
+/// # Example:
+/// ```ignore
+///fn foo(arg: impl IntoArgument<T1, IO>) -> impl IntoResult<IO>
+/// ```
 impl<F, IO, T1, R> Function<(T1,), R, IO> for F
 where
   IO: Read + Write,
@@ -61,6 +72,13 @@ where
   }
 }
 
+/// Implement Method for methods taking 1 argument:
+/// # Example:
+/// ```ignore
+/// impl Foo {
+///   fn foo(&self, arg: impl IntoArgument<T1, IO>) -> impl IntoResult<IO>
+/// }
+/// ```
 impl<F, IO, S, T1, R> Method<(&S, T1), R, IO> for F
 where
   IO: Read + Write,
@@ -76,6 +94,11 @@ where
   }
 }
 
+/// Implement Function for functions taking 2 arguments:
+/// # Example:
+/// ```ignore
+///fn foo(arg: impl IntoArgument<T1, IO>, arg2:impl IntoArgument<T2, IO>) -> impl IntoResult<IO>
+/// ```
 impl<F, IO, T1, T2, R> Function<(T1, T2), R, IO> for F
 where
   IO: Read + Write,
