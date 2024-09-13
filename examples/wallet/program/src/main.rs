@@ -74,8 +74,9 @@ mod test {
 
   #[test]
   fn test_wallet() {
-    let wallet = Wallet::new([0u8; 32]);
-    let owner: Pubkey = [0u8; 32];
+    let owner = Pubkey([0u8; 32]);
+    let wallet = Wallet::new(owner);
+
     Wallet::spawn(owner);
     let send_arguments = SendArguments {
       recipient: [0u8; 24],
