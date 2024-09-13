@@ -158,7 +158,7 @@ pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
     Arc::new(SyscallHostGetBalance {}),
   );
   syscall_map.insert(SyscallCode::HOST_SPAWN, Arc::new(SyscallHostSpawn {}));
-  syscall_map.insert(SyscallCode::HOST_DEPLOY, Arc::new(SyscallHostDeploy{}));
+  syscall_map.insert(SyscallCode::HOST_DEPLOY, Arc::new(SyscallHostDeploy {}));
   syscall_map.insert(SyscallCode::HINT_LEN, Arc::new(SyscallHintLen {}));
   syscall_map.insert(SyscallCode::HINT_READ, Arc::new(SyscallHintRead {}));
 
