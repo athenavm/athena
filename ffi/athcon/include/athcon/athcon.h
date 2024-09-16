@@ -193,7 +193,7 @@ extern "C"
    * This callback function is used by a VM to deploy a new program template
    *
    * @param context   The pointer to the Host execution context.
-   * @param blob      The program's template (serialized code).
+   * @param blob      The program's template (bytecode).
    * @param blob_size The length of the blob, in bytes.
    * @return          The newly-created template address or null bytes
    *                  if the deploy failed.

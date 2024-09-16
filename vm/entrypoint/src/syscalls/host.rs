@@ -90,7 +90,7 @@ pub extern "C" fn get_balance(value: *mut u32) {
 /// Spawn a new instance of a template.
 ///
 /// It either succeeds or reverts.
-/// Returns the address of the spawned program.
+/// In case of success, returns the address of the spawned program.
 /// The host calculates the new program address based on the template,
 /// the state blob, and the principal nonce. The template and nonce are
 /// available in its context and don't need to be passed here. The

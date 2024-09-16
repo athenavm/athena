@@ -664,7 +664,7 @@ impl<'a> HostInterface for MockHost<'a> {
     // template_address := HASH(template_code)
     let hash = blake3::hash(&code);
     let hash_bytes = hash.as_bytes().as_slice();
-    let address = Address::try_from(&hash_bytes[..24]).unwrap();
+    let address = Address::try_from(&hash_bytes[..ADDRESS_LENGTH]).unwrap();
 
     if self.templates.contains_key(&address) {
       panic!("template already exists");
