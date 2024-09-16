@@ -123,7 +123,7 @@ mod tests {
   use athena_vm_sdk::Pubkey;
 
   #[test]
-  fn deploying_other_contract() {
+  fn deploy_template() {
     athena_sdk::utils::setup_logger();
 
     let mut host = MockHost::new_with_context(
@@ -133,10 +133,10 @@ mod tests {
     let address = super::spawn(&mut host, Pubkey::default()).unwrap();
 
     // deploy other contract
-    let code = b"some bad really code".to_vec();
+    let code = b"some really bad code".to_vec();
     let mut stdin = AthenaStdin::new();
-    let wallet = host.get_program(&address).unwrap();
-    stdin.write_slice(wallet);
+    let wallet_state = host.get_program(&address).unwrap();
+    stdin.write_slice(wallet_state);
     stdin.write_vec(borsh::to_vec(&code).unwrap());
 
     let result = ExecutionClient::new().execute_function(
