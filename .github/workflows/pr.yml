@@ -135,7 +135,7 @@ jobs:
 
       - name: Compile wallet-template tests
         # Note: it's not possible to execute the tests yet as they need a risc-v machine (the VM)
-        run: RUSTUP_TOOLCHAIN=athena cargo t --manifest-path examples/Cargo.toml -p wallet-template --no-run --target riscv32em-athena-zkvm-elf
+        run: RUSTUP_TOOLCHAIN=athena cargo t --manifest-path examples/wallet/program/Cargo.toml --no-run --target riscv32em-athena-zkvm-elf
 
   cli:
     name: CLI

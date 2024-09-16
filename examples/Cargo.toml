@@ -4,6 +4,7 @@ members = [
   "hello_world/script",
   "io/script",
   "wallet/script",
-  "wallet/program",
 ]
 resolver = "2"
+
+exclude = ["wallet/program"]
