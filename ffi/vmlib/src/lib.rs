@@ -298,6 +298,12 @@ impl From<ffi::athcon_status_code> for StatusCodeWrapper {
       }
       ffi::athcon_status_code::ATHCON_REJECTED => StatusCodeWrapper(StatusCode::Rejected),
       ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCodeWrapper(StatusCode::OutOfMemory),
+      ffi::athcon_status_code::ATHCON_INSUFFICIENT_INPUT => {
+        StatusCodeWrapper(StatusCode::InsufficientInput)
+      }
+      ffi::athcon_status_code::ATHCON_INVALID_SYSCALL_ARGUMENT => {
+        StatusCodeWrapper(StatusCode::InvalidSyscallArgument)
+      }
     }
   }
 }
