@@ -57,6 +57,12 @@ impl Syscall for SyscallHostWrite {
   }
 }
 
+/// SyscallHostCall performs a host call, calling other programs.
+/// Inputs:
+///  - a0: address to call
+///  - a1: address of input (bytes) to pass to the called program
+///  - a2: length of input (bytes)
+///  - a3: address to read the amount from (2 words, 8 bytes)
 pub struct SyscallHostCall;
 
 impl Syscall for SyscallHostCall {
@@ -84,31 +90,25 @@ impl Syscall for SyscallHostCall {
     let address = AddressWrapper::from(address);
 
     // read the input length from the next register
-    let a2 = Register::X12;
-    let len = ctx.rt.register(a2) as usize;
-
-    // check byte alignment
-    assert!(len % 4 == 0, "input is not byte-aligned");
+    let len = ctx.rt.register(Register::X12) as usize;
+    assert!(len % 4 == 0, "input is not 4-byte-aligned");
 
     // `len` is denominated in number of bytes; we read words in chunks of four bytes
-    // then convert into a standard bytearray.
+    // then convert into a byte array.
     let input = if len > 0 {
-      let input_slice = ctx.slice(arg2, len / 4);
+      let input_words = ctx.slice(arg2, len / 4);
       Some(
-        input_slice
-          .iter()
-          .flat_map(|&num| num.to_le_bytes().to_vec())
+        input_words
+          .into_iter()
+          .flat_map(|word| word.to_le_bytes())
           .collect(),
       )
     } else {
       None
     };
 
-    // read the amount pointer from the next register as little-endian
-    let a3 = Register::X13;
-    let amount_ptr = ctx.rt.register(a3);
-    let amount_slice = ctx.slice(amount_ptr, 2);
-    let amount = u64::from(amount_slice[0]) | (u64::from(amount_slice[1]) << 32);
+    let amount_ptr = ctx.rt.register(Register::X13);
+    let amount = ctx.dword(amount_ptr);
 
     // note: host is responsible for checking balance and stack depth
 

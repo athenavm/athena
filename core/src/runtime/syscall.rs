@@ -127,6 +127,10 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
     self.rt.word(addr)
   }
 
+  pub fn dword(&self, addr: u32) -> u64 {
+    self.word(addr) as u64 | (self.word(addr + 4) as u64) << 32
+  }
+
   pub fn slice(&self, addr: u32, len: usize) -> Vec<u32> {
     let mut values = Vec::new();
     for i in 0..len {
