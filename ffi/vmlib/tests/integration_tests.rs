@@ -1,5 +1,3 @@
-use std::panic;
-
 use athcon_sys as ffi;
 
 unsafe extern "C" fn get_dummy_tx_context(
