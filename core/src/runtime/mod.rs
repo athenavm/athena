@@ -545,48 +545,41 @@ impl<'host> Runtime<'host> {
         b = self.rr(Register::X10, MemoryAccessPosition::B);
         let syscall = SyscallCode::from_u32(syscall_id);
 
-        let syscall_impl = self.get_syscall(syscall).cloned();
+        let syscall_impl = self
+          .get_syscall(syscall)
+          .ok_or(ExecutionError::UnsupportedSyscall(syscall_id))?
+          .clone();
         let mut precompile_rt = SyscallContext::new(self);
-        let (precompile_next_pc, precompile_cycles, _returned_exit_code) =
-          if let Some(syscall_impl) = syscall_impl {
-            // Executing a syscall optionally returns a value to write to the t0 register.
-            // If it returns None, we just keep the syscall_id in t0.
-            let res = syscall_impl.execute(&mut precompile_rt, b, c);
-            if let Some(val) = res {
-              a = val;
-            } else {
-              a = syscall_id;
-            }
 
-            // Check for failure from the call host function.
-            if syscall == SyscallCode::HOST_CALL {
-              let return_code = res.unwrap();
-              let status_code = StatusCode::try_from(return_code).unwrap();
-              if status_code != StatusCode::Success {
-                return Err(ExecutionError::HostCallFailed(status_code));
-              }
-            }
+        // Executing a syscall optionally returns a value to write to the t0 register.
+        // If it returns None, we just keep the syscall_id in t0.
+        let res = syscall_impl.execute(&mut precompile_rt, b, c);
+        if let Some(val) = res {
+          a = val;
+        } else {
+          a = syscall_id;
+        }
 
-            // If the syscall is `HALT` and the exit code is non-zero, return an error.
-            if syscall == SyscallCode::HALT && precompile_rt.exit_code != 0 {
-              return Err(ExecutionError::HaltWithNonZeroExitCode(
-                precompile_rt.exit_code,
-              ));
-            }
+        // Check for failure from the call host function.
+        if syscall == SyscallCode::HOST_CALL {
+          let return_code = res.unwrap();
+          let status_code = StatusCode::try_from(return_code).unwrap();
+          if status_code != StatusCode::Success {
+            return Err(ExecutionError::HostCallFailed(status_code));
+          }
+        }
 
-            (
-              precompile_rt.next_pc,
-              syscall_impl.num_extra_cycles(),
-              precompile_rt.exit_code,
-            )
-          } else {
-            return Err(ExecutionError::UnsupportedSyscall(syscall_id));
-          };
+        // If the syscall is `HALT` and the exit code is non-zero, return an error.
+        if syscall == SyscallCode::HALT && precompile_rt.exit_code != 0 {
+          return Err(ExecutionError::HaltWithNonZeroExitCode(
+            precompile_rt.exit_code,
+          ));
+        }
 
         // Allow the syscall impl to modify state.clk/pc (exit unconstrained does this)
+        next_pc = precompile_rt.next_pc;
+        self.state.clk += syscall_impl.num_extra_cycles();
         self.rw(t0, a);
-        next_pc = precompile_next_pc;
-        self.state.clk += precompile_cycles;
       }
       Opcode::EBREAK => {
         return Err(ExecutionError::Breakpoint());
