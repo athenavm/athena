@@ -1,17 +1,12 @@
 use athena_interface::StatusCode;
 
-use crate::runtime::{Syscall, SyscallContext, SyscallResult};
+use crate::runtime::{Outcome, Syscall, SyscallContext, SyscallResult};
 
 /// SyscallHintLen returns the length of the next slice in the hint input stream.
-pub struct SyscallHintLen;
+pub(crate) struct SyscallHintLen;
 
 impl Syscall for SyscallHintLen {
-  fn execute(
-    &self,
-    ctx: &mut SyscallContext,
-    _arg1: u32,
-    _arg2: u32,
-  ) -> Result<SyscallResult, StatusCode> {
+  fn execute(&self, ctx: &mut SyscallContext, _: u32, _: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
       log::debug!(
         "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
@@ -20,22 +15,17 @@ impl Syscall for SyscallHintLen {
             );
       return Err(StatusCode::InsufficientInput);
     }
-    Ok(SyscallResult::Result(Some(
+    Ok(Outcome::Result(Some(
       ctx.rt.state.input_stream[ctx.rt.state.input_stream_ptr].len() as u32,
     )))
   }
 }
 
 /// SyscallHintRead returns the length of the next slice in the hint input stream.
-pub struct SyscallHintRead;
+pub(crate) struct SyscallHintRead;
 
 impl Syscall for SyscallHintRead {
-  fn execute(
-    &self,
-    ctx: &mut SyscallContext,
-    ptr: u32,
-    len: u32,
-  ) -> Result<SyscallResult, StatusCode> {
+  fn execute(&self, ctx: &mut SyscallContext, ptr: u32, len: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
       log::debug!(
              "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
@@ -83,6 +73,6 @@ impl Syscall for SyscallHintRead {
         .and_modify(|_| panic!("hint read address is initialized already"))
         .or_insert(word);
     }
-    Ok(SyscallResult::Result(None))
+    Ok(Outcome::Result(None))
   }
 }

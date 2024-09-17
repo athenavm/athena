@@ -558,16 +558,16 @@ impl<'host> Runtime<'host> {
           .map_err(ExecutionError::SyscallFailed)?;
 
         match result {
-          SyscallResult::Result(value) => {
+          Outcome::Result(value) => {
             if let Some(value) = value {
               self.rw(t0, value);
             }
             next_pc = self.state.pc.wrapping_add(4);
           }
-          SyscallResult::Exit(0) => {
+          Outcome::Exit(0) => {
             next_pc = 0;
           }
-          SyscallResult::Exit(code) => {
+          Outcome::Exit(code) => {
             return Err(ExecutionError::HaltWithNonZeroExitCode(code));
           }
         };

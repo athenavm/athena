@@ -70,22 +70,19 @@ impl SyscallCode {
   }
 }
 
-pub enum SyscallResult {
+pub enum Outcome {
   Result(Option<u32>),
   Exit(u32),
 }
+
+pub(crate) type SyscallResult = Result<Outcome, StatusCode>;
 
 pub trait Syscall: Send + Sync {
   /// Execute the syscall and return the result.
   ///  `arg1` and `arg2` are the first two arguments to the syscall. These are the
   /// values in registers X10 and X11, respectively. The implementations might read more
   /// arguments from registers X12..X15.
-  fn execute(
-    &self,
-    ctx: &mut SyscallContext,
-    arg1: u32,
-    arg2: u32,
-  ) -> Result<SyscallResult, StatusCode>;
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> SyscallResult;
 
   /// The number of extra cycles that the syscall takes to execute. Unless this syscall is complex
   /// and requires many cycles, this should be zero.

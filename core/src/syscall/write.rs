@@ -1,11 +1,9 @@
 use athena_interface::StatusCode;
 
 use crate::{
-  runtime::{Register, Syscall, SyscallContext, SyscallResult},
+  runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult},
   utils::num_to_comma_separated,
 };
-
-pub struct SyscallWrite;
 
 /// Write bytes to selected file descriptor.
 /// Supported FDs:
@@ -16,13 +14,10 @@ pub struct SyscallWrite;
 ///
 /// FD 1 supports "cycle tracker". TODO(poszu): see if we need this, and add documentation or remove.
 /// Note: data written to FD 1 & 2 must be a valid UTF-8 string.
+pub(crate) struct SyscallWrite;
+
 impl Syscall for SyscallWrite {
-  fn execute(
-    &self,
-    ctx: &mut SyscallContext,
-    fd: u32,
-    write_buf: u32,
-  ) -> Result<SyscallResult, StatusCode> {
+  fn execute(&self, ctx: &mut SyscallContext, fd: u32, write_buf: u32) -> SyscallResult {
     let rt = &mut ctx.rt;
     let nbytes = rt.register(Register::X12);
     // Read nbytes from memory starting at write_buf.
@@ -84,7 +79,7 @@ impl Syscall for SyscallWrite {
         return Err(StatusCode::InvalidSyscallArgument);
       }
     }
-    Ok(SyscallResult::Result(None))
+    Ok(Outcome::Result(None))
   }
 }
 
