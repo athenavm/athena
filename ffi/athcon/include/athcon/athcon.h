@@ -174,6 +174,20 @@ extern "C"
   typedef athcon_bytes32 (*athcon_get_block_hash_fn)(struct athcon_host_context *context, int64_t number);
 
   /**
+   * Spawn program callback function.
+   *
+   * This callback function is used by a VM to spawn a new program based on an existing template
+   * and initialization params.
+   *
+   * @param context   The pointer to the Host execution context.
+   * @param blob      The program's serialized state blob.
+   * @param blob_size The length of the blob, in bytes.
+   * @return          The newly-created program address or null bytes
+   *                  if the spawn failed.
+   */
+  typedef athcon_address (*athcon_spawn_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
+
+  /**
    * The execution status code.
    *
    * Successful execution is represented by ::ATHCON_SUCCESS having value 0.
@@ -563,6 +577,9 @@ extern "C"
 
     /** Get block hash callback function. */
     athcon_get_block_hash_fn get_block_hash;
+
+    /** Spawn program callback function. */
+    athcon_spawn_fn spawn;
   };
 
   /* Forward declaration. */

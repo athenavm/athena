@@ -5,6 +5,8 @@
 mod context;
 pub use context::*;
 
+use blake3::Hasher;
+
 use std::{collections::BTreeMap, convert::TryFrom, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
@@ -309,6 +311,79 @@ pub trait HostInterface {
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> Balance;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
+  fn spawn(&mut self, blob: Vec<u8>) -> Address;
+}
+
+// Calculates a spawned program address on the basis of the template address, state blob,
+// spawning principal and nonce.
+pub fn calculate_address(
+  template: &Address,
+  blob: &[u8],
+  principal: &Address,
+  nonce: u64,
+) -> Address {
+  // calculate address by hashing the template, blob, principal, and nonce
+  let mut hasher = Hasher::new();
+  hasher.update(template);
+  hasher.update(blob);
+  hasher.update(principal);
+  hasher.update(&nonce.to_le_bytes());
+  hasher.finalize().as_bytes()[..24].try_into().unwrap()
+}
+// Stores some of the context that a running host would store to keep
+// track of what's going on in the VM execution
+// static context is set from the transaction and doesn't change until
+// the execution stack is done.
+pub struct HostStaticContext {
+  // the ultimate initiator of the current execution stack. also the
+  // account that pays gas for the execution stack.
+  principal: Address,
+
+  // the principal's nonce from the tx
+  nonce: u64,
+
+  // the destination of the transaction. note that, while this is the
+  // program that was initiated, it likely made additional calls.
+  // this is generally the caller's wallet, and is generally the same
+  // as the principal.
+  _destination: Address,
+  // in the future we'll probably need things here like block height,
+  // block hash, etc.
+}
+
+impl HostStaticContext {
+  pub fn new(principal: Address, nonce: u64, destination: Address) -> HostStaticContext {
+    HostStaticContext {
+      principal,
+      nonce,
+      _destination: destination,
+    }
+  }
+}
+
+// this context is relevant only for the current execution frame
+pub struct HostDynamicContext {
+  // the initiator and recipient programs of the current message/call frame
+  template: Address,
+  _callee: Address,
+}
+
+impl HostDynamicContext {
+  pub fn new(template: Address, callee: Address) -> HostDynamicContext {
+    HostDynamicContext {
+      template,
+      _callee: callee,
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct SpawnResult {
+  pub address: Address,
+  pub blob: Vec<u8>,
+  pub template: Address,
+  pub principal: Address,
+  pub nonce: u64,
 }
 
 // a very simple mock host implementation for testing
@@ -325,7 +400,17 @@ pub struct MockHost<'a> {
   balance: BTreeMap<Address, Balance>,
 
   // stores contract code
-  programs: BTreeMap<Address, &'a [u8]>,
+  templates: BTreeMap<Address, Vec<u8>>,
+
+  // stores program instances
+  programs: BTreeMap<Address, Vec<u8>>,
+
+  // context information
+  static_context: Option<HostStaticContext>,
+  dynamic_context: Option<HostDynamicContext>,
+
+  // the result of the most recent spawn operation
+  spawn_result: Option<SpawnResult>,
 }
 
 impl<'a> MockHost<'a> {
@@ -340,11 +425,51 @@ impl<'a> MockHost<'a> {
     }
   }
 
-  pub fn deploy_code(&mut self, address: Address, code: &'a [u8]) {
-    self.programs.insert(address, code);
+  pub fn new_with_context(
+    static_context: HostStaticContext,
+    dynamic_context: HostDynamicContext,
+  ) -> Self {
+    MockHost {
+      dynamic_context: Some(dynamic_context),
+      static_context: Some(static_context),
+      ..MockHost::default()
+    }
   }
 
-  fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
+  pub fn spawn_program(
+    &mut self,
+    template: &Address,
+    blob: Vec<u8>,
+    principal: &Address,
+    nonce: u64,
+  ) -> Address {
+    let address = calculate_address(template, &blob, principal, nonce);
+    log::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
+
+    self.programs.insert(address, blob.clone());
+    self.spawn_result = Some(SpawnResult {
+      address,
+      blob,
+      template: *template,
+      principal: *principal,
+      nonce,
+    });
+    address
+  }
+
+  pub fn get_spawn_result(&self) -> Option<&SpawnResult> {
+    self.spawn_result.as_ref()
+  }
+
+  pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
+    self.programs.get(address)
+  }
+
+  pub fn deploy_code(&mut self, address: Address, code: Vec<u8>) {
+    self.templates.insert(address, code);
+  }
+
+  pub fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
     let balance_from = self.get_balance(from);
     let balance_to = self.get_balance(to);
     if value > balance_from {
@@ -381,6 +506,7 @@ impl<'a> Default for MockHost<'a> {
     // init
     let mut storage = BTreeMap::new();
     let mut balance = BTreeMap::new();
+    let templates = BTreeMap::new();
     let programs = BTreeMap::new();
 
     // pre-populate some balances, values, and code for testing
@@ -392,7 +518,11 @@ impl<'a> Default for MockHost<'a> {
       vm: None,
       storage,
       balance,
+      templates,
       programs,
+      static_context: None,
+      dynamic_context: None,
+      spawn_result: None,
     }
   }
 }
@@ -438,7 +568,7 @@ impl<'a> HostInterface for MockHost<'a> {
     );
     let backup_storage = self.storage.clone();
     let backup_balance = self.balance.clone();
-    let backup_programs = self.programs.clone();
+    let backup_programs = self.templates.clone();
 
     // transfer balance
     // note: the host should have already subtracted an amount from the sender
@@ -451,13 +581,19 @@ impl<'a> HostInterface for MockHost<'a> {
       }
     }
 
+    // save message for context
+    let old_dynamic_context = self.dynamic_context.replace(HostDynamicContext {
+      template: msg.sender,
+      _callee: msg.recipient,
+    });
+
     // check programs list first
-    let res = if let Some(code) = self.programs.get(&msg.recipient).cloned() {
+    let res = if let Some(code) = self.templates.get(&msg.recipient).cloned() {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
 
       vm.expect("missing VM instance")
-        .execute(self, AthenaRevision::AthenaFrontier, msg, code)
+        .execute(self, AthenaRevision::AthenaFrontier, msg, &code)
     } else {
       // otherwise, pass a call to Charlie, fail all other calls
       let status_code = if msg.recipient == ADDRESS_CHARLIE {
@@ -472,6 +608,8 @@ impl<'a> HostInterface for MockHost<'a> {
       ExecutionResult::new(status_code, gas_left, None, None)
     };
 
+    self.dynamic_context = old_dynamic_context;
+
     log::info!(
       "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
       self as *const Self as usize,
@@ -482,7 +620,7 @@ impl<'a> HostInterface for MockHost<'a> {
       // rollback state
       self.storage = backup_storage;
       self.balance = backup_balance;
-      self.programs = backup_programs;
+      self.templates = backup_programs;
       log::info!(
         "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
         self as *const Self as usize,
@@ -491,6 +629,30 @@ impl<'a> HostInterface for MockHost<'a> {
       );
     }
     res
+  }
+
+  fn spawn(&mut self, blob: Vec<u8>) -> Address {
+    // TODO: double-check these semantics and how Spacemesh principal account semantics map to this
+
+    // Extract the necessary values before calling spawn_program
+    let template = self
+      .dynamic_context
+      .as_ref()
+      .expect("missing dynamic host context")
+      .template;
+
+    let static_context = self
+      .static_context
+      .as_ref()
+      .expect("missing static host context");
+
+    // Now call spawn_program with the extracted values
+    self.spawn_program(
+      &template,
+      blob,
+      &static_context.principal.clone(),
+      static_context.nonce,
+    )
   }
 }
 
@@ -648,5 +810,13 @@ mod tests {
     assert_eq!(res.status_code, StatusCode::Failure);
     assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
     assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
+  }
+
+  #[test]
+  fn test_spawn() {
+    let mut host = MockHost::new();
+    let blob = vec![1, 2, 3, 4];
+    let address = host.spawn_program(&ADDRESS_ALICE, blob.clone(), &ADDRESS_ALICE, 0);
+    assert_eq!(host.programs.get(&address), Some(&blob));
   }
 }

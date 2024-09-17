@@ -1,0 +1,23 @@
+[package]
+version = "0.1.0"
+name = "wallet-script"
+edition = "2021"
+default-run = "execute"
+
+[[bin]]
+name = "execute"
+path = "src/bin/execute.rs"
+
+[dependencies]
+athena-interface = { path = "../../../interface" }
+athena-sdk = { path = "../../../sdk" }
+athena-vm-sdk = { path = "../../../vm/sdk" }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+clap = { version = "4.0", features = ["derive", "env"] }
+wallet-common = { path = "../common" }
+hex = "0.4.3"
+borsh = "1.5.1"
+
+[build-dependencies]
+athena-helper = { path = "../../../helper" }

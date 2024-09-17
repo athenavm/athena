@@ -1,5 +1,5 @@
 [package]
-name = "ffitest"
+name = "athena-vm-sdk"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -8,10 +8,9 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-
-[dev-dependencies]
-athcon-client = { path = "../athcon/bindings/rust/athcon-client" }
+athena-vm = { path = "../entrypoint" }
+athena-hostfunctions = { path = "../hostfunctions" }
 athena-interface = { path = "../../interface" }
-athcon-sys = { path = "../athcon/bindings/rust/athcon-sys" }
-athena-vmlib = { path = "../vmlib" }
-hex = "0.4"
+borsh = "1.5.1"
+borsh-derive = "1.5.1"
+serde = { version = "1.0", features = ["derive"] }
