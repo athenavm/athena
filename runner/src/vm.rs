@@ -71,7 +71,7 @@ where
         log::info!("Execution error: {:?}", e);
         match e {
           ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
-          ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
+          ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None, None),
           // general error
           _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
         }
@@ -221,7 +221,7 @@ mod tests {
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     match res {
       Ok(_) => panic!("expected stack depth error"),
-      Err(ExecutionError::HostCallFailed(StatusCode::CallDepthExceeded)) => (),
+      Err(ExecutionError::SyscallFailed(StatusCode::CallDepthExceeded)) => (),
       Err(_) => panic!("expected stack depth error"),
     }
   }

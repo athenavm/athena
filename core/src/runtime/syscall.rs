@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use athena_interface::StatusCode;
 use strum_macros::EnumIter;
 
 use crate::runtime::{Register, Runtime};
@@ -69,13 +70,22 @@ impl SyscallCode {
   }
 }
 
+pub enum SyscallResult {
+  Result(Option<u32>),
+  Exit(u32),
+}
+
 pub trait Syscall: Send + Sync {
-  /// Execute the syscall and return the resulting value of register a0. `arg1` and `arg2` are the
-  /// values in registers X10 and X11, respectively. While not a hard requirement, the convention
-  /// is that the return value is only for system calls such as `HALT`. Most precompiles use `arg1`
-  /// and `arg2` to denote the addresses of the input data, and write the result to the memory at
-  /// `arg1`.
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32>;
+  /// Execute the syscall and return the result.
+  ///  `arg1` and `arg2` are the first two arguments to the syscall. These are the
+  /// values in registers X10 and X11, respectively. The implementations might read more
+  /// arguments from registers X12..X15.
+  fn execute(
+    &self,
+    ctx: &mut SyscallContext,
+    arg1: u32,
+    arg2: u32,
+  ) -> Result<SyscallResult, StatusCode>;
 
   /// The number of extra cycles that the syscall takes to execute. Unless this syscall is complex
   /// and requires many cycles, this should be zero.
@@ -86,23 +96,12 @@ pub trait Syscall: Send + Sync {
 
 /// A runtime for syscalls that is protected so that developers cannot arbitrarily modify the runtime.
 pub struct SyscallContext<'a, 'h> {
-  pub clk: u32,
-
-  pub(crate) next_pc: u32,
-  /// This is the exit_code used for the HALT syscall
-  pub(crate) exit_code: u32,
   pub(crate) rt: &'a mut Runtime<'h>,
 }
 
 impl<'a, 'h> SyscallContext<'a, 'h> {
   pub fn new(runtime: &'a mut Runtime<'h>) -> Self {
-    let clk = runtime.state.clk;
-    Self {
-      clk,
-      next_pc: runtime.state.pc.wrapping_add(4),
-      exit_code: 0,
-      rt: runtime,
-    }
+    Self { rt: runtime }
   }
 
   pub fn mw(&mut self, addr: u32, value: u32) {
@@ -137,14 +136,6 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
       values.push(self.word(addr + i as u32 * 4));
     }
     values
-  }
-
-  pub fn set_next_pc(&mut self, next_pc: u32) {
-    self.next_pc = next_pc;
-  }
-
-  pub fn set_exit_code(&mut self, exit_code: u32) {
-    self.exit_code = exit_code;
   }
 }
 
