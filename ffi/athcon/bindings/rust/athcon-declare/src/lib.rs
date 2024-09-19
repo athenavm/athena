@@ -343,7 +343,10 @@ fn build_execute_fn(name: &VMName) -> proc_macro2::TokenStream {
           };
 
           assert!(msg.is_aligned(), "msg must be properly aligned");
-          let execution_message = unsafe { msg.as_ref() }.expect("msg must be non-null").into();
+          let execution_message = unsafe { msg.as_ref() }.
+            expect("msg must be non-null").
+            try_into().
+            expect("converting to ExecutionMessage");
 
           let code_ref = if code.is_null() {
             assert_eq!(code_size, 0, "code_size must be 0 if code is null");
