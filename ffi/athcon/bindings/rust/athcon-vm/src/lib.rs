@@ -394,16 +394,20 @@ extern "C" fn release_stack_result(result: *const ffi::athcon_result) {
   }
 }
 
-impl From<&ffi::athcon_message> for ExecutionMessage {
-  fn from(message: &ffi::athcon_message) -> Self {
-    ExecutionMessage {
+impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
+  type Error = String;
+
+  fn try_from(message: &ffi::athcon_message) -> Result<Self, Self::Error> {
+    Ok(ExecutionMessage {
       kind: message.kind,
       depth: message.depth,
       gas: message.gas,
       recipient: message.recipient,
       sender: message.sender,
       input: if message.input_data.is_null() {
-        assert_eq!(message.input_size, 0);
+        if message.input_size != 0 {
+          return Err("msg.input_data is null but msg.input_size is not 0".to_string());
+        }
         None
       } else if message.input_size == 0 {
         None
@@ -412,14 +416,16 @@ impl From<&ffi::athcon_message> for ExecutionMessage {
       },
       value: message.value,
       code: if message.code.is_null() {
-        assert_eq!(message.code_size, 0);
+        if message.code_size != 0 {
+          return Err("msg.code is null but msg.code_size is not 0".to_string());
+        }
         None
       } else if message.code_size == 0 {
         None
       } else {
         Some(from_buf_raw::<u8>(message.code, message.code_size))
       },
-    }
+    })
   }
 }
 
@@ -625,13 +631,12 @@ mod tests {
     assert_eq!(*ret.code().unwrap(), code);
   }
 
-  #[test]
-  fn message_from_ffi() {
+  fn valid_athcon_message() -> ffi::athcon_message {
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
     let value = Uint256 { bytes: [0u8; 32] };
 
-    let msg = ffi::athcon_message {
+    ffi::athcon_message {
       kind: MessageKind::ATHCON_CALL,
       depth: 66,
       gas: 4466,
@@ -642,9 +647,13 @@ mod tests {
       value,
       code: std::ptr::null(),
       code_size: 0,
-    };
+    }
+  }
 
-    let ret: ExecutionMessage = (&msg).into();
+  #[test]
+  fn message_from_ffi() {
+    let msg = &valid_athcon_message();
+    let ret: ExecutionMessage = msg.try_into().unwrap();
 
     assert_eq!(ret.kind(), msg.kind);
     assert_eq!(ret.depth(), msg.depth);
@@ -659,24 +668,14 @@ mod tests {
   #[test]
   fn message_from_ffi_with_input() {
     let input = vec![0xc0, 0xff, 0xee];
-    let recipient = Address { bytes: [32u8; 24] };
-    let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
 
-    let msg = ffi::athcon_message {
-      kind: MessageKind::ATHCON_CALL,
-      depth: 66,
-      gas: 4466,
-      recipient,
-      sender,
+    let msg = &ffi::athcon_message {
       input_data: input.as_ptr(),
       input_size: input.len(),
-      value,
-      code: std::ptr::null(),
-      code_size: 0,
+      ..valid_athcon_message()
     };
 
-    let ret: ExecutionMessage = (&msg).into();
+    let ret: ExecutionMessage = msg.try_into().unwrap();
 
     assert_eq!(ret.kind(), msg.kind);
     assert_eq!(ret.depth(), msg.depth);
@@ -691,25 +690,15 @@ mod tests {
 
   #[test]
   fn message_from_ffi_with_code() {
-    let recipient = Address { bytes: [32u8; 24] };
-    let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
     let code = vec![0x5f, 0x5f, 0xfd];
 
-    let msg = ffi::athcon_message {
-      kind: MessageKind::ATHCON_CALL,
-      depth: 66,
-      gas: 4466,
-      recipient,
-      sender,
-      input_data: std::ptr::null(),
-      input_size: 0,
-      value,
+    let msg = &ffi::athcon_message {
       code: code.as_ptr(),
       code_size: code.len(),
+      ..valid_athcon_message()
     };
 
-    let ret: ExecutionMessage = (&msg).into();
+    let ret: ExecutionMessage = msg.try_into().unwrap();
 
     assert_eq!(ret.kind(), msg.kind);
     assert_eq!(ret.depth(), msg.depth);
@@ -720,6 +709,28 @@ mod tests {
     assert_eq!(*ret.value(), msg.value);
     assert!(ret.code().is_some());
     assert_eq!(*ret.code().unwrap(), code);
+  }
+
+  #[test]
+  fn message_from_ffi_code_size_must_be_0_when_no_code() {
+    let msg = &ffi::athcon_message {
+      code: std::ptr::null(),
+      code_size: 10,
+      ..valid_athcon_message()
+    };
+    let ret: Result<ExecutionMessage, _> = msg.try_into();
+    assert!(ret.is_err());
+  }
+
+  #[test]
+  fn message_from_ffi_input_size_must_be_0_when_no_input() {
+    let msg = &ffi::athcon_message {
+      input_data: std::ptr::null(),
+      input_size: 10,
+      ..valid_athcon_message()
+    };
+    let ret: Result<ExecutionMessage, _> = msg.try_into();
+    assert!(ret.is_err());
   }
 
   unsafe extern "C" fn get_dummy_tx_context(
@@ -735,19 +746,11 @@ mod tests {
     }
   }
 
-  // unsafe extern "C" fn get_dummy_code_size(
-  //   _context: *mut ffi::athcon_host_context,
-  //   _addr: *const Address,
-  // ) -> usize {
-  //   105023_usize
-  // }
-
   unsafe extern "C" fn execute_call(
     _context: *mut ffi::athcon_host_context,
-    _msg: *const ffi::athcon_message,
+    msg: *const ffi::athcon_message,
   ) -> ffi::athcon_result {
-    // Some dumb validation for testing.
-    let msg = *_msg;
+    let msg = &*msg;
     let success = if msg.input_size != 0 && msg.input_data.is_null() {
       false
     } else {

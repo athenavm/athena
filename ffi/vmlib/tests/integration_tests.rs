@@ -1,5 +1,3 @@
-use std::panic;
-
 use athcon_sys as ffi;
 
 unsafe extern "C" fn get_dummy_tx_context(
@@ -84,20 +82,6 @@ fn test_athcon_create() {
       code_size: code.len(),
     };
 
-    // this message is invalid because code_size doesn't match code length
-    let bad_message = ::athcon_sys::athcon_message {
-      kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
-      depth: 0,
-      gas: 0,
-      recipient: ::athcon_sys::athcon_address::default(),
-      sender: ::athcon_sys::athcon_address::default(),
-      input_data: std::ptr::null(),
-      input_size: 0,
-      value: ::athcon_sys::athcon_uint256be::default(),
-      code: std::ptr::null(),
-      code_size: 1,
-    };
-
     // note: we cannot check for a null instance or message pointer here, as the VM wrapper code
     // calls `std::process::abort()`. this is a violation of the athcon spec.
     // host pointer is allowed to be null.
@@ -136,22 +120,6 @@ fn test_athcon_create() {
       // failure expected due to input null pointers
       ffi::athcon_status_code::ATHCON_FAILURE
     );
-
-    // fail due to bad message
-    // fails an assertion inside the VM macro code
-    let result = panic::catch_unwind(|| {
-      vm.execute.unwrap()(
-        vm_ptr,
-        &host_interface,
-        // host_context is an opaque pointer
-        std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
-        ffi::athcon_revision::ATHCON_FRONTIER,
-        &bad_message,
-        code.as_ptr(),
-        code.len(),
-      )
-    });
-    assert!(result.is_err(), "Expected panic did not occur");
 
     // this one should succeed
     // note that host needs to be non-null, but the host context can be null.
