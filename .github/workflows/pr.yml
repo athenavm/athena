@@ -4,18 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches:
-      - "**"
-    paths:
-      - "cli/**"
-      - "core/**"
-      - "ffi/**"
-      - "sdk/**"
-      - "vm/**"
-      - "tests/**"
-      - "examples/**"
-      - "Cargo.toml"
-      - ".github/workflows/**"
   merge_group:
 
 concurrency:
@@ -132,6 +120,10 @@ jobs:
         run: |
           RUSTFLAGS="-Copt-level=3 -Cdebug-assertions -Coverflow-checks=y -Cdebuginfo=0 -C target-cpu=native" \
           cargo check --manifest-path examples/Cargo.toml --all-targets --all-features
+
+      - name: Compile wallet-template tests
+        # Note: it's not possible to execute the tests yet as they need a risc-v machine (the VM)
+        run: RUSTUP_TOOLCHAIN=athena cargo t --manifest-path examples/wallet/program/Cargo.toml --no-run --target riscv32em-athena-zkvm-elf
 
   cli:
     name: CLI

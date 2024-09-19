@@ -159,6 +159,11 @@ pub fn hint_slice(buf: &[u8]) {
 
 #[derive(Default)]
 pub struct Io {
+  /// The remaining bytes to be read from the input stream.
+  /// The IO only supports reading whole 'lines' at a time.
+  /// We cache the remaining bytes that `read()` has not consumed yet
+  /// for future reads. This is important for cases when `read()` doesn't
+  /// consume the whole line.
   read_remainder: std::collections::VecDeque<u8>,
 }
 

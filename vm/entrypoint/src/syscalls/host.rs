@@ -118,6 +118,9 @@ pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
     )
   }
 
+  // SAFETY: the host initialized the data in the `result` variable
+  // by writing to the memory address pointed to in the `a2` register.
+  // In the case the host failed it would not return here.
   unsafe { result.assume_init() }
 }
 

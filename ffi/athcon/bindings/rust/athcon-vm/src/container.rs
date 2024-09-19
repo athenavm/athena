@@ -113,7 +113,7 @@ mod tests {
 
     let code = [0u8; 0];
 
-    let message = ::athcon_sys::athcon_message {
+    let message = &::athcon_sys::athcon_message {
       kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
       depth: 0,
       gas: 0,
@@ -125,7 +125,7 @@ mod tests {
       code: std::ptr::null(),
       code_size: 0,
     };
-    let message: ExecutionMessage = (&message).into();
+    let message: ExecutionMessage = message.try_into().unwrap();
 
     let host = ::athcon_sys::athcon_host_interface {
       account_exists: None,

@@ -12,10 +12,7 @@ path = "src/bin/execute.rs"
 athena-interface = { path = "../../../interface" }
 athena-sdk = { path = "../../../sdk" }
 athena-vm-sdk = { path = "../../../vm/sdk" }
-serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-serde = { version = "1.0", default-features = false, features = ["derive"] }
 clap = { version = "4.0", features = ["derive", "env"] }
-wallet-common = { path = "../common" }
 hex = "0.4.3"
 borsh = "1.5.1"
 
