@@ -790,8 +790,8 @@ pub mod tests {
     ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
+  use athena_vm_sdk::SendArguments;
   use borsh::to_vec;
-  use wallet_common::SendArguments;
 
   use crate::{
     runtime::Register,
@@ -889,7 +889,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &2102260
+      &2102212
     );
     assert_eq!(
       runtime
@@ -898,7 +898,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &2102288
+      &2102264
     );
 
     // now attempt to execute each function in turn

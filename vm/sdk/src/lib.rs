@@ -3,7 +3,9 @@ use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "zkvm")]
 mod spawn;
+#[cfg(target_os = "zkvm")]
 pub use spawn::spawn;
 
 // This type needs to be serializable
@@ -44,9 +46,15 @@ pub trait VerifiableTemplate {
   fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
 }
 
+#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize)]
+pub struct SendArguments {
+  pub recipient: Address,
+  pub amount: u64,
+}
+
 pub trait WalletProgram {
-  fn spawn();
-  fn send(&self);
+  fn spawn(owner: Pubkey) -> Address;
+  fn send(&self, args: SendArguments);
   fn proxy(&self, destination: Address, args: &[u8]);
   fn deploy(&self, code: &[u8]);
 }
