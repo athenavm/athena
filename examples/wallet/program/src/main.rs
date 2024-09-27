@@ -4,11 +4,10 @@
 
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
-use athena_vm_sdk::{call, spawn, Pubkey, VerifiableTemplate, WalletProgram, PUBKEY_LENGTH};
-use borsh::{from_slice, to_vec};
+use athena_vm_sdk::{call, spawn, Pubkey, SendArguments, VerifiableTemplate, WalletProgram};
+use borsh::to_vec;
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use wallet_common::SendArguments;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct Wallet {
@@ -34,18 +33,14 @@ impl Wallet {
 #[template]
 impl WalletProgram for Wallet {
   #[callable]
-  fn spawn() {
-    let owner = athena_vm::io::read::<Pubkey>();
+  fn spawn(owner: Pubkey) -> Address {
     let wallet = Wallet::new(owner);
     let serialized = to_vec(&wallet).expect("serializing wallet");
-    spawn(serialized);
+    spawn(serialized)
   }
 
   #[callable]
-  fn send(&self) {
-    let buffer = athena_vm::io::read_vec();
-    let send_arguments =
-      from_slice::<SendArguments>(&buffer).expect("deserializing send arguments");
+  fn send(&self, send_arguments: SendArguments) {
     // Send coins
     // Note: error checking happens inside the host
     call(send_arguments.recipient, None, send_arguments.amount);
@@ -79,17 +74,14 @@ mod test {
 
   #[test]
   fn test_wallet() {
-    let wallet = Wallet::new([0u8; 32]);
-    let owner: Pubkey = [0u8; 32];
-    Wallet::spawn(owner.as_ptr());
+    let owner = Pubkey([0u8; 32]);
+    let wallet = Wallet::new(owner);
+
+    Wallet::spawn(owner);
     let send_arguments = SendArguments {
       recipient: [0u8; 24],
       amount: 0,
     };
-    let serialized = to_vec(&send_arguments).unwrap();
-    wallet.send(serialized.as_ptr(), serialized.len());
-    unsafe { athexp_spawn(owner.as_ptr()) };
-    let serialized = to_vec(&wallet).unwrap();
-    unsafe { athexp_send(serialized.as_ptr(), serialized.len()) };
+    wallet.send(send_arguments);
   }
 }

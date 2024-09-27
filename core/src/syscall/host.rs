@@ -172,9 +172,17 @@ impl Syscall for SyscallHostSpawn {
     let vec_words = ctx.slice(address, len_words);
     let blob = vec_u32_to_bytes(vec_words, len as usize);
 
-    // get value from host
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
-    host.spawn(blob);
+    let address = host.spawn(blob);
+
+    let out_addr = ctx
+      .rt
+      .rr(Register::X12, crate::runtime::MemoryAccessPosition::A);
+
+    for (idx, c) in address.chunks_exact(4).enumerate() {
+      let v = u32::from_le_bytes(c.try_into().unwrap());
+      ctx.rt.mw(out_addr + idx as u32 * 4, v);
+    }
 
     None
   }
