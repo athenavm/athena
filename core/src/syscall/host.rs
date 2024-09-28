@@ -1,12 +1,13 @@
-use crate::runtime::{Register, Syscall, SyscallContext};
+use crate::runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult};
 use athena_interface::{
-  AddressWrapper, AthenaMessage, Bytes32Wrapper, MessageKind, ADDRESS_LENGTH, BYTES32_LENGTH,
+  AddressWrapper, AthenaMessage, Bytes32Wrapper, MessageKind, StatusCode, ADDRESS_LENGTH,
+  BYTES32_LENGTH,
 };
 
-pub struct SyscallHostRead;
+pub(crate) struct SyscallHostRead;
 
 impl Syscall for SyscallHostRead {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _: u32) -> SyscallResult {
     let athena_ctx = ctx
       .rt
       .context
@@ -23,14 +24,14 @@ impl Syscall for SyscallHostRead {
     // set return value
     let value_vec: Vec<u32> = Bytes32Wrapper::new(value).into();
     ctx.mw_slice(arg1, value_vec.as_slice());
-    None
+    Ok(Outcome::Result(None))
   }
 }
 
-pub struct SyscallHostWrite;
+pub(crate) struct SyscallHostWrite;
 
 impl Syscall for SyscallHostWrite {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> SyscallResult {
     let athena_ctx = ctx
       .rt
       .context
@@ -53,14 +54,20 @@ impl Syscall for SyscallHostWrite {
     let mut status_word = [0u32; 8];
     status_word[0] = status_code as u32;
     ctx.mw_slice(arg1, &status_word);
-    None
+    Ok(Outcome::Result(None))
   }
 }
 
-pub struct SyscallHostCall;
+/// SyscallHostCall performs a host call, calling other programs.
+/// Inputs:
+///  - a0: address to call
+///  - a1: address of input (bytes) to pass to the called program
+///  - a2: length of input (bytes)
+///  - a3: address to read the amount from (2 words, 8 bytes)
+pub(crate) struct SyscallHostCall;
 
 impl Syscall for SyscallHostCall {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> SyscallResult {
     // make sure we have a runtime context
     let athena_ctx = ctx
       .rt
@@ -84,31 +91,28 @@ impl Syscall for SyscallHostCall {
     let address = AddressWrapper::from(address);
 
     // read the input length from the next register
-    let a2 = Register::X12;
-    let len = ctx.rt.register(a2) as usize;
-
-    // check byte alignment
-    assert!(len % 4 == 0, "input is not byte-aligned");
+    let len = ctx.rt.register(Register::X12) as usize;
+    if len % 4 != 0 {
+      log::debug!("host system call input (a2/x12) not aligned to 4 bytes");
+      return Err(StatusCode::InvalidSyscallArgument);
+    }
 
     // `len` is denominated in number of bytes; we read words in chunks of four bytes
-    // then convert into a standard bytearray.
+    // then convert into a byte array.
     let input = if len > 0 {
-      let input_slice = ctx.slice(arg2, len / 4);
+      let input_words = ctx.slice(arg2, len / 4);
       Some(
-        input_slice
-          .iter()
-          .flat_map(|&num| num.to_le_bytes().to_vec())
+        input_words
+          .into_iter()
+          .flat_map(|word| word.to_le_bytes())
           .collect(),
       )
     } else {
       None
     };
 
-    // read the amount pointer from the next register as little-endian
-    let a3 = Register::X13;
-    let amount_ptr = ctx.rt.register(a3);
-    let amount_slice = ctx.slice(amount_ptr, 2);
-    let amount = u64::from(amount_slice[0]) | (u64::from(amount_slice[1]) << 32);
+    let amount_ptr = ctx.rt.register(Register::X13);
+    let amount = ctx.dword(amount_ptr);
 
     // note: host is responsible for checking balance and stack depth
 
@@ -134,14 +138,20 @@ impl Syscall for SyscallHostCall {
       .expect("host call spent more than available gas");
     ctx.rt.state.clk += gas_spent;
 
-    Some(res.status_code as u32)
+    match res.status_code {
+      StatusCode::Success => Ok(Outcome::Result(None)),
+      status => {
+        log::debug!("host system call failed with status code '{status}'");
+        Err(status)
+      }
+    }
   }
 }
 
-pub struct SyscallHostGetBalance;
+pub(crate) struct SyscallHostGetBalance;
 
 impl Syscall for SyscallHostGetBalance {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _arg2: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, _: u32) -> SyscallResult {
     let athena_ctx = ctx
       .rt
       .context
@@ -155,18 +165,18 @@ impl Syscall for SyscallHostGetBalance {
     let balance_low = balance as u32;
     let balance_slice = [balance_low, balance_high];
 
-    log::info!("Get balance syscall returning: {}", balance);
+    log::debug!("get balance syscall returning: {}", balance);
 
     // return to caller
     ctx.mw_slice(arg1, &balance_slice);
-    None
+    Ok(Outcome::Result(None))
   }
 }
 
-pub struct SyscallHostSpawn;
+pub(crate) struct SyscallHostSpawn;
 
 impl Syscall for SyscallHostSpawn {
-  fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> SyscallResult {
     // length in words, rounded up if needed
     let len_words = (len as usize + 3) / 4;
     let vec_words = ctx.slice(address, len_words);
@@ -184,7 +194,7 @@ impl Syscall for SyscallHostSpawn {
       ctx.rt.mw(out_addr + idx as u32 * 4, v);
     }
 
-    None
+    Ok(Outcome::Result(None))
   }
 }
 
