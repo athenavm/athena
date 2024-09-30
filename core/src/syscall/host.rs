@@ -202,14 +202,21 @@ impl Syscall for SyscallHostSpawn {
 pub struct SyscallHostDeploy;
 
 impl Syscall for SyscallHostDeploy {
-  fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> SyscallResult {
     // length in words, rounded up if needed
     let len_words = (len as usize + 3) / 4;
     let vec_words = ctx.slice(address, len_words);
     let blob = vec_u32_to_bytes(vec_words, len as usize);
 
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
-    let address = host.deploy(blob);
+    let address = match host.deploy(blob) {
+      Ok(addr) => addr,
+      Err(err) => {
+        log::debug!("deploy failed: {err}");
+        return Err(StatusCode::Failure);
+      }
+    };
+    log::debug!("deploy succeeded: {}", hex::encode(address));
 
     let out_addr = ctx
       .rt
@@ -220,7 +227,7 @@ impl Syscall for SyscallHostDeploy {
       ctx.rt.mw(out_addr + idx as u32 * 4, v);
     }
 
-    None
+    Ok(Outcome::Result(None))
   }
 }
 

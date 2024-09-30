@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
 use athcon_vm::{
@@ -485,7 +487,7 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
     AddressWrapper::from(self.context.spawn(&blob)).into()
   }
 
-  fn deploy(&mut self, code: Vec<u8>) -> Address {
-    AddressWrapper::from(self.context.deploy(&code)).into()
+  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>> {
+    Ok(AddressWrapper::from(self.context.deploy(&code)).into())
   }
 }

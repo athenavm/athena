@@ -7,7 +7,7 @@ pub use context::*;
 
 use blake3::Hasher;
 
-use std::{collections::BTreeMap, convert::TryFrom, fmt};
+use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -316,7 +316,7 @@ pub trait HostInterface {
   fn get_balance(&self, addr: &Address) -> Balance;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
   fn spawn(&mut self, blob: Vec<u8>) -> Address;
-  fn deploy(&mut self, code: Vec<u8>) -> Address;
+  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>>;
 }
 
 // Calculates a spawned program address on the basis of the template address, state blob,
@@ -664,17 +664,17 @@ impl<'a> HostInterface for MockHost<'a> {
     )
   }
 
-  fn deploy(&mut self, code: Vec<u8>) -> Address {
+  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>> {
     // template_address := HASH(template_code)
     let hash = blake3::hash(&code);
     let hash_bytes = hash.as_bytes().as_slice();
     let address = Address::try_from(&hash_bytes[..ADDRESS_LENGTH]).unwrap();
 
     if self.templates.contains_key(&address) {
-      panic!("template already exists");
+      return Err("template already exists".into());
     }
     self.deploy_code(address, code);
-    address
+    Ok(address)
   }
 }
 
@@ -840,5 +840,17 @@ mod tests {
     let blob = vec![1, 2, 3, 4];
     let address = host.spawn_program(&ADDRESS_ALICE, blob.clone(), &ADDRESS_ALICE, 0);
     assert_eq!(host.programs.get(&address), Some(&blob));
+  }
+
+  #[test]
+  fn test_deploy() {
+    let mut host = MockHost::new();
+    let blob = vec![1, 2, 3, 4];
+    let address = host.deploy(blob.clone());
+    assert_eq!(host.template(&address.unwrap()), Some(&blob));
+
+    // deploying again should fail
+    let address = host.deploy(blob.clone());
+    assert!(address.is_err());
   }
 }
