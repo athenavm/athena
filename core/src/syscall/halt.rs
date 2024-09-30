@@ -1,12 +1,10 @@
-use crate::runtime::{Syscall, SyscallContext};
+use crate::runtime::{Outcome, Syscall, SyscallContext, SyscallResult};
 
-pub struct SyscallHalt;
+pub(crate) struct SyscallHalt;
 
 impl Syscall for SyscallHalt {
-  fn execute(&self, ctx: &mut SyscallContext, exit_code: u32, _: u32) -> Option<u32> {
-    log::debug!("Halt syscall with exit code {}", exit_code);
-    ctx.set_next_pc(0);
-    ctx.set_exit_code(exit_code);
-    None
+  fn execute(&self, _: &mut SyscallContext, exit_code: u32, _: u32) -> SyscallResult {
+    log::debug!("Halt syscall with exit code {exit_code}",);
+    Ok(Outcome::Exit(exit_code))
   }
 }

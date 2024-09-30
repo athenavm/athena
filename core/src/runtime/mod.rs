@@ -88,8 +88,8 @@ pub enum MemoryAccessPosition {
 pub enum ExecutionError {
   #[error("execution failed with exit code {0}")]
   HaltWithNonZeroExitCode(u32),
-  #[error("host call failed with status code {0}")]
-  HostCallFailed(StatusCode),
+  #[error("syscall failed with status code {0}")]
+  SyscallFailed(StatusCode),
   #[error("invalid memory access for opcode {0} and address {1}")]
   InvalidMemoryAccess(Opcode, u32),
   #[error("unimplemented syscall {0}")]
@@ -545,48 +545,35 @@ impl<'host> Runtime<'host> {
         b = self.rr(Register::X10, MemoryAccessPosition::B);
         let syscall = SyscallCode::from_u32(syscall_id);
 
-        let syscall_impl = self.get_syscall(syscall).cloned();
-        let mut precompile_rt = SyscallContext::new(self);
-        let (precompile_next_pc, precompile_cycles, _returned_exit_code) =
-          if let Some(syscall_impl) = syscall_impl {
-            // Executing a syscall optionally returns a value to write to the t0 register.
-            // If it returns None, we just keep the syscall_id in t0.
-            let res = syscall_impl.execute(&mut precompile_rt, b, c);
-            if let Some(val) = res {
-              a = val;
-            } else {
-              a = syscall_id;
-            }
+        let syscall_impl = self
+          .get_syscall(syscall)
+          .ok_or(ExecutionError::UnsupportedSyscall(syscall_id))?
+          .clone();
+        let mut ctx = SyscallContext::new(self);
 
-            // Check for failure from the call host function.
-            if syscall == SyscallCode::HOST_CALL {
-              let return_code = res.unwrap();
-              let status_code = StatusCode::try_from(return_code).unwrap();
-              if status_code != StatusCode::Success {
-                return Err(ExecutionError::HostCallFailed(status_code));
-              }
-            }
+        // Executing a syscall optionally returns a value to write to the t0 register.
+        // If it returns None, we just keep the syscall_id in t0.
+        let result = syscall_impl
+          .execute(&mut ctx, b, c)
+          .map_err(ExecutionError::SyscallFailed)?;
 
-            // If the syscall is `HALT` and the exit code is non-zero, return an error.
-            if syscall == SyscallCode::HALT && precompile_rt.exit_code != 0 {
-              return Err(ExecutionError::HaltWithNonZeroExitCode(
-                precompile_rt.exit_code,
-              ));
+        match result {
+          Outcome::Result(value) => {
+            if let Some(value) = value {
+              self.rw(t0, value);
             }
-
-            (
-              precompile_rt.next_pc,
-              syscall_impl.num_extra_cycles(),
-              precompile_rt.exit_code,
-            )
-          } else {
-            return Err(ExecutionError::UnsupportedSyscall(syscall_id));
-          };
+            next_pc = self.state.pc.wrapping_add(4);
+          }
+          Outcome::Exit(0) => {
+            next_pc = 0;
+          }
+          Outcome::Exit(code) => {
+            return Err(ExecutionError::HaltWithNonZeroExitCode(code));
+          }
+        };
 
         // Allow the syscall impl to modify state.clk/pc (exit unconstrained does this)
-        self.rw(t0, a);
-        next_pc = precompile_next_pc;
-        self.state.clk += precompile_cycles;
+        self.state.clk += syscall_impl.num_extra_cycles();
       }
       Opcode::EBREAK => {
         return Err(ExecutionError::Breakpoint());
@@ -952,10 +939,10 @@ pub mod tests {
     match res {
       Ok(_) => panic!("expected execution error"),
       Err(e) => match e {
-        ExecutionError::HostCallFailed(status) => {
+        ExecutionError::SyscallFailed(status) => {
           assert_eq!(status, StatusCode::InsufficientBalance);
         }
-        _ => panic!("expected HostCallFailed error"),
+        _ => panic!("expected SyscallFailed error"),
       },
     }
     drop(runtime);
@@ -1205,7 +1192,7 @@ pub mod tests {
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     match runtime.execute() {
       Err(e) => match e {
-        ExecutionError::HostCallFailed(code) => {
+        ExecutionError::SyscallFailed(code) => {
           assert_eq!(code, athena_interface::StatusCode::Failure);
         }
         _ => panic!("unexpected error: {:?}", e),

@@ -1,32 +1,38 @@
-use crate::runtime::{Syscall, SyscallContext};
+use athena_interface::StatusCode;
+
+use crate::runtime::{Outcome, Syscall, SyscallContext, SyscallResult};
 
 /// SyscallHintLen returns the length of the next slice in the hint input stream.
-pub struct SyscallHintLen;
+pub(crate) struct SyscallHintLen;
 
 impl Syscall for SyscallHintLen {
-  fn execute(&self, ctx: &mut SyscallContext, _arg1: u32, _arg2: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, _: u32, _: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
-      panic!(
-             "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
+      log::debug!(
+        "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
              ctx.rt.state.input_stream_ptr,
-             ctx.rt.state.input_stream.len()
-      );
+             ctx.rt.state.input_stream.len(),
+            );
+      return Err(StatusCode::InsufficientInput);
     }
-    Some(ctx.rt.state.input_stream[ctx.rt.state.input_stream_ptr].len() as u32)
+    Ok(Outcome::Result(Some(
+      ctx.rt.state.input_stream[ctx.rt.state.input_stream_ptr].len() as u32,
+    )))
   }
 }
 
 /// SyscallHintRead returns the length of the next slice in the hint input stream.
-pub struct SyscallHintRead;
+pub(crate) struct SyscallHintRead;
 
 impl Syscall for SyscallHintRead {
-  fn execute(&self, ctx: &mut SyscallContext, ptr: u32, len: u32) -> Option<u32> {
+  fn execute(&self, ctx: &mut SyscallContext, ptr: u32, len: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
-      panic!(
+      log::debug!(
              "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
               ctx.rt.state.input_stream_ptr,
               ctx.rt.state.input_stream.len()
       );
+      return Err(StatusCode::InsufficientInput);
     }
     let vec = &ctx.rt.state.input_stream[ctx.rt.state.input_stream_ptr];
     ctx.rt.state.input_stream_ptr += 1;
@@ -34,12 +40,18 @@ impl Syscall for SyscallHintRead {
       !ctx.rt.unconstrained,
       "hint read should not be used in a unconstrained block"
     );
-    assert_eq!(
-      vec.len() as u32,
-      len,
-      "hint input stream read length mismatch"
-    );
-    assert_eq!(ptr % 4, 0, "hint read address not aligned to 4 bytes");
+    if vec.len() != len as usize {
+      log::debug!(
+        "hint input stream read length mismatch: expected={}, actual={}",
+        len,
+        vec.len()
+      );
+      return Err(StatusCode::InvalidSyscallArgument);
+    }
+    if ptr % 4 != 0 {
+      log::debug!("hint read address not aligned to 4 bytes");
+      return Err(StatusCode::InvalidSyscallArgument);
+    }
     // Iterate through the vec in 4-byte chunks
     for i in (0..len).step_by(4) {
       // Get each byte in the chunk
@@ -61,6 +73,6 @@ impl Syscall for SyscallHintRead {
         .and_modify(|_| panic!("hint read address is initialized already"))
         .or_insert(word);
     }
-    None
+    Ok(Outcome::Result(None))
   }
 }

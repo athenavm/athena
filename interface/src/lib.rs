@@ -219,6 +219,8 @@ pub enum StatusCode {
   InternalError,
   Rejected,
   OutOfMemory,
+  InsufficientInput,
+  InvalidSyscallArgument,
 }
 
 impl TryFrom<u32> for StatusCode {
@@ -278,6 +280,8 @@ impl fmt::Display for StatusCode {
       StatusCode::InternalError => write!(f, "Athena implementation generic internal error."),
       StatusCode::Rejected => write!(f, "The execution of the given code and/or message has been rejected by the Athena implementation."),
       StatusCode::OutOfMemory => write!(f, "The VM failed to allocate the amount of memory needed for execution."),
+      StatusCode::InsufficientInput => write!(f, "Tried to read more input than was available."),
+      StatusCode::InvalidSyscallArgument => write!(f, "Invalid syscall arguments."),
     }
   }
 }

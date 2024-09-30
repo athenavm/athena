@@ -288,6 +288,12 @@ extern "C"
     /** The caller does not have enough funds for value transfer. */
     ATHCON_INSUFFICIENT_BALANCE = 17,
 
+    /** A system call tried to read more from STDIN than was available. */
+    ATHCON_INSUFFICIENT_INPUT = 18,
+
+    /** A system call was called with invalid arguments. */
+    ATHCON_INVALID_SYSCALL_ARGUMENT = 19,
+
     /** Athena implementation generic internal error. */
     ATHCON_INTERNAL_ERROR = -1,
 
