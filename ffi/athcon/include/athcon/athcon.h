@@ -123,7 +123,7 @@ extern "C"
     /**
      * The size of the method name data.
      *
-     * If input_data is NULL this MUST be 0.
+     * If method_name is NULL this MUST be 0.
      */
     size_t method_name_size;
 
