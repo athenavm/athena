@@ -121,6 +121,8 @@ mod tests {
       sender: ::athcon_sys::athcon_address::default(),
       input_data: std::ptr::null(),
       input_size: 0,
+      method_name: std::ptr::null(),
+      method_name_size: 0,
       value: ::athcon_sys::athcon_uint256be::default(),
       code: std::ptr::null(),
       code_size: 0,

@@ -87,8 +87,12 @@ impl AthconVm {
         code.as_ptr(),
         code.len(),
       );
-      let data = std::slice::from_raw_parts(result.output_data, result.output_size);
-      let output = data.to_vec();
+      let output = if !result.output_data.is_null() && result.output_size > 0 {
+        let data = std::slice::from_raw_parts(result.output_data, result.output_size);
+        data.to_vec()
+      } else {
+        Vec::new()
+      };
       if let Some(release) = result.release {
         release(&result);
       }

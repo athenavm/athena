@@ -5,6 +5,8 @@ use core::arch::asm;
 ///
 /// `address` is the callee address, `input` is a bytearray to be passed to the
 /// callee function, and `len` is the number of bytes to read from the input bytearray.
+/// `method` is the name of the function to call, and `method_len` is the length of
+/// the method name in bytes.
 /// `amount` is the number of coins to transfer to the callee.
 /// For now there is no return value and no return status code. The caller can assume
 /// that, if this function returns, the call was successful.
@@ -12,7 +14,14 @@ use core::arch::asm;
 /// See https://github.com/athenavm/athena/issues/5 for more information.
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern "C" fn call(address: *const u32, input: *const u32, len: usize, amount: *const u32) {
+pub extern "C" fn call(
+  address: *const u32,
+  input: *const u32,
+  len: usize,
+  method: *const u32,
+  method_len: usize,
+  amount: *const u32,
+) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
@@ -21,7 +30,9 @@ pub extern "C" fn call(address: *const u32, input: *const u32, len: usize, amoun
         in("a0") address,
         in("a1") input,
         in("a2") len,
-        in("a3") amount,
+        in("a3") method,
+        in("a4") method_len,
+        in("a5") amount,
     )
   }
 

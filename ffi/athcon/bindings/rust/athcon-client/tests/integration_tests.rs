@@ -81,6 +81,7 @@ impl HostInterface for HostContext {
     sender: &Address,
     value: &Bytes32,
     input: &Bytes,
+    method: &Bytes,
     gas: i64,
     depth: i32,
   ) -> (Vec<u8>, i64, Address, StatusCode) {
@@ -114,6 +115,7 @@ impl HostInterface for HostContext {
       destination,
       sender,
       input,
+      method,
       value,
       CONTRACT_CODE,
     );
@@ -153,6 +155,8 @@ fn test_rust_host() {
     &[128u8; ADDRESS_LENGTH],
     // the value 3 as little-endian u32
     3u32.to_le_bytes().as_slice(),
+    // empty method name
+    &[],
     &[0u8; BYTES32_LENGTH],
     CONTRACT_CODE,
   );

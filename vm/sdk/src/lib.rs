@@ -13,7 +13,7 @@ pub use spawn::spawn;
 pub struct Pubkey(pub Bytes32);
 pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
-pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
+pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<Vec<u8>>, amount: Balance) {
   let address = address_to_32bit_words(address);
   let amount = balance_to_32bit_words(amount);
 
@@ -34,10 +34,36 @@ pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
   } else {
     None
   };
-
   let (input, input_len) = input32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len()));
 
-  athena_vm::syscalls::call(address.as_ptr(), input, input_len, amount.as_ptr());
+  let method32 = if let Some(method) = method {
+    let mut v = method
+      .chunks(4)
+      .map(|chunk| {
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(chunk);
+        u32::from_le_bytes(bytes)
+      })
+      .collect::<Vec<u32>>();
+    let len = v.len();
+    // pad method name to 4-byte alignment
+    if len % 4 != 0 {
+      v.extend(std::iter::repeat(0).take(4 - len % 4));
+    }
+    Some(v)
+  } else {
+    None
+  };
+  let (method, method_len) = method32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len()));
+
+  athena_vm::syscalls::call(
+    address.as_ptr(),
+    input,
+    input_len,
+    method,
+    method_len,
+    amount.as_ptr(),
+  );
 }
 
 // These traits define the reference wallet interface.

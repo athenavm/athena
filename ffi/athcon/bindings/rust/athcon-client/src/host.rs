@@ -23,6 +23,7 @@ pub trait HostContext {
     sender: &Address,
     value: &Bytes32,
     input: &Bytes,
+    method: &Bytes,
     gas: i64,
     depth: i32,
   ) -> (Vec<u8>, i64, Address, StatusCode);
@@ -148,6 +149,7 @@ pub unsafe extern "C" fn call(
       &msg.sender.bytes,
       &msg.value.bytes,
       std::slice::from_raw_parts(msg.input_data, msg.input_size),
+      std::slice::from_raw_parts(msg.method_name, msg.method_name_size),
       msg.gas,
       msg.depth,
     );
