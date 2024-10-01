@@ -104,6 +104,7 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
+        None,
         Balance::default(),
         vec![],
       ),
@@ -191,6 +192,7 @@ mod tests {
       ADDRESS_ALICE,
       ADDRESS_ALICE,
       Some(vec![8u8, 0, 0, 0]),
+      None,
       0,
       vec![],
     );

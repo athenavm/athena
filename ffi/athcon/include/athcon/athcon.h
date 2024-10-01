@@ -113,6 +113,21 @@ extern "C"
     size_t input_size;
 
     /**
+     * The destination program method to call.
+     *
+     * The arbitrary length byte array of the method name of the call.
+     * This MAY be NULL.
+     */
+    const uint8_t *method_name;
+
+    /**
+     * The size of the method name data.
+     *
+     * If input_data is NULL this MUST be 0.
+     */
+    size_t method_name_size;
+
+    /**
      * The number of coins transferred with the message.
      *
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.

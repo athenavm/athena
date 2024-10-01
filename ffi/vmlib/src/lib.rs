@@ -140,6 +140,13 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       None
     };
 
+    // Convert method pointer and size to Vec<u8>
+    let method = if !item.method_name.is_null() && item.method_name_size > 0 {
+      Some(unsafe { std::slice::from_raw_parts(item.method_name, item.method_name_size) }.to_vec())
+    } else {
+      None
+    };
+
     // Convert code pointer and size to Vec<u8>
     let code = if !item.code.is_null() && item.code_size > 0 {
       unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
@@ -156,6 +163,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
+      method,
       value: Bytes32AsU64::new(byteswrapper.0).into(),
       code,
     })
@@ -215,6 +223,7 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       AddressWrapper(item.0.recipient).into(),
       AddressWrapper(item.0.sender).into(),
       item.0.input_data.as_deref(),
+      item.0.method.as_deref(),
       Bytes32Wrapper(value.into()).into(),
       code,
     )
@@ -232,6 +241,7 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(*item.recipient()).into(),
       sender: AddressWrapper::from(*item.sender()).into(),
       input_data: item.input().cloned(),
+      method: item.method().cloned(),
       value: Bytes32AsU64::new(byteswrapper.0).into(),
       code: item.code().map_or(Vec::new(), |c| c.to_vec()),
     })

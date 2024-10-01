@@ -124,6 +124,7 @@ impl Syscall for SyscallHostCall {
       address.into(),
       *athena_ctx.address(),
       input,
+      None,
       amount,
       Vec::new(),
     );
