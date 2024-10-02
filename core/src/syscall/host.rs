@@ -198,6 +198,39 @@ impl Syscall for SyscallHostSpawn {
   }
 }
 
+/// System call to deploy a new program
+pub struct SyscallHostDeploy;
+
+impl Syscall for SyscallHostDeploy {
+  fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> SyscallResult {
+    // length in words, rounded up if needed
+    let len_words = (len as usize + 3) / 4;
+    let vec_words = ctx.slice(address, len_words);
+    let blob = vec_u32_to_bytes(vec_words, len as usize);
+
+    let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
+    let address = match host.deploy(blob) {
+      Ok(addr) => addr,
+      Err(err) => {
+        log::debug!("deploy failed: {err}");
+        return Err(StatusCode::Failure);
+      }
+    };
+    log::debug!("deploy succeeded: {}", hex::encode(address));
+
+    let out_addr = ctx
+      .rt
+      .rr(Register::X12, crate::runtime::MemoryAccessPosition::A);
+
+    for (idx, c) in address.chunks_exact(4).enumerate() {
+      let v = u32::from_le_bytes(c.try_into().unwrap());
+      ctx.rt.mw(out_addr + idx as u32 * 4, v);
+    }
+
+    Ok(Outcome::Result(None))
+  }
+}
+
 // Helper function to convert a vector of u32 into a vector of u8
 // with a specified length in bytes.
 fn vec_u32_to_bytes(vec: Vec<u32>, length: usize) -> Vec<u8> {

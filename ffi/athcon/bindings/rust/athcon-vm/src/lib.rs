@@ -292,6 +292,13 @@ impl<'a> ExecutionContext<'a> {
   pub fn spawn(&self, code: &[u8]) -> Address {
     unsafe { self.host.spawn.unwrap()(self.context, code.as_ptr(), code.len()) }
   }
+
+  /// Deploy a new template
+  /// Returns the newly-deployed template address, which is calculated as the hash of the template code
+  /// The code is a pointer to the code buffer.
+  pub fn deploy(&self, code: &[u8]) -> Address {
+    unsafe { self.host.deploy.unwrap()(self.context, code.as_ptr(), code.len()) }
+  }
 }
 
 impl From<ffi::athcon_result> for ExecutionResult {
@@ -783,6 +790,7 @@ mod tests {
       get_tx_context: Some(get_dummy_tx_context),
       get_block_hash: None,
       spawn: None,
+      deploy: None,
     }
   }
 

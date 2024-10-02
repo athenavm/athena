@@ -1,6 +1,7 @@
 //! The Spacemesh standard wallet template.
 #![no_main]
 #![no_std]
+extern crate alloc;
 
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
@@ -50,8 +51,9 @@ impl WalletProgram for Wallet {
     unimplemented!();
   }
 
-  fn deploy(&self, _code: &[u8]) {
-    unimplemented!();
+  #[callable]
+  fn deploy(&self, code: alloc::vec::Vec<u8>) -> Address {
+    athena_vm_sdk::deploy(code)
   }
 }
 
