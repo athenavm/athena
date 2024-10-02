@@ -55,11 +55,34 @@ where
       stdin.write_vec(input_data);
     }
 
-    log::info!("Executing code with input data");
-    match self
-      .client
-      .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
-    {
+    // method name is also optional
+    let execution_result = if let Some(method_name) = msg.method {
+      // TODO: use a fixed-length method selector here rather than a string
+      // https://github.com/athenavm/athena/issues/113
+      let method_name_str = match std::str::from_utf8(&method_name) {
+        Ok(name) => name,
+        Err(err) => {
+          log::info!("malformed utf-8 method name: {:?}", err);
+          return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+        }
+      };
+      log::info!("Executing method {} with input data", method_name_str);
+      self.client.execute_function(
+        code,
+        method_name_str,
+        stdin,
+        Some(host),
+        Some(msg.gas),
+        Some(context),
+      )
+    } else {
+      log::info!("Executing default method with input data");
+      self
+        .client
+        .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+    };
+
+    match execution_result {
       Ok((public_values, gas_left)) => ExecutionResult::new(
         StatusCode::Success,
         gas_left.unwrap(),
