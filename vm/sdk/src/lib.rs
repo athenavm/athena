@@ -34,10 +34,11 @@ pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<Vec<u8>>, a
   } else {
     None
   };
-  let (input, input_len) = input32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len()));
+  // multiply len * 4 since len is in bytes not words
+  let (input, input_len) = input32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len() * 4));
 
   let method32 = if let Some(method) = method {
-    let mut v = method
+    let v = method
       .chunks(4)
       .map(|chunk| {
         let mut bytes = [0u8; 4];
@@ -45,16 +46,12 @@ pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<Vec<u8>>, a
         u32::from_le_bytes(bytes)
       })
       .collect::<Vec<u32>>();
-    let len = v.len();
-    // pad method name to 4-byte alignment
-    if len % 4 != 0 {
-      v.extend(std::iter::repeat(0).take(4 - len % 4));
-    }
     Some(v)
   } else {
     None
   };
-  let (method, method_len) = method32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len()));
+  // multiply len * 4 since len is in bytes not words
+  let (method, method_len) = method32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len() * 4));
 
   athena_vm::syscalls::call(
     address.as_ptr(),

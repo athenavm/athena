@@ -60,12 +60,12 @@ impl Syscall for SyscallHostWrite {
 
 /// SyscallHostCall performs a host call, calling other programs.
 /// Inputs:
-///  - a0: address to call
-///  - a1: pointer to input (bytes) to pass to the called program
-///  - a2: length of input (bytes)
-///  - a3: pointer to method name (bytes) to call
-///  - a4: length of method name (bytes)
-///  - a5: address to read the amount from (2 words, 8 bytes)
+///  - a0 (arg1): address to call
+///  - a1 (arg2): pointer to input (bytes) to pass to the called program
+///  - a2 (x12): length of input (bytes)
+///  - a3 (x13): pointer to method name (bytes) to call
+///  - a4 (x14): length of method name (bytes)
+///  - a5 (x15): address to read the amount from (2 words, 8 bytes)
 pub(crate) struct SyscallHostCall;
 
 impl Syscall for SyscallHostCall {

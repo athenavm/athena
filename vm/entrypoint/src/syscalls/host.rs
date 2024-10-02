@@ -3,9 +3,9 @@ use core::arch::asm;
 
 /// Call a function in a foreign program.
 ///
-/// `address` is the callee address, `input` is a bytearray to be passed to the
-/// callee function, and `len` is the number of bytes to read from the input bytearray.
-/// `method` is the name of the function to call, and `method_len` is the length of
+/// `address` is the callee address, `input_ptr` is a bytearray to be passed to the
+/// callee function, and `input_len` is the number of bytes to read from the input bytearray.
+/// `method_ptr` is the name of the function to call, and `method_len` is the length of
 /// the method name in bytes.
 /// `amount` is the number of coins to transfer to the callee.
 /// For now there is no return value and no return status code. The caller can assume
@@ -16,9 +16,9 @@ use core::arch::asm;
 #[no_mangle]
 pub extern "C" fn call(
   address: *const u32,
-  input: *const u32,
-  len: usize,
-  method: *const u32,
+  input_ptr: *const u32,
+  input_len: usize,
+  method_ptr: *const u32,
   method_len: usize,
   amount: *const u32,
 ) {
@@ -28,9 +28,9 @@ pub extern "C" fn call(
         "ecall",
         in("t0") crate::syscalls::HOST_CALL,
         in("a0") address,
-        in("a1") input,
-        in("a2") len,
-        in("a3") method,
+        in("a1") input_ptr,
+        in("a2") input_len,
+        in("a3") method_ptr,
         in("a4") method_len,
         in("a5") amount,
     )

@@ -148,8 +148,16 @@ pub unsafe extern "C" fn call(
       &msg.recipient.bytes,
       &msg.sender.bytes,
       &msg.value.bytes,
-      std::slice::from_raw_parts(msg.input_data, msg.input_size),
-      std::slice::from_raw_parts(msg.method_name, msg.method_name_size),
+      if !msg.input_data.is_null() && msg.input_size > 0 {
+        std::slice::from_raw_parts(msg.input_data, msg.input_size)
+      } else {
+        &[]
+      },
+      if !msg.method_name.is_null() && msg.method_name_size > 0 {
+        std::slice::from_raw_parts(msg.input_data, msg.input_size)
+      } else {
+        &[]
+      },
       msg.gas,
       msg.depth,
     );
