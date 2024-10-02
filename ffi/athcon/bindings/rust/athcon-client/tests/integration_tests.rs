@@ -125,6 +125,10 @@ impl HostInterface for HostContext {
   fn spawn(&mut self, _blob: &[u8]) -> Address {
     todo!()
   }
+
+  fn deploy(&mut self, _code: &[u8]) -> Address {
+    todo!()
+  }
 }
 
 impl Drop for HostContext {

@@ -55,6 +55,10 @@ func (host *testHostContext) Spawn(blob []byte) Address {
 	return Address{}
 }
 
+func (host *testHostContext) Deploy(code []byte) Address {
+	return Address{}
+}
+
 // TestGetBalance tests the GetBalance() host function. It's a minimal test that
 // only executes a few instructions.
 func TestGetBalance(t *testing.T) {
