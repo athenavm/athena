@@ -137,11 +137,17 @@ mod tests {
 
   #[test]
   fn test_method_selector() {
-    let elf = include_bytes!("../../examples/wallet/program/elf/wallet-template");
+    let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
+
+    // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
+    let vm = AthenaVm::new();
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let input = bincode::serialize(&ADDRESS_ALICE).unwrap();
 
     // this will execute from the default entry point
     let result = AthenaVm::new().execute(
-      &mut MockHost::new(),
+      &mut host,
       AthenaRevision::AthenaFrontier,
       AthenaMessage::new(
         MessageKind::Call,
@@ -156,11 +162,32 @@ mod tests {
       ),
       elf,
     );
+    // this should fail: in noentrypoint mode, this panics.
+    assert_eq!(result.status_code, StatusCode::Failure);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        Some(input),
+        Some("athexp_test1".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should succeed
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
     let result = AthenaVm::new().execute(
-      &mut MockHost::new(),
+      &mut host,
       AthenaRevision::AthenaFrontier,
       AthenaMessage::new(
         MessageKind::Call,
@@ -169,13 +196,34 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
-        Some("athcon_send".as_bytes().to_vec()),
+        Some("athexp_test2".as_bytes().to_vec()),
         Balance::default(),
         vec![],
       ),
       elf,
     );
+    // this should also succeed
     assert_eq!(result.status_code, StatusCode::Success);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        Some("athexp_test3".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should fail, as this method is not `callable`
+    assert_eq!(result.status_code, StatusCode::Failure);
   }
 
   // Note: we run this test here, as opposed to at a lower level (inside the SDK), since recursive host calls

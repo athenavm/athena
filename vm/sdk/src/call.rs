@@ -24,14 +24,14 @@ pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<Vec<u8>>, a
   };
 
   let (method_name, method_name_len) =
-    method32.map_or((std::ptr::null(), 0), |(v, l)| (v.as_ptr(), l));
+    method32.map_or((std::ptr::null(), 0), |(v, _)| (v.as_ptr(), v.len() * 4));
 
   athena_vm::syscalls::call(
     address.as_ptr(),
     input,
     input_len,
-    method,
-    method_len,
+    method_name,
+    method_name_len,
     amount.as_ptr(),
   );
 }

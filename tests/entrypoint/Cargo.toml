@@ -1,8 +1,14 @@
 [workspace]
 [package]
-name = "stack-depth-test"
+name = "entrypoint-test"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }
+athena-vm = { path = "../../vm/entrypoint", features = [
+  "noentrypoint",
+  "rv32e",
+] }
+athena-vm-declare = { path = "../../vm/declare" }
+athena-vm-sdk = { path = "../../vm/sdk" }
+bincode = "1.3.3"

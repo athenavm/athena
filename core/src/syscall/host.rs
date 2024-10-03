@@ -136,7 +136,7 @@ impl Syscall for SyscallHostCall {
       None
     };
 
-    let amount_ptr = ctx.rt.register(Register::X13);
+    let amount_ptr = ctx.rt.register(Register::X15);
     let amount = ctx.dword(amount_ptr);
 
     // note: host is responsible for checking balance and stack depth

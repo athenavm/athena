@@ -54,6 +54,22 @@ where
   }
 }
 
+/// Implement Function for functions taking no arguments:
+/// # Example:
+/// ```ignore
+///fn foo() -> impl IntoResult<IO>
+/// ```
+impl<F, IO, R> Function<(), R, IO> for F
+where
+  IO: Read + Write,
+  F: Fn() -> R,
+  R: IntoResult<IO>,
+{
+  fn call_func(self, io: &mut IO) {
+    self().into_result(io);
+  }
+}
+
 /// Implement Function for functions taking 1 argument:
 /// # Example:
 /// ```ignore

@@ -12,8 +12,8 @@ cfg_if! {
     mod deploy;
     pub use deploy::deploy;
     mod io;
-    pub use io::read;
-    pub use io::write;
+    pub use io::read_storage;
+    pub use io::write_storage;
   }
 }
 
