@@ -135,6 +135,49 @@ mod tests {
     );
   }
 
+  #[test]
+  fn test_method_selector() {
+    let elf = include_bytes!("../../examples/wallet/program/elf/wallet-template");
+
+    // this will execute from the default entry point
+    let result = AthenaVm::new().execute(
+      &mut MockHost::new(),
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        None,
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    assert_eq!(result.status_code, StatusCode::Success);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut MockHost::new(),
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        Some("athcon_send".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    assert_eq!(result.status_code, StatusCode::Success);
+  }
+
   // Note: we run this test here, as opposed to at a lower level (inside the SDK), since recursive host calls
   // require access to an actual VM instance.
   #[test]

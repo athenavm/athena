@@ -1,21 +1,21 @@
 use athena_interface::{Address, Bytes32, BYTES32_LENGTH};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
+use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 
-#[cfg(target_os = "zkvm")]
-mod spawn;
-#[cfg(target_os = "zkvm")]
-pub use spawn::spawn;
-
-#[cfg(target_os = "zkvm")]
-mod call;
-#[cfg(target_os = "zkvm")]
-pub use call::call;
-
-#[cfg(target_os = "zkvm")]
-mod deploy;
-#[cfg(target_os = "zkvm")]
-pub use deploy::deploy;
+cfg_if! {
+  if #[cfg(target_os = "zkvm")] {
+    mod spawn;
+    pub use spawn::spawn;
+    mod call;
+    pub use call::call;
+    mod deploy;
+    pub use deploy::deploy;
+    mod io;
+    pub use io::read;
+    pub use io::write;
+  }
+}
 
 #[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 pub struct Pubkey(pub Bytes32);
