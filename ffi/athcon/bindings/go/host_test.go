@@ -46,7 +46,7 @@ func (host *testHostContext) GetBlockHash(number int64) Bytes32 {
 }
 
 func (host *testHostContext) Call(kind CallKind,
-	recipient Address, sender Address, value Bytes32, input []byte, gas int64, depth int) (
+	recipient Address, sender Address, value Bytes32, input []byte, method []byte, gas int64, depth int) (
 	output []byte, gasLeft int64, createAddr Address, err error) {
 	return nil, gas, Address{}, nil
 }
