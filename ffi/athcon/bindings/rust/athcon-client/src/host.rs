@@ -168,7 +168,7 @@ pub unsafe extern "C" fn call(
         &[]
       },
       if !msg.method_name.is_null() && msg.method_name_size > 0 {
-        std::slice::from_raw_parts(msg.input_data, msg.input_size)
+        std::slice::from_raw_parts(msg.method_name, msg.method_name_size)
       } else {
         &[]
       },
