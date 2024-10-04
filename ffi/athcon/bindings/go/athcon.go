@@ -190,15 +190,9 @@ func (vm *VM) Execute(
 		// Otherwise, the Go garbage collector may move the data around and
 		// invalidate the pointer passed to the C code.
 		// Without this, the CGO complains `cgo argument has Go pointer to unpinned Go pointer`.
-		cInputData := C.malloc(C.size_t(len(input)))
-		if cInputData == nil {
-			return res, fmt.Errorf("failed to allocate memory for input data")
-		}
+		cInputData := C.CBytes(input)
 		defer C.free(cInputData)
-
-		cSlice := unsafe.Slice((*byte)(cInputData), len(input))
-		copy(cSlice, input)
-		msg.input_data = (*C.uchar)(unsafe.Pointer(&cSlice[0]))
+		msg.input_data = (*C.uchar)(cInputData)
 		msg.input_size = C.size_t(len(input))
 	}
 	if len(method) > 0 {
@@ -221,7 +215,7 @@ func (vm *VM) Execute(
 	result := C.athcon_execute(
 		vm.handle,
 		hostInterface,
-		(*C.struct_athcon_host_context)(unsafe.Pointer(uintptr(ctxHandle))),
+		(*C.struct_athcon_host_context)(unsafe.Pointer(&ctxHandle)),
 		uint32(rev),
 		&msg,
 		(*C.uint8_t)(unsafe.Pointer(&code[0])),
