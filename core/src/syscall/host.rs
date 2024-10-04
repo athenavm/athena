@@ -60,10 +60,12 @@ impl Syscall for SyscallHostWrite {
 
 /// SyscallHostCall performs a host call, calling other programs.
 /// Inputs:
-///  - a0: address to call
-///  - a1: address of input (bytes) to pass to the called program
-///  - a2: length of input (bytes)
-///  - a3: address to read the amount from (2 words, 8 bytes)
+///  - a0 (arg1): address to call
+///  - a1 (arg2): pointer to input (bytes) to pass to the called program
+///  - a2 (x12): length of input (bytes)
+///  - a3 (x13): pointer to method name (bytes) to call
+///  - a4 (x14): length of method name (bytes)
+///  - a5 (x15): address to read the amount from (2 words, 8 bytes)
 pub(crate) struct SyscallHostCall;
 
 impl Syscall for SyscallHostCall {
@@ -111,7 +113,30 @@ impl Syscall for SyscallHostCall {
       None
     };
 
-    let amount_ptr = ctx.rt.register(Register::X13);
+    // read the method name from the next register
+    let len = ctx.rt.register(Register::X14) as usize;
+    if len % 4 != 0 {
+      log::debug!("host system call input (a4/x14) not aligned to 4 bytes");
+      return Err(StatusCode::InvalidSyscallArgument);
+    }
+
+    let method_name_ptr = ctx.rt.register(Register::X13);
+
+    // `len` is denominated in number of bytes; we read words in chunks of four bytes
+    // then convert into a byte array.
+    let method = if len > 0 {
+      let words = ctx.slice(method_name_ptr, len / 4);
+      Some(
+        words
+          .into_iter()
+          .flat_map(|word| word.to_le_bytes())
+          .collect(),
+      )
+    } else {
+      None
+    };
+
+    let amount_ptr = ctx.rt.register(Register::X15);
     let amount = ctx.dword(amount_ptr);
 
     // note: host is responsible for checking balance and stack depth
@@ -124,6 +149,7 @@ impl Syscall for SyscallHostCall {
       address.into(),
       *athena_ctx.address(),
       input,
+      method,
       amount,
       Vec::new(),
     );

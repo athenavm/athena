@@ -55,11 +55,34 @@ where
       stdin.write_vec(input_data);
     }
 
-    log::info!("Executing code with input data");
-    match self
-      .client
-      .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
-    {
+    // method name is also optional
+    let execution_result = if let Some(method_name) = msg.method {
+      // TODO: use a fixed-length method selector here rather than a string
+      // https://github.com/athenavm/athena/issues/113
+      let method_name_str = match std::str::from_utf8(&method_name) {
+        Ok(name) => name,
+        Err(err) => {
+          log::info!("malformed utf-8 method name: {:?}", err);
+          return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+        }
+      };
+      log::info!("Executing method {} with input data", method_name_str);
+      self.client.execute_function(
+        code,
+        method_name_str,
+        stdin,
+        Some(host),
+        Some(msg.gas),
+        Some(context),
+      )
+    } else {
+      log::info!("Executing default method with input data");
+      self
+        .client
+        .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+    };
+
+    match execution_result {
       Ok((public_values, gas_left)) => ExecutionResult::new(
         StatusCode::Success,
         gas_left.unwrap(),
@@ -104,11 +127,103 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
+        None,
         Balance::default(),
         vec![],
       ),
       &[],
     );
+  }
+
+  #[test]
+  fn test_method_selector() {
+    let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
+
+    // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
+    let vm = AthenaVm::new();
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let input = bincode::serialize(&ADDRESS_ALICE).unwrap();
+
+    // this will execute from the default entry point
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        None,
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should fail: in noentrypoint mode, this panics.
+    assert_eq!(result.status_code, StatusCode::Failure);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        Some(input),
+        Some("athexp_test1".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should succeed
+    assert_eq!(result.status_code, StatusCode::Success);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        Some("athexp_test2".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should also succeed
+    assert_eq!(result.status_code, StatusCode::Success);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        Some("athexp_test3".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should fail, as this method is not `callable`
+    assert_eq!(result.status_code, StatusCode::Failure);
   }
 
   // Note: we run this test here, as opposed to at a lower level (inside the SDK), since recursive host calls
@@ -191,6 +306,7 @@ mod tests {
       ADDRESS_ALICE,
       ADDRESS_ALICE,
       Some(vec![8u8, 0, 0, 0]),
+      None,
       0,
       vec![],
     );

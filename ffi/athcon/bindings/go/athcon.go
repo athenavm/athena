@@ -170,6 +170,7 @@ func (vm *VM) Execute(
 	gas int64,
 	recipient, sender Address,
 	input []byte,
+	method []byte,
 	value Bytes32,
 	code []byte,
 ) (res Result, err error) {
@@ -193,6 +194,13 @@ func (vm *VM) Execute(
 		defer C.free(cInputData)
 		msg.input_data = (*C.uchar)(cInputData)
 		msg.input_size = C.size_t(len(input))
+	}
+	if len(method) > 0 {
+		// Allocate memory for method name in C.
+		cMethodName := C.CBytes(method)
+		defer C.free(cMethodName)
+		msg.method_name = (*C.uchar)(cMethodName)
+		msg.method_name_size = C.size_t(len(method))
 	}
 
 	ctxHandle := cgo.NewHandle(ctx)

@@ -68,7 +68,7 @@ func TestGetBalance(t *testing.T) {
 	host := &testHostContext{}
 	addr := Address{}
 	h := Bytes32{}
-	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, h, MINIMAL_TEST_CODE)
+	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, nil, h, MINIMAL_TEST_CODE)
 	output := result.Output
 	gasLeft := result.GasLeft
 
@@ -98,14 +98,14 @@ func TestCall(t *testing.T) {
 	host := &testHostContext{}
 	addr := Address{}
 	h := Bytes32{}
-	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, []byte{2, 0, 0, 0}, h, RECURSIVE_CALL_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, []byte{2, 0, 0, 0}, nil, h, RECURSIVE_CALL_TEST)
 	output := result.Output
 	gasLeft := result.GasLeft
 
 	if len(output) != 4 {
 		t.Errorf("execution unexpected output length: %d", len(output))
 	}
-	if gasLeft != 6604 {
+	if gasLeft != 5204 {
 		t.Errorf("execution gas left is incorrect: %d", gasLeft)
 	}
 	if err != nil {

@@ -3,6 +3,8 @@
 mod container;
 mod types;
 
+use core::slice;
+
 pub use athcon_sys as ffi;
 pub use container::AthconContainer;
 pub use types::*;
@@ -53,6 +55,7 @@ pub struct ExecutionMessage {
   recipient: Address,
   sender: Address,
   input: Option<Vec<u8>>,
+  method: Option<Vec<u8>>,
   value: Uint256,
   code: Option<Vec<u8>>,
 }
@@ -124,6 +127,7 @@ impl ExecutionMessage {
     recipient: Address,
     sender: Address,
     input: Option<&[u8]>,
+    method: Option<&[u8]>,
     value: Uint256,
     code: Option<&[u8]>,
   ) -> Self {
@@ -134,6 +138,7 @@ impl ExecutionMessage {
       recipient,
       sender,
       input: input.map(|s| s.to_vec()),
+      method: method.map(|s| s.to_vec()),
       value,
       code: code.map(|s| s.to_vec()),
     }
@@ -167,6 +172,11 @@ impl ExecutionMessage {
   /// Read the optional input message.
   pub fn input(&self) -> Option<&Vec<u8>> {
     self.input.as_ref()
+  }
+
+  /// Read the optional method.
+  pub fn method(&self) -> Option<&Vec<u8>> {
+    self.method.as_ref()
   }
 
   /// Read the value of the message.
@@ -243,15 +253,15 @@ impl<'a> ExecutionContext<'a> {
     // There is no need to make any kind of copies here, because the caller
     // won't go out of scope and ensures these pointers remain valid.
     let input = message.input();
-    let input_size = if let Some(input) = input {
-      input.len()
+    let (input_data, input_size) = if let Some(input) = input {
+      (input.as_ptr(), input.len())
     } else {
-      0
+      (std::ptr::null(), 0)
     };
-    let input_data = if let Some(input) = input {
-      input.as_ptr()
+    let (method_name, method_name_size) = if let Some(method) = message.method() {
+      (method.as_ptr(), method.len())
     } else {
-      std::ptr::null()
+      (std::ptr::null(), 0)
     };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
@@ -270,6 +280,8 @@ impl<'a> ExecutionContext<'a> {
       sender: *message.sender(),
       input_data,
       input_size,
+      method_name,
+      method_name_size,
       value: *message.value(),
       code: code_data,
       code_size,
@@ -312,7 +324,7 @@ impl From<ffi::athcon_result> for ExecutionResult {
       } else if result.output_size == 0 {
         None
       } else {
-        Some(from_buf_raw::<u8>(result.output_data, result.output_size))
+        Some(unsafe { slice::from_raw_parts(result.output_data, result.output_size).to_vec() })
       },
       // Consider it is always valid.
       create_address: Some(result.create_address),
@@ -419,7 +431,19 @@ impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
       } else if message.input_size == 0 {
         None
       } else {
-        Some(from_buf_raw::<u8>(message.input_data, message.input_size))
+        Some(unsafe { slice::from_raw_parts(message.input_data, message.input_size).to_vec() })
+      },
+      method: if message.method_name.is_null() {
+        if message.method_name_size != 0 {
+          return Err("msg.method_data is null but msg.method_size is not 0".to_string());
+        }
+        None
+      } else if message.method_name_size == 0 {
+        None
+      } else {
+        Some(unsafe {
+          slice::from_raw_parts(message.method_name, message.method_name_size).to_vec()
+        })
       },
       value: message.value,
       code: if message.code.is_null() {
@@ -430,22 +454,10 @@ impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
       } else if message.code_size == 0 {
         None
       } else {
-        Some(from_buf_raw::<u8>(message.code, message.code_size))
+        Some(unsafe { slice::from_raw_parts(message.code, message.code_size).to_vec() })
       },
     })
   }
-}
-
-fn from_buf_raw<T>(ptr: *const T, size: usize) -> Vec<T> {
-  // Pre-allocate a vector.
-  let mut buf = Vec::with_capacity(size);
-  unsafe {
-    // Copy from the C buffer to the vec's buffer.
-    std::ptr::copy(ptr, buf.as_mut_ptr(), size);
-    // Set the len of the vec manually.
-    buf.set_len(size);
-  }
-  buf
 }
 
 #[cfg(test)]
@@ -596,6 +608,7 @@ mod tests {
       recipient,
       sender,
       Some(&input),
+      None,
       value,
       None,
     );
@@ -624,6 +637,7 @@ mod tests {
       recipient,
       sender,
       None,
+      None,
       value,
       Some(&code),
     );
@@ -651,6 +665,8 @@ mod tests {
       sender,
       input_data: std::ptr::null(),
       input_size: 0,
+      method_name: std::ptr::null(),
+      method_name_size: 0,
       value,
       code: std::ptr::null(),
       code_size: 0,
@@ -823,6 +839,7 @@ mod tests {
       test_addr,
       test_addr,
       None,
+      None,
       Uint256::default(),
       None,
     );
@@ -853,6 +870,7 @@ mod tests {
       test_addr,
       test_addr,
       Some(&data),
+      None,
       Uint256::default(),
       None,
     );

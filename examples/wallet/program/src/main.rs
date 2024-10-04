@@ -44,7 +44,7 @@ impl WalletProgram for Wallet {
   fn send(&self, send_arguments: SendArguments) {
     // Send coins
     // Note: error checking happens inside the host
-    call(send_arguments.recipient, None, send_arguments.amount);
+    call(send_arguments.recipient, None, None, send_arguments.amount);
   }
 
   fn proxy(&self, _destination: Address, _args: &[u8]) {

@@ -1,10 +1,11 @@
 #![no_main]
 athena_vm::entrypoint!(main);
 
-use athena_vm::helpers::{address_to_32bit_words, bytes32_to_32bit_words};
+use athena_vm::helpers::bytes32_to_32bit_words;
 use athena_vm::types::{
   StorageStatus::StorageAdded, StorageStatus::StorageModified, ADDRESS_ALICE, STORAGE_KEY,
 };
+use athena_vm_sdk::call;
 
 // Note: the test harness installs this contract code at ADDRESS_ALICE
 
@@ -27,14 +28,8 @@ fn return_value(value: u32) {
 }
 
 fn recursive_call(value: u32) -> u32 {
-  // we need a pointer to the value as an array
-  let val: [u32; 4] = [value, 0, 0, 0];
-
-  // same for amount to send
-  let amount: [u32; 2] = [0, 0];
-
-  let address = address_to_32bit_words(ADDRESS_ALICE);
-  unsafe { athena_vm::host::call(address.as_ptr(), val.as_ptr(), 4, amount.as_ptr()) };
+  let value_bytes = value.to_le_bytes().to_vec();
+  call(ADDRESS_ALICE, Some(value_bytes), None, 0);
 
   // read the return value
   let mut key = bytes32_to_32bit_words(STORAGE_KEY);
