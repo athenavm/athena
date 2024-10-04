@@ -89,31 +89,31 @@ type HostContext interface {
 
 //export accountExists
 func accountExists(pCtx unsafe.Pointer, pAddr *C.athcon_address) C.bool {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	return C.bool(ctx.AccountExists(goAddress(*pAddr)))
 }
 
 //export getStorage
 func getStorage(pCtx unsafe.Pointer, pAddr *C.athcon_address, pKey *C.athcon_bytes32) C.athcon_bytes32 {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	return athconBytes32(ctx.GetStorage(goAddress(*pAddr), goHash(*pKey)))
 }
 
 //export setStorage
 func setStorage(pCtx unsafe.Pointer, pAddr *C.athcon_address, pKey *C.athcon_bytes32, pVal *C.athcon_bytes32) C.enum_athcon_storage_status {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	return C.enum_athcon_storage_status(ctx.SetStorage(goAddress(*pAddr), goHash(*pKey), goHash(*pVal)))
 }
 
 //export getBalance
 func getBalance(pCtx unsafe.Pointer, pAddr *C.athcon_address) C.athcon_uint256be {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	return athconBytes32(ctx.GetBalance(goAddress(*pAddr)))
 }
 
 //export getTxContext
 func getTxContext(pCtx unsafe.Pointer) C.struct_athcon_tx_context {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	txContext := ctx.GetTxContext()
 
 	return C.struct_athcon_tx_context{
@@ -128,13 +128,13 @@ func getTxContext(pCtx unsafe.Pointer) C.struct_athcon_tx_context {
 
 //export getBlockHash
 func getBlockHash(pCtx unsafe.Pointer, number int64) C.athcon_bytes32 {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	return athconBytes32(ctx.GetBlockHash(number))
 }
 
 //export call
 func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_result {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 
 	kind := CallKind(msg.kind)
 	output, gasLeft, createAddr, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), goHash(msg.value),

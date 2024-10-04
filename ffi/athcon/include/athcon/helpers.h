@@ -88,14 +88,14 @@ extern "C"
    */
   static inline struct athcon_result athcon_execute(struct athcon_vm *vm,
                                                     const struct athcon_host_interface *host,
-                                                    uintptr_t context,
+                                                    struct athcon_host_context* context,
                                                     enum athcon_revision rev,
                                                     const struct athcon_message *msg,
                                                     uint8_t const *code,
                                                     size_t code_size)
   {
 
-    return vm->execute(vm, host, (struct athcon_host_context*)context, rev, msg, code, code_size);
+    return vm->execute(vm, host, context, rev, msg, code, code_size);
   }
 
   /// The athcon_result release function using free() for releasing the memory.

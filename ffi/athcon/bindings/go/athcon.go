@@ -201,7 +201,7 @@ func (vm *VM) Execute(
 	result := C.athcon_execute(
 		vm.handle,
 		hostInterface,
-		C.uintptr_t(ctxHandle),
+		(*C.struct_athcon_host_context)(unsafe.Pointer(&ctxHandle)),
 		uint32(rev),
 		&msg,
 		(*C.uint8_t)(unsafe.Pointer(&code[0])),
