@@ -43,6 +43,73 @@ const (
 	StorageModifiedRestored StorageStatus = C.ATHCON_STORAGE_MODIFIED_RESTORED
 )
 
+type StatusCode int
+
+const (
+	AthconSuccess                   StatusCode = C.ATHCON_SUCCESS
+	AthconFailure                   StatusCode = C.ATHCON_FAILURE
+	AthconRevert                    StatusCode = C.ATHCON_REVERT
+	AthconOutOfGas                  StatusCode = C.ATHCON_OUT_OF_GAS
+	AthconInvalidInstruction        StatusCode = C.ATHCON_INVALID_INSTRUCTION
+	AthconUndefinedInstruction      StatusCode = C.ATHCON_UNDEFINED_INSTRUCTION
+	AthconStackOverflow             StatusCode = C.ATHCON_STACK_OVERFLOW
+	AthconStackUnderflow            StatusCode = C.ATHCON_STACK_UNDERFLOW
+	AthconBadJumpDestination        StatusCode = C.ATHCON_BAD_JUMP_DESTINATION
+	AthconInvalidMemoryAccess       StatusCode = C.ATHCON_INVALID_MEMORY_ACCESS
+	AthconCallDepthExceeded         StatusCode = C.ATHCON_CALL_DEPTH_EXCEEDED
+	AthconStaticModeViolation       StatusCode = C.ATHCON_STATIC_MODE_VIOLATION
+	AthconPrecompileFailure         StatusCode = C.ATHCON_PRECOMPILE_FAILURE
+	AthconContractValidationFailure StatusCode = C.ATHCON_CONTRACT_VALIDATION_FAILURE
+	AthconArgumentOutOfRange        StatusCode = C.ATHCON_ARGUMENT_OUT_OF_RANGE
+	AthconUnreachableInstruction    StatusCode = C.ATHCON_UNREACHABLE_INSTRUCTION
+	AthconTrap                      StatusCode = C.ATHCON_TRAP
+	AthconInsufficientBalance       StatusCode = C.ATHCON_INSUFFICIENT_BALANCE
+	AthconInsufficientInput         StatusCode = C.ATHCON_INSUFFICIENT_INPUT
+	AthconInvalidSyscallArgument    StatusCode = C.ATHCON_INVALID_SYSCALL_ARGUMENT
+	AthconInternalError             StatusCode = C.ATHCON_INTERNAL_ERROR
+	AthconRejected                  StatusCode = C.ATHCON_REJECTED
+	AthconOutOfMemory               StatusCode = C.ATHCON_OUT_OF_MEMORY
+)
+
+// ConvertToGoMessage converts C.struct_athcon_message to AthconMessage
+func ConvertToGoMessage(cMsg *C.struct_athcon_message) AthconMessage {
+	return AthconMessage{
+		Kind:      CallKind(cMsg.kind),
+		Depth:     uint32(cMsg.depth),
+		Gas:       int64(cMsg.gas),
+		Recipient: goAddress(cMsg.recipient),
+		Sender:    goAddress(cMsg.sender),
+		Input:     goByteSlice(cMsg.input_data, cMsg.input_size),
+		Method:    goByteSlice(cMsg.method_name, cMsg.method_name_size),
+		Value:     goHash(cMsg.value),
+		Code:      goByteSlice(cMsg.code, cMsg.code_size),
+	}
+}
+
+// ConvertToCResult converts AthconResult to C.struct_athcon_result
+func ConvertToCResult(goResult AthconResult) C.struct_athcon_result {
+	cResult := C.struct_athcon_result{
+		status_code:    C.enum_athcon_status_code(goResult.Status),
+		gas_left:       C.int64_t(goResult.GasLeft),
+		create_address: cAddress(goResult.CreateAddr),
+	}
+
+	if len(goResult.Output) > 0 {
+		cResult.output_data = (*C.uint8_t)(&goResult.Output[0])
+		cResult.output_size = C.size_t(len(goResult.Output))
+	}
+
+	return cResult
+}
+
+func cAddress(goAddr Address) C.struct_athcon_address {
+	var cAddr C.struct_athcon_address
+	for i := 0; i < 20; i++ {
+		cAddr.bytes[i] = C.uint8_t(goAddr[i])
+	}
+	return cAddr
+}
+
 func goAddress(in C.athcon_address) Address {
 	out := Address{}
 	for i := 0; i < len(out); i++ {
@@ -77,6 +144,25 @@ type TxContext struct {
 	ChainID     Bytes32
 }
 
+type AthconResult struct {
+	Status     StatusCode
+	Output     []byte
+	GasLeft    int64
+	CreateAddr Address
+}
+
+type AthconMessage struct {
+	Kind      CallKind
+	Depth     uint32
+	Gas       int64
+	Recipient Address
+	Sender    Address
+	Input     []byte
+	Method    []byte
+	Value     Bytes32
+	Code      []byte
+}
+
 type HostContext interface {
 	AccountExists(addr Address) bool
 	GetStorage(addr Address, key Bytes32) Bytes32
@@ -84,8 +170,7 @@ type HostContext interface {
 	GetBalance(addr Address) Bytes32
 	GetTxContext() TxContext
 	GetBlockHash(number int64) Bytes32
-	Call(kind CallKind, recipient Address, sender Address, value Bytes32, input []byte, gas int64, depth int) (
-		output []byte, gasLeft int64, createAddr Address, err error)
+	Call(msg AthconMessage) AthconResult
 	Spawn(blob []byte) Address
 	Deploy(code []byte) Address
 }
@@ -138,24 +223,14 @@ func getBlockHash(pCtx unsafe.Pointer, number int64) C.athcon_bytes32 {
 //export call
 func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_result {
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
+	// Convert C message to Go message
+	goMsg := ConvertToGoMessage(msg)
 
-	kind := CallKind(msg.kind)
-	output, gasLeft, createAddr, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), goHash(msg.value),
-		goByteSlice(msg.input_data, msg.input_size), int64(msg.gas), int(msg.depth))
+	// Call the Go function
+	goResult := ctx.Call(goMsg)
 
-	statusCode := C.enum_athcon_status_code(0)
-	if err != nil {
-		statusCode = C.enum_athcon_status_code(err.(Error))
-	}
-
-	outputData := (*C.uint8_t)(nil)
-	if len(output) > 0 {
-		outputData = (*C.uint8_t)(&output[0])
-	}
-
-	result := C.athcon_make_result(statusCode, C.int64_t(gasLeft), outputData, C.size_t(len(output)))
-	result.create_address = athconAddress(createAddr)
-	return result
+	// Convert Go result to C result
+	return ConvertToCResult(goResult)
 }
 
 //export spawn

@@ -45,10 +45,8 @@ func (host *testHostContext) GetBlockHash(number int64) Bytes32 {
 	return Bytes32{}
 }
 
-func (host *testHostContext) Call(kind CallKind,
-	recipient Address, sender Address, value Bytes32, input []byte, gas int64, depth int) (
-	output []byte, gasLeft int64, createAddr Address, err error) {
-	return nil, gas, Address{}, nil
+func (host *testHostContext) Call(msg AthconMessage) AthconResult {
+	return AthconResult{Status: AthconSuccess, GasLeft: msg.Gas}
 }
 
 func (host *testHostContext) Spawn(blob []byte) Address {
@@ -91,7 +89,7 @@ func TestGetBalance(t *testing.T) {
 	}
 }
 
-func TestCall(t *testing.T) {
+func TestExecute(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
 
