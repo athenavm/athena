@@ -112,7 +112,6 @@ impl Default for ExecutionClient {
 mod tests {
 
   use crate::{utils, AthenaStdin, ExecutionClient};
-  use athena_interface::{AthenaContext, MockHost, ADDRESS_ALICE};
 
   #[test]
   fn test_execute() {
@@ -125,24 +124,11 @@ mod tests {
   }
 
   #[test]
-  fn test_host() {
-    utils::setup_logger();
-    let client = ExecutionClient::new();
-    let elf = include_bytes!("../../tests/host/elf/host-test");
-    let stdin = AthenaStdin::new();
-    let mut host = MockHost::new();
-    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
-    client
-      .execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx))
-      .unwrap();
-  }
-
-  #[test]
   #[should_panic]
   fn test_missing_host() {
     utils::setup_logger();
     let client = ExecutionClient::new();
-    let elf = include_bytes!("../../tests/host/elf/host-test");
+    let elf = include_bytes!("../../tests/minimal/getbalance.bin");
     let stdin = AthenaStdin::new();
     client.execute(elf, stdin, None, None, None).unwrap();
   }

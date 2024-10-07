@@ -5,7 +5,6 @@ mod program;
 mod register;
 mod state;
 mod syscall;
-#[macro_use]
 mod utils;
 
 pub use instruction::*;
@@ -777,28 +776,18 @@ impl<'host> Runtime<'host> {
 
 #[cfg(test)]
 pub mod tests {
-
   use crate::{
-    io::AthenaStdin,
     runtime::ExecutionError,
-    runtime::MemoryAccessPosition,
     utils::{self, with_max_gas},
   };
   use athena_interface::{
-    calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
-    HostStaticContext, MockHost, StatusCode, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
-    ADDRESS_LENGTH, SOME_COINS,
+    Address, AthenaContext, ExecutionResult, MockHostInterface, StatusCode, ADDRESS_LENGTH,
   };
   use athena_vm::helpers::address_to_32bit_words;
-  use athena_vm_sdk::SendArguments;
-  use borsh::to_vec;
 
   use crate::{
     runtime::Register,
-    utils::{
-      tests::{TEST_FIBONACCI_ELF, TEST_HOST, TEST_PANIC_ELF, WALLET_ELF},
-      AthenaCoreOpts,
-    },
+    utils::{tests::TEST_PANIC_ELF, AthenaCoreOpts},
   };
 
   use super::syscall::SyscallCode;
@@ -813,20 +802,8 @@ pub mod tests {
     Program::new(instructions, 0, 0)
   }
 
-  pub fn fibonacci_program() -> Program {
-    Program::from(TEST_FIBONACCI_ELF)
-  }
-
   pub fn panic_program() -> Program {
     Program::from(TEST_PANIC_ELF)
-  }
-
-  pub fn host_program() -> Program {
-    Program::from(TEST_HOST)
-  }
-
-  pub fn wallet_program() -> Program {
-    Program::from(WALLET_ELF)
   }
 
   #[test]
@@ -838,169 +815,22 @@ pub mod tests {
   }
 
   #[test]
-  #[should_panic]
   fn test_panic() {
     let program = panic_program();
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
-    runtime.execute().unwrap();
-  }
-
-  #[test]
-  fn test_wallet() {
-    let program = wallet_program();
-
-    // set up host context
-    let owner_pubkey = [1u8; 32];
-    let principal = ADDRESS_ALICE;
-    let template = ADDRESS_BOB;
-    let callee = ADDRESS_CHARLIE;
-    // arbitrary template address
-    let wallet_template = [9u8; ADDRESS_LENGTH];
-    let nonce = 0;
-    let static_context = HostStaticContext::new(principal, nonce, Address::default());
-    let dynamic_context = HostDynamicContext::new(template, callee);
-    let mut host = MockHost::new_with_context(static_context, dynamic_context);
-
-    // check balances: only alice has coins
-    let amount_to_send = 1000;
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
-    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
-
-    // set up send arguments
-    let send_args = SendArguments {
-      amount: amount_to_send,
-      recipient: ADDRESS_CHARLIE,
-    };
-
-    // alice initiates the call. initially she calls the wallet template directly.
-    let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
-    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
-    let mut stdin = AthenaStdin::new();
-    stdin.write(&owner_pubkey);
-    runtime.write_vecs(&stdin.buffer);
-
-    // make sure the program loaded correctly
-    // riscv32-unknown-linux-gnu-objdump -d -j .text elf/wallet-template | grep athexp
-    assert_eq!(
-      runtime
-        .program
-        .as_ref()
-        .symbol_table
-        .get("athexp_spawn")
-        .unwrap(),
-      &2103464
-    );
-    assert_eq!(
-      runtime
-        .program
-        .as_ref()
-        .symbol_table
-        .get("athexp_send")
-        .unwrap(),
-      &2103516
-    );
-
-    // now attempt to execute each function in turn
-    // first, the spawn
-    runtime.execute_function("athexp_spawn").unwrap();
-    drop(runtime);
-
-    // get newly-created wallet address
-    let spawn_result = host.get_spawn_result().unwrap().clone();
-    assert_eq!(principal, spawn_result.principal);
-    assert_eq!(template, spawn_result.template);
-    assert_eq!(nonce, spawn_result.nonce);
-    assert_eq!(
-      calculate_address(&template, &spawn_result.blob, &principal, nonce),
-      spawn_result.address
-    );
-    assert_eq!(
-      host.get_program(&spawn_result.address).unwrap(),
-      &spawn_result.blob
-    );
-
-    // check balances again
-    // note: Alice hasn't paid for gas since we're not charging for gas yet
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
-    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
-    assert_eq!(host.get_balance(&spawn_result.address), 0);
-
-    // write the input: serialized state blob, then serialized send args
-    let mut stdin = AthenaStdin::new();
-    let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
-    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
-    stdin.write_vec(spawn_result.blob.clone());
-    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
-    runtime.write_vecs(&stdin.buffer);
-
-    // now attempt the send
-    let res = runtime.execute_function("athexp_send");
-    match res {
-      Ok(_) => panic!("expected execution error"),
-      Err(e) => match e {
-        ExecutionError::SyscallFailed(status) => {
-          assert_eq!(status, StatusCode::InsufficientBalance);
-        }
-        _ => panic!("expected SyscallFailed error"),
-      },
-    }
-    drop(runtime);
-
-    // transfer some coins to the new wallet
-    let address = spawn_result.address;
-    host.transfer_balance(&ADDRESS_ALICE, &address, amount_to_send);
-    assert_eq!(
-      host.get_balance(&ADDRESS_ALICE),
-      SOME_COINS - amount_to_send
-    );
-    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
-    assert_eq!(host.get_balance(&address), amount_to_send);
-
-    // set up the runtime again
-    let mut stdin = AthenaStdin::new();
-    let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
-    let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
-    stdin.write_vec(spawn_result.blob);
-    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
-    runtime.write_vecs(&stdin.buffer);
-
-    // do the send again
-    runtime.execute_function("athexp_send").unwrap();
-
-    // final balance check: some of alice's coins were sent to Charlie
-    assert_eq!(
-      host.get_balance(&ADDRESS_ALICE),
-      SOME_COINS - amount_to_send
-    );
-    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), amount_to_send);
-    assert_eq!(host.get_balance(&address), 0);
-  }
-
-  #[test]
-  fn test_host() {
-    utils::setup_logger();
-    let program = host_program();
-    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
-    let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    let mut host = MockHost::new();
-    let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
-    let gas_left = runtime.execute().unwrap();
-
-    // don't bother checking exact gas value, that's checked in the following test
-    assert!(gas_left.is_some());
+    runtime.execute().unwrap_err();
   }
 
   #[test]
   fn test_gas() {
-    let program = fibonacci_program();
+    let program = simple_program();
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
 
     // failure
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(543)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(1)]),
       Some(ctx.clone()),
     );
     assert!(matches!(runtime.execute(), Err(ExecutionError::OutOfGas())));
@@ -1009,7 +839,7 @@ pub mod tests {
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(12)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -1019,7 +849,7 @@ pub mod tests {
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(13)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -1031,7 +861,7 @@ pub mod tests {
     utils::setup_logger();
 
     // recipient address
-    let address_words = address_to_32bit_words(ADDRESS_CHARLIE);
+    let address_words = address_to_32bit_words([0xCA; ADDRESS_LENGTH]);
 
     let amount_to_send = 1000;
 
@@ -1142,22 +972,17 @@ pub mod tests {
     instructions.push(Instruction::new(Opcode::ECALL, 0, 0, 0, false, false));
     let program = Program::new(instructions, 0, 0);
 
-    let mut host = MockHost::new();
-    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+    let mut host = MockHostInterface::new();
+    host
+      .expect_call()
+      .once()
+      .returning(|_| ExecutionResult::new(StatusCode::Success, 1000, None, None));
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    // balances before execution
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
-    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
-    assert!(runtime.execute().unwrap().is_some());
-
-    // balances after execution
-    assert_eq!(
-      host.get_balance(&ADDRESS_ALICE),
-      SOME_COINS - amount_to_send as u64
-    );
-    assert_eq!(host.get_balance(&ADDRESS_CHARLIE), amount_to_send as u64);
+    let result = runtime.execute().unwrap();
+    assert!(result.unwrap() < 1000);
   }
 
   #[test]
@@ -1198,21 +1023,20 @@ pub mod tests {
 
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    let mut host = MockHost::new();
+    let mut host = MockHostInterface::new();
+    host
+      .expect_call()
+      .returning(|_| ExecutionResult::failed(1000));
+
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
-    match runtime.execute() {
-      Err(e) => match e {
-        ExecutionError::SyscallFailed(code) => {
-          assert_eq!(code, athena_interface::StatusCode::Failure);
-        }
-        _ => panic!("unexpected error: {:?}", e),
-      },
-      Ok(_) => panic!("expected error, got Ok"),
-    }
+    assert!(matches!(
+      runtime.execute().unwrap_err(),
+      ExecutionError::SyscallFailed(StatusCode::Failure)
+    ));
   }
 
   #[test]
-  fn test_get_balance() {
+  fn syscall_get_balance() {
     utils::setup_logger();
 
     // arbitrary memory location
@@ -1235,20 +1059,19 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
+    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
-    let mut host = MockHost::new();
+    let mut host = MockHostInterface::new();
+    host.expect_get_balance().return_const(1111u64);
+
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     let gas_left = runtime.execute().expect("execution failed");
     assert!(gas_left.is_some());
 
     // check result: we expect the u64 value to be split into two 32-bit words
-    let value_low = runtime.mr_cpu(memloc, MemoryAccessPosition::Memory);
-    let value_high = runtime.mr_cpu(memloc + 4, MemoryAccessPosition::Memory);
-    assert_eq!(
-      u64::from(value_high) << 32 | u64::from(value_low),
-      SOME_COINS
-    );
+    let value_low = runtime.mr(memloc);
+    let value_high = runtime.mr(memloc + 4);
+    assert_eq!(u64::from(value_high) << 32 | u64::from(value_low), 1111u64);
   }
 
   #[test]

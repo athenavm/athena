@@ -109,7 +109,7 @@ mod tests {
   use super::*;
   use athena_interface::{
     Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
-    SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    STORAGE_KEY, STORAGE_VALUE,
   };
   use athena_sdk::utils;
 
@@ -238,6 +238,7 @@ mod tests {
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
@@ -274,12 +275,13 @@ mod tests {
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    host.set_balance(&ADDRESS_ALICE, 9999);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
       .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
       .unwrap();
     let result = output.read::<Balance>();
-    assert_eq!(result, SOME_COINS, "got wrong output value");
+    assert_eq!(result, 9999, "got wrong output value");
   }
 
   #[test]
@@ -295,6 +297,7 @@ mod tests {
     // trying to go any higher should result in an out-of-gas error
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
