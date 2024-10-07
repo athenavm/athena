@@ -22,7 +22,7 @@ exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Lane Rettig <lane@spacemesh.io>"]
 repository = "https://github.com/athenavm/athena"
 homepage = "https://www.athenavm.org/"
