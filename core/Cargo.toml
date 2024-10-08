@@ -19,13 +19,12 @@ cfg-if = "1.0.0"
 hex = "0.4.3"
 serde_with = "3.9.0"
 tracing = "0.1.40"
-tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
-tracing-subscriber = { version = "0.3.18", features = ["std", "env-filter"] }
 strum_macros = "0.26"
 strum = "0.26"
 thiserror = "1.0.60"
 
 [dev-dependencies]
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 athena-vm = { path = "../vm/entrypoint" }
 athena-vm-sdk = { path = "../vm/sdk" }
 borsh = "1.5.1"

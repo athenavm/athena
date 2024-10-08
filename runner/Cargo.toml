@@ -15,3 +15,6 @@ athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
 log = "0.4.21"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

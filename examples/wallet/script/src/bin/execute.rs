@@ -51,8 +51,7 @@ fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> 
 }
 
 fn main() {
-  // Setup the logger.
-  athena_sdk::utils::setup_logger();
+  tracing_subscriber::fmt::init();
 
   let args = RunArgs::parse();
 
@@ -124,7 +123,7 @@ mod tests {
 
   #[test]
   fn deploy_template() {
-    athena_sdk::utils::setup_logger();
+    env_logger::builer().is_test(true).try_init();
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),

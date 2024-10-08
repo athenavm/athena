@@ -779,10 +779,7 @@ impl<'host> Runtime<'host> {
 pub mod tests {
 
   use crate::{
-    io::AthenaStdin,
-    runtime::ExecutionError,
-    runtime::MemoryAccessPosition,
-    utils::{self, with_max_gas},
+    io::AthenaStdin, runtime::ExecutionError, runtime::MemoryAccessPosition, utils::with_max_gas,
   };
   use athena_interface::{
     calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
@@ -827,6 +824,13 @@ pub mod tests {
 
   pub fn wallet_program() -> Program {
     Program::from(WALLET_ELF)
+  }
+
+  pub(crate) fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
   }
 
   #[test]
@@ -979,7 +983,7 @@ pub mod tests {
 
   #[test]
   fn test_host() {
-    utils::setup_logger();
+    setup_logger();
     let program = host_program();
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
@@ -1028,7 +1032,7 @@ pub mod tests {
 
   #[test]
   fn test_call_send() {
-    utils::setup_logger();
+    setup_logger();
 
     // recipient address
     let address_words = address_to_32bit_words(ADDRESS_CHARLIE);
@@ -1162,7 +1166,7 @@ pub mod tests {
 
   #[test]
   fn test_bad_call() {
-    utils::setup_logger();
+    setup_logger();
 
     let instructions = vec![
       // X10 is arg1 (ptr to address)
@@ -1213,7 +1217,7 @@ pub mod tests {
 
   #[test]
   fn test_get_balance() {
-    utils::setup_logger();
+    setup_logger();
 
     // arbitrary memory location
     let memloc = 0x12345678;

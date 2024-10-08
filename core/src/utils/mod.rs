@@ -1,13 +1,9 @@
 mod buffer;
-mod logger;
 mod options;
 mod programs;
-mod tracer;
 
 pub use buffer::*;
-pub use logger::*;
 pub use options::*;
-pub use tracer::*;
 
 #[cfg(test)]
 pub use programs::*;
