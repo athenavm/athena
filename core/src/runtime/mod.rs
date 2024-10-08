@@ -658,7 +658,7 @@ impl<'host> Runtime<'host> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
-    log::debug!("Executing cycle with instruction: {:?}", instruction);
+    tracing::debug!(instruction = ?instruction, "executing cycle");
 
     // Log the current state of the runtime.
     self.log(&instruction);
@@ -719,7 +719,7 @@ impl<'host> Runtime<'host> {
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
-      log::info!("Initializing");
+      tracing::info!("initializing");
       self.initialize();
     }
 
@@ -729,7 +729,7 @@ impl<'host> Runtime<'host> {
         break;
       }
     }
-    log::info!("Execution finished");
+    tracing::info!("execution finished");
 
     self.postprocess();
 

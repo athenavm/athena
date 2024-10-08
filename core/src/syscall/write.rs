@@ -38,7 +38,7 @@ impl Syscall for SyscallWrite {
           rt.cycle_tracker
             .insert(fn_name.to_string(), (rt.state.global_clk, depth));
           let padding = (0..depth).map(|_| "│ ").collect::<String>();
-          log::debug!("{}┌╴{}", padding, fn_name);
+          tracing::debug!("{}┌╴{}", padding, fn_name);
         } else if s.contains("cycle-tracker-end:") {
           let fn_name = s
             .split("cycle-tracker-end:")
@@ -49,7 +49,7 @@ impl Syscall for SyscallWrite {
           let (start, depth) = rt.cycle_tracker.remove(fn_name).unwrap_or((0, 0));
           // Leftpad by 2 spaces for each depth.
           let padding = (0..depth).map(|_| "│ ").collect::<String>();
-          log::info!(
+          tracing::info!(
             "{}└╴{} cycles",
             padding,
             num_to_comma_separated(rt.state.global_clk - start as u64)
@@ -75,7 +75,7 @@ impl Syscall for SyscallWrite {
         rt.state.input_stream.push(bytes);
       }
       fd => {
-        log::debug!("syscall write called with invalid fd: {fd}");
+        tracing::debug!("syscall write called with invalid fd: {fd}");
         return Err(StatusCode::InvalidSyscallArgument);
       }
     }

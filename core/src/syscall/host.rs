@@ -95,7 +95,7 @@ impl Syscall for SyscallHostCall {
     // read the input length from the next register
     let len = ctx.rt.register(Register::X12) as usize;
     if len % 4 != 0 {
-      log::debug!("host system call input (a2/x12) not aligned to 4 bytes");
+      tracing::debug!("host system call input (a2/x12) not aligned to 4 bytes");
       return Err(StatusCode::InvalidSyscallArgument);
     }
 
@@ -116,7 +116,7 @@ impl Syscall for SyscallHostCall {
     // read the method name from the next register
     let len = ctx.rt.register(Register::X14) as usize;
     if len % 4 != 0 {
-      log::debug!("host system call input (a4/x14) not aligned to 4 bytes");
+      tracing::debug!("host system call input (a4/x14) not aligned to 4 bytes");
       return Err(StatusCode::InvalidSyscallArgument);
     }
 
@@ -167,7 +167,7 @@ impl Syscall for SyscallHostCall {
     match res.status_code {
       StatusCode::Success => Ok(Outcome::Result(None)),
       status => {
-        log::debug!("host system call failed with status code '{status}'");
+        tracing::debug!("host system call failed with status code '{status}'");
         Err(status)
       }
     }
@@ -191,7 +191,7 @@ impl Syscall for SyscallHostGetBalance {
     let balance_low = balance as u32;
     let balance_slice = [balance_low, balance_high];
 
-    log::debug!("get balance syscall returning: {}", balance);
+    tracing::debug!("get balance syscall returning: {}", balance);
 
     // return to caller
     ctx.mw_slice(arg1, &balance_slice);
@@ -238,11 +238,11 @@ impl Syscall for SyscallHostDeploy {
     let address = match host.deploy(blob) {
       Ok(addr) => addr,
       Err(err) => {
-        log::debug!("deploy failed: {err}");
+        tracing::debug!("deploy failed: {err}");
         return Err(StatusCode::Failure);
       }
     };
-    log::debug!("deploy succeeded: {}", hex::encode(address));
+    tracing::debug!("deploy succeeded: {}", hex::encode(address));
 
     let out_addr = ctx
       .rt

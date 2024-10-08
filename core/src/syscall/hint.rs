@@ -8,7 +8,7 @@ pub(crate) struct SyscallHintLen;
 impl Syscall for SyscallHintLen {
   fn execute(&self, ctx: &mut SyscallContext, _: u32, _: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
-      log::debug!(
+      tracing::debug!(
         "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
              ctx.rt.state.input_stream_ptr,
              ctx.rt.state.input_stream.len(),
@@ -27,7 +27,7 @@ pub(crate) struct SyscallHintRead;
 impl Syscall for SyscallHintRead {
   fn execute(&self, ctx: &mut SyscallContext, ptr: u32, len: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
-      log::debug!(
+      tracing::debug!(
              "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
               ctx.rt.state.input_stream_ptr,
               ctx.rt.state.input_stream.len()
@@ -41,7 +41,7 @@ impl Syscall for SyscallHintRead {
       "hint read should not be used in a unconstrained block"
     );
     if vec.len() != len as usize {
-      log::debug!(
+      tracing::debug!(
         "hint input stream read length mismatch: expected={}, actual={}",
         len,
         vec.len()
@@ -49,7 +49,7 @@ impl Syscall for SyscallHintRead {
       return Err(StatusCode::InvalidSyscallArgument);
     }
     if ptr % 4 != 0 {
-      log::debug!("hint read address not aligned to 4 bytes");
+      tracing::debug!("hint read address not aligned to 4 bytes");
       return Err(StatusCode::InvalidSyscallArgument);
     }
     // Iterate through the vec in 4-byte chunks
