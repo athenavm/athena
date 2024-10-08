@@ -17,7 +17,7 @@ impl<'h> Runtime<'h> {
       }
     }
 
-    tracing::warn!(
+    tracing::trace!(
         clk = self.state.global_clk,
         pc = format_args!("0x{:x}", self.state.pc),
         instruction = ?instruction,
@@ -43,7 +43,7 @@ impl<'h> Runtime<'h> {
     );
 
     if !self.unconstrained && self.state.global_clk % 10_000_000 == 0 {
-      tracing::warn!(
+      tracing::trace!(
         clk = self.state.clk,
         global_clk = self.state.global_clk,
         pc = self.state.pc,

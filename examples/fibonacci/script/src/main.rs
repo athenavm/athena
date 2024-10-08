@@ -1,11 +1,10 @@
-use athena_sdk::{utils, AthenaStdin, ExecutionClient};
+use athena_sdk::{AthenaStdin, ExecutionClient};
 
 /// The ELF we want to execute inside the zkVM.
 const ELF: &[u8] = include_bytes!("../../program/elf/fibonacci-program");
 
 fn main() {
-  // Setup logging.
-  utils::setup_logger();
+  tracing_subscriber::fmt::init();
 
   // Create an input stream and write '500' to it.
   let n = 500u32;
