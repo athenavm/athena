@@ -123,7 +123,10 @@ mod tests {
 
   #[test]
   fn deploy_template() {
-    env_logger::builer().is_test(true).try_init();
+    tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .init();
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
