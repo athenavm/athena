@@ -224,7 +224,7 @@ version = "0.4.1"
 dependencies = [
  "blake3",
  "bytemuck",
- "log",
+ "tracing",
 ]
 
 [[package]]
@@ -247,7 +247,7 @@ dependencies = [
  "athena-interface",
  "athena-sdk",
  "bincode",
- "log",
+ "tracing",
  "tracing-subscriber",
 ]
 
@@ -261,7 +261,6 @@ dependencies = [
  "bincode",
  "cfg-if",
  "hex",
- "log",
  "serde",
  "tracing",
  "tracing-subscriber",

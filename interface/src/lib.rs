@@ -452,7 +452,7 @@ impl<'a> MockHost<'a> {
     nonce: u64,
   ) -> Address {
     let address = calculate_address(template, &blob, principal, nonce);
-    log::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
+    tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
 
     self.programs.insert(address, blob.clone());
     self.spawn_result = Some(SpawnResult {
@@ -560,9 +560,9 @@ impl<'a> HostInterface for MockHost<'a> {
     self.balance.get(addr).copied().unwrap_or(0)
   }
 
+  #[tracing::instrument(skip(self), fields(id = self as *const Self as usize, depth = msg.depth))]
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
-    let depth = msg.depth;
-    log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
+    tracing::info!(msg = ?msg);
 
     // don't go too deep!
     if msg.depth > 10 {
@@ -572,10 +572,8 @@ impl<'a> HostInterface for MockHost<'a> {
     // take snapshots of the state in case we need to roll back
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
-    log::info!(
-      "MockHost::call:id {:?} depth {} before backup storage item is :: {:?}",
-      self as *const Self as usize,
-      depth,
+    tracing::debug!(
+      "before backup storage item is {:?}",
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
     let backup_storage = self.storage.clone();
@@ -622,10 +620,8 @@ impl<'a> HostInterface for MockHost<'a> {
 
     self.dynamic_context = old_dynamic_context;
 
-    log::info!(
-      "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
-      self as *const Self as usize,
-      depth,
+    tracing::debug!(
+      "finished with storage item {:?}",
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
     if res.status_code != StatusCode::Success {
@@ -633,10 +629,8 @@ impl<'a> HostInterface for MockHost<'a> {
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.templates = backup_programs;
-      log::info!(
-        "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
-        self as *const Self as usize,
-        depth,
+      tracing::debug!(
+        "after restore storage item is {:?}",
         self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
       );
     }

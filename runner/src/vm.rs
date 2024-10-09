@@ -60,11 +60,11 @@ where
       let method_name_str = match std::str::from_utf8(&method_name) {
         Ok(name) => name,
         Err(err) => {
-          log::info!("malformed utf-8 method name: {:?}", err);
+          tracing::info!("malformed utf-8 method name: {err:?}");
           return ExecutionResult::new(StatusCode::Failure, 0, None, None);
         }
       };
-      log::info!("Executing method {} with input data", method_name_str);
+      tracing::info!("Executing method {method_name_str} with input data");
       self.client.execute_function(
         code,
         method_name_str,
@@ -74,7 +74,7 @@ where
         Some(context),
       )
     } else {
-      log::info!("Executing default method with input data");
+      tracing::info!("Executing default method with input data");
       self
         .client
         .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
@@ -89,7 +89,7 @@ where
       ),
       // map error to execution result
       Err(e) => {
-        log::info!("Execution error: {:?}", e);
+        tracing::info!("Execution error: {e:?}");
         match e {
           ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
           ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None, None),
