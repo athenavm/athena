@@ -15,6 +15,7 @@ athena-vm-sdk = { path = "../../../vm/sdk" }
 clap = { version = "4.0", features = ["derive", "env"] }
 hex = "0.4.3"
 borsh = "1.5.1"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [build-dependencies]
 athena-helper = { path = "../../../helper" }

@@ -42,15 +42,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,7 +163,6 @@ dependencies = [
  "anstyle",
  "anyhow",
  "athena-builder",
- "athena-core",
  "athena-interface",
  "athena-sdk",
  "cargo_metadata",
@@ -188,6 +178,7 @@ dependencies = [
  "serde_json",
  "target-lexicon",
  "tokio",
+ "tracing-subscriber",
  "vergen-git2",
  "yansi",
 ]
@@ -204,7 +195,6 @@ dependencies = [
  "cfg-if",
  "elf",
  "hex",
- "log",
  "nohash-hasher",
  "rrs-lib",
  "serde",
@@ -213,7 +203,6 @@ dependencies = [
  "strum_macros",
  "thiserror",
  "tracing",
- "tracing-forest",
  "tracing-subscriber",
 ]
 
@@ -259,6 +248,7 @@ dependencies = [
  "athena-sdk",
  "bincode",
  "log",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -274,6 +264,7 @@ dependencies = [
  "log",
  "serde",
  "tracing",
+ "tracing-subscriber",
  "vergen-git2",
 ]
 
@@ -323,6 +314,7 @@ dependencies = [
  "athcon-vm",
  "athena-interface",
  "athena-runner",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2247,19 +2239,6 @@ checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-forest"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee40835db14ddd1e3ba414292272eddde9dad04d3d4b65509656414d1c42592f"
-dependencies = [
- "ansi_term",
- "smallvec",
- "thiserror",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
