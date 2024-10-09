@@ -10,6 +10,9 @@ on:
       - "**/Cargo.lock"
 jobs:
   security_audit:
+    permissions:
+      issues: write
+      checks: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
