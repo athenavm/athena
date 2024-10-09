@@ -1,4 +1,3 @@
-[workspace]
 [package]
 name = "host-test"
 version = "0.1.0"
@@ -6,3 +5,8 @@ edition = "2021"
 
 [dependencies]
 athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }
+athena-interface = { path = "../../interface" }
+
+[dev-dependencies]
+athena-sdk = { path = "../../sdk" }
+tracing-subscriber = "0.3.18"

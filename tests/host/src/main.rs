@@ -1,10 +1,12 @@
-#![no_main]
+#![cfg_attr(target_os = "zkvm", no_main)]
+
+#[cfg(target_os = "zkvm")]
 athena_vm::entrypoint!(main);
 
+use athena_interface::ADDRESS_LENGTH;
 use athena_vm::helpers::{address_to_32bit_words, bytes32_to_32bit_words};
 use athena_vm::types::{
-  StorageStatus::StorageAdded, StorageStatus::StorageModified, ADDRESS_CHARLIE, SOME_COINS,
-  STORAGE_KEY, STORAGE_VALUE,
+  StorageStatus::StorageAdded, StorageStatus::StorageModified, STORAGE_KEY, STORAGE_VALUE,
 };
 
 // storage status is returned as a 256-bit value
@@ -12,12 +14,12 @@ const STORAGE_ADDED: [u32; 8] = [StorageAdded as u32, 0, 0, 0, 0, 0, 0, 0];
 const STORAGE_MODIFIED: [u32; 8] = [StorageModified as u32, 0, 0, 0, 0, 0, 0, 0];
 const STORAGE_KEY_2: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
 
-pub fn main() {
+fn main() {
   let mut key = bytes32_to_32bit_words(STORAGE_KEY);
   let value = bytes32_to_32bit_words(STORAGE_VALUE);
   let value2: [u32; 8] = [0xaa; 8];
   let value_unset: [u32; 8] = [0; 8];
-  let address_charlie = address_to_32bit_words(ADDRESS_CHARLIE);
+  let address_charlie = address_to_32bit_words([0xCC; ADDRESS_LENGTH]);
 
   // note: for all of these calls, the result is written to the first argument, hence as_mut_ptr()
 
@@ -62,6 +64,8 @@ pub fn main() {
       address_charlie.as_ptr(),
       std::ptr::null(),
       0,
+      std::ptr::null(),
+      0,
       value.as_ptr(),
     )
   };
@@ -71,10 +75,8 @@ pub fn main() {
   unsafe { athena_vm::host::get_balance(value.as_mut_ptr()) };
   // value is returned as a pointer to two 32-bit values. reconstruct the u64 value.
   assert_eq!(
-    SOME_COINS,
+    10000,
     u64::from(value[0]) | (u64::from(value[1]) << 32),
     "get_balance failed"
   );
-
-  println!("success");
 }

@@ -311,8 +311,13 @@ impl ExecutionResult {
       create_address,
     }
   }
+
+  pub fn failed(gas_left: u32) -> Self {
+    ExecutionResult::new(StatusCode::Failure, gas_left, None, None)
+  }
 }
 
+#[mockall::automock]
 pub trait HostInterface {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
@@ -397,6 +402,7 @@ pub struct SpawnResult {
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
+#[derive(Default)]
 pub struct MockHost<'a> {
   // VM instance
   vm: Option<&'a dyn VmInterface<MockHost<'a>>>,
@@ -442,6 +448,12 @@ impl<'a> MockHost<'a> {
       static_context: Some(static_context),
       ..MockHost::default()
     }
+  }
+
+  /// Set balance of given address.
+  /// The previous balance is discarded.
+  pub fn set_balance(&mut self, address: &Address, balance: Balance) {
+    self.balance.insert(*address, balance);
   }
 
   pub fn spawn_program(
@@ -501,7 +513,6 @@ impl<'a> MockHost<'a> {
 pub const ADDRESS_ALICE: Address = [1u8; ADDRESS_LENGTH];
 pub const ADDRESS_BOB: Address = [2u8; ADDRESS_LENGTH];
 pub const ADDRESS_CHARLIE: Address = [3u8; ADDRESS_LENGTH];
-pub const SOME_COINS: Balance = 1000000;
 // "sentinel value" useful for testing: 0xc0ffee
 // also useful as a morning wake up!
 pub const STORAGE_KEY: Bytes32 = [
@@ -512,32 +523,6 @@ pub const STORAGE_VALUE: Bytes32 = [
   0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-
-impl<'a> Default for MockHost<'a> {
-  fn default() -> Self {
-    // init
-    let mut storage = BTreeMap::new();
-    let mut balance = BTreeMap::new();
-    let templates = BTreeMap::new();
-    let programs = BTreeMap::new();
-
-    // pre-populate some balances, values, and code for testing
-    balance.insert(ADDRESS_ALICE, SOME_COINS);
-    // balance.insert(ADDRESS_BOB, SOME_COINS);
-    storage.insert((ADDRESS_ALICE, STORAGE_KEY), STORAGE_VALUE);
-
-    Self {
-      vm: None,
-      storage,
-      balance,
-      templates,
-      programs,
-      static_context: None,
-      dynamic_context: None,
-      spawn_result: None,
-    }
-  }
-}
 
 impl<'a> HostInterface for MockHost<'a> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
@@ -741,12 +726,14 @@ mod tests {
   #[test]
   fn test_transfer_balance() {
     let mut host = MockHost::new();
+    host.set_balance(&ADDRESS_ALICE, 10000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000);
     assert_eq!(
       host.transfer_balance(&ADDRESS_ALICE, &ADDRESS_CHARLIE, 1000),
       StatusCode::Success
     );
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 9000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 1000);
     assert_eq!(
       host.transfer_balance(&ADDRESS_CHARLIE, &ADDRESS_ALICE, 1001),
@@ -771,7 +758,7 @@ mod tests {
     let mut host = MockHost::new();
 
     // send zero balance
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    host.set_balance(&ADDRESS_ALICE, 10000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
     let msg = AthenaMessage::new(
       MessageKind::Call,
@@ -786,7 +773,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Success);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
     // send some balance
@@ -803,7 +790,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Success);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
 
     // try to send more than the sender has
@@ -815,12 +802,12 @@ mod tests {
       ADDRESS_ALICE,
       None,
       None,
-      SOME_COINS,
+      10000,
       vec![],
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::InsufficientBalance);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
 
     // bob is not callable (which means coins also cannot be sent, even if we have them)
@@ -837,7 +824,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Failure);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
     assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
   }
 
