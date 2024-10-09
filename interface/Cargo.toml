@@ -10,4 +10,4 @@ edition.workspace = true
 [dependencies]
 blake3 = "1.5.3"
 bytemuck = "1.16.0"
-log = "0.4.21"
+tracing = "0.1.40"
