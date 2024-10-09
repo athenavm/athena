@@ -5,7 +5,7 @@ use athena_sdk::{AthenaStdin, ExecutionClient};
 
 #[test]
 fn test() {
-  athena_sdk::utils::setup_logger();
+  tracing_subscriber::fmt::init();
 
   let caller = [0xCA; ADDRESS_LENGTH];
   // host-test binary is precompiled and kept in git

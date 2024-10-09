@@ -657,7 +657,7 @@ impl<'host> Runtime<'host> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
-    log::debug!("Executing cycle with instruction: {:?}", instruction);
+    tracing::debug!(instruction = ?instruction, "executing cycle");
 
     // Log the current state of the runtime.
     self.log(&instruction);
@@ -718,7 +718,7 @@ impl<'host> Runtime<'host> {
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
-      log::info!("Initializing");
+      tracing::info!("initializing");
       self.initialize();
     }
 
@@ -728,7 +728,7 @@ impl<'host> Runtime<'host> {
         break;
       }
     }
-    log::info!("Execution finished");
+    tracing::info!("execution finished");
 
     self.postprocess();
 
@@ -776,10 +776,7 @@ impl<'host> Runtime<'host> {
 
 #[cfg(test)]
 pub mod tests {
-  use crate::{
-    runtime::ExecutionError,
-    utils::{self, with_max_gas},
-  };
+  use crate::{runtime::ExecutionError, utils::with_max_gas};
   use athena_interface::{
     Address, AthenaContext, ExecutionResult, MockHostInterface, StatusCode, ADDRESS_LENGTH,
   };
@@ -804,6 +801,13 @@ pub mod tests {
 
   pub fn panic_program() -> Program {
     Program::from(TEST_PANIC_ELF)
+  }
+
+  pub(crate) fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
   }
 
   #[test]
@@ -858,7 +862,7 @@ pub mod tests {
 
   #[test]
   fn test_call_send() {
-    utils::setup_logger();
+    setup_logger();
 
     // recipient address
     let address_words = address_to_32bit_words([0xCA; ADDRESS_LENGTH]);
@@ -987,7 +991,7 @@ pub mod tests {
 
   #[test]
   fn test_bad_call() {
-    utils::setup_logger();
+    setup_logger();
 
     let instructions = vec![
       // X10 is arg1 (ptr to address)
@@ -1037,7 +1041,7 @@ pub mod tests {
 
   #[test]
   fn syscall_get_balance() {
-    utils::setup_logger();
+    setup_logger();
 
     // arbitrary memory location
     let memloc = 0x12345678;

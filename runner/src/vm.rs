@@ -3,7 +3,7 @@ use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
   HostInterface, SetOptionError, StatusCode, VmInterface,
 };
-use athena_sdk::{utils::setup_logger, AthenaStdin, ExecutionClient};
+use athena_sdk::{AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
   client: ExecutionClient,
@@ -43,8 +43,6 @@ where
     // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
-    setup_logger();
-
     // construct context object
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
@@ -111,7 +109,13 @@ mod tests {
     Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
     STORAGE_KEY, STORAGE_VALUE,
   };
-  use athena_sdk::utils;
+
+  fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
+  }
 
   #[test]
   #[should_panic]
@@ -230,7 +234,8 @@ mod tests {
   // require access to an actual VM instance.
   #[test]
   fn test_recursive_call() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
@@ -268,7 +273,8 @@ mod tests {
 
   #[test]
   fn test_minimal() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/minimal/getbalance.bin");
     let stdin = AthenaStdin::new();
@@ -286,7 +292,8 @@ mod tests {
 
   #[test]
   fn test_recursive_call_fail() {
-    utils::setup_logger();
+    setup_logger();
+
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let vm = AthenaVm::new();
 
@@ -329,7 +336,8 @@ mod tests {
 
   #[test]
   fn test_stack_depth() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
     let stdin = AthenaStdin::new();
