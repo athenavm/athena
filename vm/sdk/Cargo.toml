@@ -9,7 +9,6 @@ edition.workspace = true
 
 [dependencies]
 athena-vm = { path = "../entrypoint" }
-athena-hostfunctions = { path = "../hostfunctions" }
 athena-interface = { path = "../../interface" }
 borsh = "1.5.1"
 borsh-derive = "1.5.1"

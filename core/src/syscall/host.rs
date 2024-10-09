@@ -50,11 +50,7 @@ impl Syscall for SyscallHostWrite {
       &Bytes32Wrapper::from(value).into(),
     );
 
-    // save return code
-    let mut status_word = [0u32; 8];
-    status_word[0] = status_code as u32;
-    ctx.mw_slice(arg1, &status_word);
-    Ok(Outcome::Result(None))
+    Ok(Outcome::Result(Some(status_code as u32)))
   }
 }
 

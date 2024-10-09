@@ -124,6 +124,24 @@ pub enum StorageStatus {
   StorageModifiedRestored,
 }
 
+impl TryFrom<u32> for StorageStatus {
+  type Error = &'static str;
+  fn try_from(value: u32) -> Result<Self, Self::Error> {
+    match value {
+      0 => Ok(StorageStatus::StorageAssigned),
+      1 => Ok(StorageStatus::StorageAdded),
+      2 => Ok(StorageStatus::StorageDeleted),
+      3 => Ok(StorageStatus::StorageModified),
+      4 => Ok(StorageStatus::StorageDeletedAdded),
+      5 => Ok(StorageStatus::StorageModifiedDeleted),
+      6 => Ok(StorageStatus::StorageDeletedRestored),
+      7 => Ok(StorageStatus::StorageAddedDeleted),
+      8 => Ok(StorageStatus::StorageModifiedRestored),
+      _ => Err("Invalid storage status"),
+    }
+  }
+}
+
 impl fmt::Display for StorageStatus {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {

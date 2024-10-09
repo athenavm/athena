@@ -1,6 +1,8 @@
 #[cfg(target_os = "zkvm")]
 use core::arch::asm;
 
+use athena_interface::StorageStatus;
+
 /// Call a function in a foreign program.
 ///
 /// `address` is the callee address, `input_ptr` is a bytearray to be passed to the
@@ -13,8 +15,7 @@ use core::arch::asm;
 ///
 /// See https://github.com/athenavm/athena/issues/5 for more information.
 #[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn call(
+pub fn call(
   address: *const u32,
   input_ptr: *const u32,
   input_len: usize,
@@ -41,18 +42,17 @@ pub extern "C" fn call(
 }
 
 /// Read from host storage at the given address and key.
-///
-/// The output is stored in the `key` pointer.
 #[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn read_storage(key: *mut u32) {
+pub fn read_storage(key: &[u32; 8]) -> [u32; 8] {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let mut result = *key;
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_READ,
-        in("a0") key,
-    )
+        in("a0") result.as_mut_ptr(),
+    );
+    return result;
   }
 
   #[cfg(not(target_os = "zkvm"))]
@@ -60,19 +60,19 @@ pub extern "C" fn read_storage(key: *mut u32) {
 }
 
 /// Write to host storage at the given address and key.
-///
-/// The result status code is stored in the `key` pointer.
 #[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn write_storage(key: *mut u32, value: *const u32) {
+pub fn write_storage(key: &[u32; 8], value: &[u32; 8]) -> StorageStatus {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let status: u32;
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_WRITE,
-        in("a0") key,
-        in("a1") value,
-    )
+        in("a0") key.as_ptr(),
+        in("a1") value.as_ptr(),
+        lateout("t0") status,
+    );
+    return status.try_into().unwrap();
   }
 
   #[cfg(not(target_os = "zkvm"))]
@@ -80,18 +80,16 @@ pub extern "C" fn write_storage(key: *mut u32, value: *const u32) {
 }
 
 /// Get the current account balance
-///
-/// The result status code is stored in the `value` pointer.
-#[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn get_balance(value: *mut u32) {
+pub fn get_balance() -> u64 {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let mut balance = std::mem::MaybeUninit::<u64>::uninit();
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_GETBALANCE,
-        in("a0") value,
-    )
+        in("a0") balance.as_mut_ptr(),
+    );
+    balance.assume_init()
   }
 
   #[cfg(not(target_os = "zkvm"))]
@@ -114,7 +112,6 @@ pub extern "C" fn get_balance(value: *mut u32) {
 /// The address of spawned program is obtained via sharing a
 /// variable located on the stack. The host must write the address,
 /// initializing the variable.
-#[no_mangle]
 #[cfg(target_os = "zkvm")]
 pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
   let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
@@ -144,7 +141,6 @@ pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
 /// The address of the deployed template is obtained via sharing a
 /// variable located on the stack. The host must write the address,
 /// initializing the variable.
-#[no_mangle]
 #[cfg(target_os = "zkvm")]
 pub fn deploy(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
   let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
