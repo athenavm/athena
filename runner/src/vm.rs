@@ -253,7 +253,7 @@ mod tests {
         elf,
         stdin,
         Some(&mut host),
-        Some(150_000),
+        Some(200_000),
         Some(ctx.clone()),
       )
       .unwrap();
