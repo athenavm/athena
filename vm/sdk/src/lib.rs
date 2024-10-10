@@ -1,6 +1,6 @@
-use athena_interface::{Address, Bytes32, BYTES32_LENGTH};
-use borsh_derive::{BorshDeserialize, BorshSerialize};
+use athena_interface::{Address, Bytes32};
 use cfg_if::cfg_if;
+use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
 cfg_if! {
@@ -17,9 +17,8 @@ cfg_if! {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
 pub struct Pubkey(pub Bytes32);
-pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
 #[allow(dead_code)] // Used by RISC-V targets and tests
 /// Convert a slice of bytes to a vector of u32 little-endian values.
@@ -52,7 +51,7 @@ pub trait VerifiableTemplate {
   fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
 }
 
-#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode)]
 pub struct SendArguments {
   pub recipient: Address,
   pub amount: u64,

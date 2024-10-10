@@ -2,7 +2,7 @@
 //! between the host IO and the program functions.
 use std::io::{Read, Write};
 
-use borsh::{BorshDeserialize, BorshSerialize};
+use parity_scale_codec::{Decode, Encode, IoReader};
 
 pub trait Function<T, R, IO> {
   fn call_func(self, io: &mut IO);
@@ -28,10 +28,10 @@ where
 impl<T, R> IntoArgument<T, R> for T
 where
   R: Read,
-  T: BorshDeserialize,
+  T: Decode,
 {
   fn into_argument(r: &mut R) -> T {
-    T::deserialize_reader(r).expect("deserializing")
+    T::decode(&mut IoReader(r)).expect("deserializing")
   }
 }
 
@@ -47,10 +47,10 @@ where
 impl<T, W> IntoResult<W> for T
 where
   W: Write,
-  T: BorshSerialize,
+  T: Encode,
 {
   fn into_result(self, w: &mut W) {
-    self.serialize(w).expect("serializing");
+    self.encode_to(w);
   }
 }
 
@@ -158,12 +158,12 @@ mod tests {
   #[test]
   fn test_takes_self() {
     let mut io = VecDeque::<u8>::new();
-    100u64.serialize(&mut io).unwrap();
-    77u64.serialize(&mut io).unwrap();
+    100u64.encode_to(&mut io);
+    77u64.encode_to(&mut io);
 
     Method::call_method(TestProgram::sub, &mut io);
 
-    let result: u64 = borsh::de::from_reader(&mut io).unwrap();
+    let result: u64 = u64::decode(&mut IoReader(io)).unwrap();
     assert_eq!(result, 23);
   }
 }
