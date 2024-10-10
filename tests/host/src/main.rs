@@ -17,8 +17,6 @@ pub fn main() {
   let value2: [u32; 8] = [0xaa; 8];
   let address_charlie = address_to_32bit_words(ADDRESS_CHARLIE);
 
-  // note: for all of these calls, the result is written to the first argument, hence as_mut_ptr()
-
   // Alice already has a storage item
   let res = read_storage(&key);
   assert_eq!(value, res, "read_storage failed");
