@@ -13,8 +13,8 @@ use athena_interface::{
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{Pubkey, SendArguments};
-use borsh::to_vec;
 use clap::Parser;
+use parity_scale_codec::Encode;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
 ///
@@ -81,7 +81,7 @@ fn main() {
     recipient: ADDRESS_CHARLIE,
     amount: 10,
   };
-  stdin.write_slice(&to_vec(&args).expect("serializing send arguments"));
+  stdin.write_slice(&args.encode());
 
   let alice_balance = host.get_balance(&ADDRESS_ALICE);
   assert!(alice_balance >= 10);
@@ -120,6 +120,7 @@ mod tests {
   use athena_interface::{Address, HostDynamicContext, HostStaticContext, MockHost, ADDRESS_ALICE};
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
+  use parity_scale_codec::Encode;
 
   #[test]
   fn deploy_template() {
@@ -139,7 +140,7 @@ mod tests {
     let mut stdin = AthenaStdin::new();
     let wallet_state = host.get_program(&address).unwrap();
     stdin.write_slice(wallet_state);
-    stdin.write_vec(borsh::to_vec(&code).unwrap());
+    stdin.write_vec(code.encode());
 
     let result = ExecutionClient::new().execute_function(
       super::ELF,
