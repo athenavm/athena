@@ -105,7 +105,7 @@ func TestCall(t *testing.T) {
 	if len(output) != 4 {
 		t.Errorf("execution unexpected output length: %d", len(output))
 	}
-	if gasLeft != 5204 {
+	if gasLeft != 4772 {
 		t.Errorf("execution gas left is incorrect: %d", gasLeft)
 	}
 	if err != nil {

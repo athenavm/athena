@@ -1013,7 +1013,7 @@ pub mod tests {
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(568)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -1023,7 +1023,7 @@ pub mod tests {
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(569)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
