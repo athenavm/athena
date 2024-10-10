@@ -202,7 +202,7 @@ extern "C"
    */
   typedef athcon_address (*athcon_spawn_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
 
-    /**
+  /**
    * Deploy program callback function.
    *
    * This callback function is used by a VM to deploy a new program template
@@ -706,6 +706,22 @@ extern "C"
                                                     size_t code_size);
 
   /**
+   * Returns the maximum amount that may be spent by the transaction represented by the message.
+   *
+   * @param vm         The VM instance. This argument MUST NOT be NULL.
+   * @param rev        The requested Athena specification revision.
+   * @param msg        The call parameters. See ::athcon_message. This argument MUST NOT be NULL.
+   * @param code       The reference to the code to be executed. This argument MAY be NULL.
+   * @param code_size  The length of the code. If @p code is NULL this argument MUST be 0.
+   * @return           The max spend amount.
+   */
+  typedef uint64_t (*athcon_maxspend_fn)(struct athcon_vm *vm,
+                                         enum athcon_revision rev,
+                                         const struct athcon_message *msg,
+                                         uint8_t const *code,
+                                         size_t code_size);
+
+  /**
    * Possible capabilities of a VM.
    */
   enum athcon_capabilities
@@ -778,6 +794,11 @@ extern "C"
      * This is a mandatory method and MUST NOT be set to NULL.
      */
     athcon_execute_fn execute;
+
+    /**
+     * Pointer to function for calculating max spend.
+     */
+    athcon_maxspend_fn maxspend;
 
     /**
      * A method returning capabilities supported by the VM instance.
