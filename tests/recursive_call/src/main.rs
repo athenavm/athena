@@ -2,6 +2,7 @@
 athena_vm::entrypoint!(main);
 
 use athena_vm::helpers::bytes32_to_32bit_words;
+use athena_vm::syscalls::{read_storage, write_storage};
 use athena_vm::types::{
   StorageStatus::StorageAdded, StorageStatus::StorageModified, ADDRESS_ALICE, STORAGE_KEY,
 };
@@ -9,19 +10,14 @@ use athena_vm_sdk::call;
 
 // Note: the test harness installs this contract code at ADDRESS_ALICE
 
-// storage status is returned as a 256-bit value
-const STORAGE_ADDED: [u32; 8] = [StorageAdded as u32, 0, 0, 0, 0, 0, 0, 0];
-const STORAGE_MODIFIED: [u32; 8] = [StorageModified as u32, 0, 0, 0, 0, 0, 0, 0];
-
 // emulate a return value by writing the return value to storage.
 // Athena doesn't support return values yet.
 fn return_value(value: u32) {
-  // println!("Returning {}", value);
-  let mut key = bytes32_to_32bit_words(STORAGE_KEY);
+  let key = bytes32_to_32bit_words(STORAGE_KEY);
   let val: [u32; 8] = [value, 0, 0, 0, 0, 0, 0, 0];
-  unsafe { athena_vm::host::write_storage(key.as_mut_ptr(), val.as_ptr()) };
+  let status = write_storage(&key, &val);
   assert!(
-    key == STORAGE_ADDED || key == STORAGE_MODIFIED,
+    matches!(status, StorageAdded | StorageModified),
     "write_storage failed"
   );
   athena_vm::io::write::<u32>(&value);
@@ -32,9 +28,9 @@ fn recursive_call(value: u32) -> u32 {
   call(ADDRESS_ALICE, Some(value_bytes), None, 0);
 
   // read the return value
-  let mut key = bytes32_to_32bit_words(STORAGE_KEY);
-  unsafe { athena_vm::host::read_storage(key.as_mut_ptr()) };
-  return key[0];
+  let key = bytes32_to_32bit_words(STORAGE_KEY);
+  let result = read_storage(&key);
+  return result[0];
 }
 
 pub fn main() {

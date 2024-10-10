@@ -9,7 +9,6 @@ edition.workspace = true
 
 [dependencies]
 athena-vm = { path = "../entrypoint" }
-athena-hostfunctions = { path = "../hostfunctions" }
 athena-interface = { path = "../../interface" }
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
 

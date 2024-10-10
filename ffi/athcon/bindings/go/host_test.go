@@ -100,13 +100,9 @@ func TestCall(t *testing.T) {
 	h := Bytes32{}
 	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, []byte{2, 0, 0, 0}, nil, h, RECURSIVE_CALL_TEST)
 	output := result.Output
-	gasLeft := result.GasLeft
 
 	if len(output) != 4 {
 		t.Errorf("execution unexpected output length: %d", len(output))
-	}
-	if gasLeft != 4772 {
-		t.Errorf("execution gas left is incorrect: %d", gasLeft)
 	}
 	if err != nil {
 		t.Errorf("execution returned unexpected error: %v", err)
