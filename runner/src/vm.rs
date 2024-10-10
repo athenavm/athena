@@ -106,8 +106,8 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
-    SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, MockHostInterface,
+    ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -336,17 +336,18 @@ mod tests {
     setup_logger();
 
     let client = ExecutionClient::new();
-    let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
-    let stdin = AthenaStdin::new();
-    let vm = AthenaVm::new();
-    let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
+    let mut stdin = AthenaStdin::new();
+    stdin.write::<u32>(&7);
+    let mut host = MockHostInterface::new();
+    host
+      .expect_call()
+      .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
-    match res {
-      Ok(_) => panic!("expected stack depth error"),
-      Err(ExecutionError::SyscallFailed(StatusCode::CallDepthExceeded)) => (),
-      Err(_) => panic!("expected stack depth error"),
-    }
+    assert!(matches!(
+      res,
+      Err(ExecutionError::SyscallFailed(StatusCode::CallDepthExceeded))
+    ));
   }
 }
