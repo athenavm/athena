@@ -6,11 +6,9 @@ extern crate alloc;
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::{call, spawn, Pubkey, SendArguments, VerifiableTemplate, WalletProgram};
-use borsh::to_vec;
-use borsh_derive::{BorshDeserialize, BorshSerialize};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+use parity_scale_codec::{Decode, Encode};
+#[derive(Debug, Encode, Decode)]
 pub struct Wallet {
   nonce: u64,
   balance: u64,
@@ -36,7 +34,7 @@ impl WalletProgram for Wallet {
   #[callable]
   fn spawn(owner: Pubkey) -> Address {
     let wallet = Wallet::new(owner);
-    let serialized = to_vec(&wallet).expect("serializing wallet");
+    let serialized = wallet.encode();
     spawn(serialized)
   }
 
