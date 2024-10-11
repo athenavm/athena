@@ -12,7 +12,7 @@ pub trait HostContext {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
   fn get_balance(&self, addr: &Address) -> u64;
-  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
+  fn get_tx_context(&self) -> (u64, Address, i64, i64, i64, Bytes32);
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn spawn(&mut self, blob: &[u8]) -> Address;
   fn deploy(&mut self, blob: &[u8]) -> Address;
@@ -93,7 +93,7 @@ unsafe extern "C" fn get_tx_context(
   let (gas_price, origin, height, timestamp, gas_limit, chain_id) =
     (*(context as *mut ExtendedContext)).hctx.get_tx_context();
   ffi::athcon_tx_context {
-    tx_gas_price: athcon_sys::athcon_bytes32 { bytes: gas_price },
+    tx_gas_price: gas_price,
     tx_origin: athcon_sys::athcon_address { bytes: origin },
     block_height: height,
     block_timestamp: timestamp,

@@ -4,7 +4,7 @@ unsafe extern "C" fn get_dummy_tx_context(
   _context: *mut ffi::athcon_host_context,
 ) -> ffi::athcon_tx_context {
   ffi::athcon_tx_context {
-    tx_gas_price: athcon_vm::Uint256 { bytes: [0u8; 32] },
+    tx_gas_price: 0,
     tx_origin: athcon_vm::Address { bytes: [0u8; 24] },
     block_height: 42,
     block_timestamp: 235117,

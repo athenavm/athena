@@ -57,16 +57,9 @@ impl HostInterface for HostContext {
     0
   }
 
-  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32) {
+  fn get_tx_context(&self) -> (u64, Address, i64, i64, i64, Bytes32) {
     println!("Host: get_tx_context");
-    (
-      [0u8; BYTES32_LENGTH],
-      [0u8; ADDRESS_LENGTH],
-      0,
-      0,
-      0,
-      [0u8; BYTES32_LENGTH],
-    )
+    (0, [0u8; ADDRESS_LENGTH], 0, 0, 0, [0u8; BYTES32_LENGTH])
   }
 
   fn get_block_hash(&self, _number: i64) -> Bytes32 {

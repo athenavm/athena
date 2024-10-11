@@ -8,8 +8,8 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
-  HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
+  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, ExecutionResult, HostInterface,
+  MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
 use athena_runner::AthenaVm;
 
@@ -109,12 +109,6 @@ impl From<Bytes32Wrapper> for ffi::athcon_bytes32 {
 impl From<Bytes32Wrapper> for Bytes32 {
   fn from(bytes: Bytes32Wrapper) -> Self {
     bytes.0
-  }
-}
-
-impl From<Bytes32Wrapper> for u64 {
-  fn from(bytes: Bytes32Wrapper) -> Self {
-    Bytes32AsU64::new(bytes.0).into()
   }
 }
 
@@ -444,7 +438,7 @@ impl From<TransactionContextWrapper> for TransactionContext {
   fn from(context: TransactionContextWrapper) -> Self {
     let tx_context = context.0;
     TransactionContext {
-      gas_price: Bytes32Wrapper::from(tx_context.tx_gas_price).into(),
+      gas_price: tx_context.tx_gas_price,
       origin: AddressWrapper::from(tx_context.tx_origin).into(),
       block_height: tx_context.block_height,
       block_timestamp: tx_context.block_timestamp,
