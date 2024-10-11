@@ -132,7 +132,7 @@ extern "C"
      *
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.
      */
-    athcon_uint256be value;
+    uint64_t value;
 
     /**
      * The code to be executed.
@@ -568,8 +568,8 @@ extern "C"
    * @param address  The address of the account.
    * @return         The balance of the given account or 0 if the account does not exist.
    */
-  typedef athcon_uint256be (*athcon_get_balance_fn)(struct athcon_host_context *context,
-                                                    const athcon_address *address);
+  typedef uint64_t (*athcon_get_balance_fn)(struct athcon_host_context *context,
+                                            const athcon_address *address);
 
   /**
    * Pointer to the callback function supporting Athena calls.

@@ -80,7 +80,7 @@ fn test_athcon_create() {
       input_size: 0,
       method_name: std::ptr::null(),
       method_name_size: 0,
-      value: ::athcon_sys::athcon_uint256be::default(),
+      value: 0,
       code: code.as_ptr(),
       code_size: code.len(),
     };

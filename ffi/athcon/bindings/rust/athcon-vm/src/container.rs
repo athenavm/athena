@@ -123,7 +123,7 @@ mod tests {
       input_size: 0,
       method_name: std::ptr::null(),
       method_name_size: 0,
-      value: ::athcon_sys::athcon_uint256be::default(),
+      value: 0,
       code: std::ptr::null(),
       code_size: 0,
     };

@@ -160,7 +160,6 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     };
 
     let kind: MessageKindWrapper = item.kind.into();
-    let byteswrapper: Bytes32Wrapper = item.value.into();
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: u32::try_from(item.depth).expect("Depth value out of range"),
@@ -169,7 +168,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
       method,
-      value: Bytes32AsU64::new(byteswrapper.0).into(),
+      value: item.value,
       code,
     })
   }
@@ -215,7 +214,6 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
     let kind = match item.0.kind {
       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
     };
-    let value: Bytes32AsU64 = item.0.value.into();
     let code = if !item.0.code.is_empty() {
       Some(item.0.code.as_slice())
     } else {
@@ -229,7 +227,7 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       AddressWrapper(item.0.sender).into(),
       item.0.input_data.as_deref(),
       item.0.method.as_deref(),
-      Bytes32Wrapper(value.into()).into(),
+      item.0.value,
       code,
     )
   }
@@ -238,17 +236,16 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
 impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
   fn from(item: &AthconExecutionMessage) -> Self {
     let kind: MessageKindWrapper = item.kind().into();
-    let byteswrapper = Bytes32Wrapper::from(*item.value());
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
-      recipient: AddressWrapper::from(*item.recipient()).into(),
-      sender: AddressWrapper::from(*item.sender()).into(),
+      recipient: item.recipient().bytes,
+      sender: item.sender().bytes,
       input_data: item.input().cloned(),
       method: item.method().cloned(),
-      value: Bytes32AsU64::new(byteswrapper.0).into(),
-      code: item.code().map_or(Vec::new(), |c| c.to_vec()),
+      value: item.value(),
+      code: item.code().cloned().unwrap_or_default(),
     })
   }
 }
@@ -485,8 +482,7 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
   }
 
   fn get_balance(&self, addr: &Address) -> Balance {
-    let balance = self.context.get_balance(&AddressWrapper(*addr).into());
-    Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
+    self.context.get_balance(&AddressWrapper(*addr).into())
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
