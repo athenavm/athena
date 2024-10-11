@@ -199,7 +199,6 @@ pub struct AthenaMessage {
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
-  pub method: Option<MethodSelector>,
   pub value: Balance,
   // code is currently unused, and it seems redundant.
   // it's not in the yellow paper.
@@ -216,7 +215,6 @@ impl AthenaMessage {
     recipient: Address,
     sender: Address,
     input_data: Option<Vec<u8>>,
-    method: Option<MethodSelector>,
     value: Balance,
     code: Vec<u8>,
   ) -> Self {
@@ -227,7 +225,6 @@ impl AthenaMessage {
       recipient,
       sender,
       input_data,
-      method,
       value,
       code,
     }
@@ -810,7 +807,6 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      None,
       0,
       vec![],
     );
@@ -826,7 +822,6 @@ mod tests {
       1000,
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
-      None,
       None,
       100,
       vec![],
@@ -844,7 +839,6 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      None,
       SOME_COINS,
       vec![],
     );
@@ -860,7 +854,6 @@ mod tests {
       1000,
       ADDRESS_BOB,
       ADDRESS_ALICE,
-      None,
       None,
       100,
       vec![],

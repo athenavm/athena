@@ -1,7 +1,7 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, SetOptionError, StatusCode, VmInterface,
+  HostInterface, MethodSelector, SetOptionError, StatusCode, VmInterface, METHOD_SELECTOR_LENGTH,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -49,13 +49,21 @@ where
     let mut stdin = AthenaStdin::new();
 
     // input data is optional
-    if let Some(input_data) = msg.input_data {
-      stdin.write_vec(input_data);
-    }
+    let execution_result = if let Some(input_data) = msg.input_data {
+      // extract method selector from input data
+      if input_data.len() < METHOD_SELECTOR_LENGTH {
+        tracing::info!("Method selector missing from input");
+        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+      }
+      let method_selector = input_data[..METHOD_SELECTOR_LENGTH].try_into().unwrap();
 
-    // method name is also optional
-    let execution_result = if let Some(method_selector) = msg.method {
-      tracing::info!("Executing method selector {method_selector} with input data");
+      // write the remainder to stdin
+      stdin.write_vec(input_data[METHOD_SELECTOR_LENGTH..].to_vec());
+      tracing::info!(
+        "Executing method selector {:?} with input length {}",
+        method_selector,
+        input_data.len() - METHOD_SELECTOR_LENGTH
+      );
       self.client.execute_function(
         code,
         &method_selector,
@@ -65,7 +73,7 @@ where
         Some(context),
       )
     } else {
-      tracing::info!("Executing default method with input data");
+      tracing::info!("Executing default method without input");
       self
         .client
         .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
@@ -97,8 +105,8 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
-    SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MethodSelector,
+    MethodSelectorAsString, MockHost, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -121,7 +129,6 @@ mod tests {
         1000,
         Address::default(),
         Address::default(),
-        None,
         None,
         Balance::default(),
         vec![],
@@ -151,7 +158,6 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
-        None,
         Balance::default(),
         vec![],
       ),
@@ -161,6 +167,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
+    let selector =
+      MethodSelector::from(MethodSelectorAsString::from(&String::from("athexp_test1")));
+    let mut combined_input = selector.to_vec();
+    combined_input.extend_from_slice(&input);
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -170,8 +180,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(input),
-        Some("athexp_test1".as_bytes().to_vec()),
+        Some(combined_input),
         Balance::default(),
         vec![],
       ),
@@ -181,6 +190,8 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
+    let selector =
+      MethodSelector::from(MethodSelectorAsString::from(&String::from("athexp_test2")));
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -190,8 +201,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        None,
-        Some("athexp_test2".as_bytes().to_vec()),
+        Some(selector.to_vec()),
         Balance::default(),
         vec![],
       ),
@@ -201,6 +211,8 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
+    let selector =
+      MethodSelector::from(MethodSelectorAsString::from(&String::from("athexp_test3")));
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -210,8 +222,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        None,
-        Some("athexp_test3".as_bytes().to_vec()),
+        Some(selector.to_vec()),
         Balance::default(),
         vec![],
       ),
@@ -304,7 +315,6 @@ mod tests {
       ADDRESS_ALICE,
       ADDRESS_ALICE,
       Some(vec![8u8, 0, 0, 0]),
-      None,
       0,
       vec![],
     );

@@ -81,7 +81,6 @@ impl HostInterface for HostContext {
     sender: &Address,
     value: &Bytes32,
     input: &Bytes,
-    method: &Bytes,
     gas: i64,
     depth: i32,
   ) -> (Vec<u8>, i64, Address, StatusCode) {
@@ -115,7 +114,6 @@ impl HostInterface for HostContext {
       destination,
       sender,
       input,
-      method,
       value,
       CONTRACT_CODE,
     );
@@ -149,6 +147,7 @@ fn test_rust_host() {
   println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
 
   let mut host = HostContext::new(vm);
+
   let (output, gas_left, status_code) = host.vm.clone().execute(
     &mut host,
     Revision::ATHCON_FRONTIER,
@@ -157,10 +156,8 @@ fn test_rust_host() {
     50000000,
     &ADDRESS_ALICE,
     &[128u8; ADDRESS_LENGTH],
-    // the value 3 as little-endian u32
-    3u32.to_le_bytes().as_slice(),
-    // empty method name
-    &[],
+    // input payload consists of empty method selector (4 bytes) + simple LE integer argument (4 bytes)
+    [0u8, 0u8, 0u8, 0u8, 3u8, 0u8, 0u8, 0u8].as_ref(),
     &[0u8; BYTES32_LENGTH],
     CONTRACT_CODE,
   );

@@ -1,7 +1,12 @@
-use athena_interface::{Address, Balance};
+use athena_interface::{Address, Balance, MethodSelector};
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 
-pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<Vec<u8>>, amount: Balance) {
+pub fn call(
+  address: Address,
+  input: Option<Vec<u8>>,
+  method: Option<MethodSelector>,
+  amount: Balance,
+) {
   let address = address_to_32bit_words(address);
   let amount = balance_to_32bit_words(amount);
 

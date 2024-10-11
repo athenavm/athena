@@ -719,10 +719,10 @@ impl<'host> Runtime<'host> {
   /// Execute an exported function using method selector. Does the same work as execute().
   pub fn execute_selector(
     &mut self,
-    selector: MethodSelector,
+    selector: &MethodSelector,
   ) -> Result<Option<u32>, ExecutionError> {
     // Make sure the selector exists, and set the program counter
-    let offset = match self.program.selector_table.get(&selector) {
+    let offset = match self.program.selector_table.get(selector) {
       Some(offset) => *offset,
       None => return Err(ExecutionError::UnknownSymbol()),
     };

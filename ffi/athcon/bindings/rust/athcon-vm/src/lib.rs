@@ -126,7 +126,6 @@ impl ExecutionMessage {
     recipient: Address,
     sender: Address,
     input: Option<&[u8]>,
-    method: Option<&[u8]>,
     value: Uint256,
     code: Option<&[u8]>,
   ) -> Self {
@@ -582,7 +581,6 @@ mod tests {
       recipient,
       sender,
       Some(&input),
-      None,
       value,
       None,
     );
@@ -610,7 +608,6 @@ mod tests {
       4466,
       recipient,
       sender,
-      None,
       None,
       value,
       Some(&code),
@@ -811,7 +808,6 @@ mod tests {
       test_addr,
       test_addr,
       None,
-      None,
       Uint256::default(),
       None,
     );
@@ -842,7 +838,6 @@ mod tests {
       test_addr,
       test_addr,
       Some(&data),
-      None,
       Uint256::default(),
       None,
     );

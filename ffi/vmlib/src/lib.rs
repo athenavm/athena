@@ -139,27 +139,11 @@ struct AthenaMessageWrapper(AthenaMessage);
 
 impl From<ffi::athcon_message> for AthenaMessageWrapper {
   fn from(item: ffi::athcon_message) -> Self {
-    // Extract method selector from input, if present.
-    let (input_data, method_selector) = if !item.input_data.is_null() && item.input_size > 0 {
-      assert!(
-        item.input_size >= METHOD_SELECTOR_LENGTH,
-        "Input data too short"
-      );
-      // Convert input_data pointer and size to Vec<u8>
-      (
-        Some(
-          unsafe {
-            std::slice::from_raw_parts(
-              item.input_data.as_ptr().add(METHOD_SELECTOR_LENGTH),
-              item.input_size - METHOD_SELECTOR_LENGTH,
-            )
-          }
-          .to_vec(),
-        ),
-        Some(&item.input_data[..METHOD_SELECTOR_LENGTH]),
-      )
+    // Convert input_data pointer and size to Vec<u8>
+    let input_data = if !item.input_data.is_null() && item.input_size > 0 {
+      Some(unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec())
     } else {
-      (None, None)
+      None
     };
 
     // Convert code pointer and size to Vec<u8>
@@ -178,47 +162,11 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
-      method: method_selector,
       value: Bytes32AsU64::new(byteswrapper.0).into(),
       code,
     })
   }
 }
-
-// probably not needed, but keeping it here for reference for now
-// note: this code is memory safe, but would require manually freeing the input_data and code pointers.
-// impl From<AthenaMessageWrapper> for ffi::athcon_message {
-//   fn from(item: AthenaMessageWrapper) -> Self {
-//     let (input_data, input_size) = if let Some(data) = item.0.input_data {
-//       // need to transfer ownership of the data to the FFI
-//       let boxed_data = data.into_boxed_slice();
-//       let data_len = boxed_data.len();
-//       let data_ptr = Box::into_raw(boxed_data) as *const u8;
-//       (data_ptr, data_len)
-//     } else {
-//       (std::ptr::null(), 0)
-//     };
-//     let boxed_code = item.0.code.into_boxed_slice();
-//     let code_size = boxed_code.len();
-//     let code_ptr = Box::into_raw(boxed_code) as *const u8;
-//     let kind = match item.0.kind {
-//       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
-//     };
-//     let value: Bytes32AsU64 = item.0.value.into();
-//     ffi::athcon_message {
-//       kind,
-//       depth: item.0.depth as i32,
-//       gas: item.0.gas as i64,
-//       recipient: AddressWrapper(item.0.recipient).into(),
-//       sender: AddressWrapper(item.0.sender).into(),
-//       input_data,
-//       input_size,
-//       value: Bytes32Wrapper(value.into()).into(),
-//       code: code_ptr,
-//       code_size,
-//     }
-//   }
-// }
 
 impl From<AthenaMessageWrapper> for AthconExecutionMessage {
   fn from(item: AthenaMessageWrapper) -> Self {
@@ -238,7 +186,6 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       AddressWrapper(item.0.recipient).into(),
       AddressWrapper(item.0.sender).into(),
       item.0.input_data.as_deref(),
-      item.0.method.as_deref(),
       Bytes32Wrapper(value.into()).into(),
       code,
     )
@@ -256,7 +203,6 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(*item.recipient()).into(),
       sender: AddressWrapper::from(*item.sender()).into(),
       input_data: item.input().cloned(),
-      method: item.method().cloned(),
       value: Bytes32AsU64::new(byteswrapper.0).into(),
       code: item.code().map_or(Vec::new(), |c| c.to_vec()),
     })
