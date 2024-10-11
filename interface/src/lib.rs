@@ -17,6 +17,7 @@ pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 pub type MethodSelector = [u8; METHOD_SELECTOR_LENGTH];
+pub const METHOD_SELECTOR_DEFAULT: MethodSelector = [0u8; METHOD_SELECTOR_LENGTH];
 
 pub struct MethodSelectorAsString(MethodSelector);
 

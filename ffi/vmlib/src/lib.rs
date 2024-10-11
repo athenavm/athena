@@ -10,7 +10,6 @@ use athcon_vm::{
 use athena_interface::{
   Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
   HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
-  METHOD_SELECTOR_LENGTH,
 };
 use athena_runner::AthenaVm;
 
@@ -343,40 +342,6 @@ impl From<ExecutionResultWrapper> for AthconExecutionResult {
     )
   }
 }
-
-// probably not needed, but keeping it here for reference for now
-// note: this code is NOT MEMORY SAFE. it assumes that output lives at least as long as the result.
-// otherwise, output_data will be a dangling pointer.
-// impl From<ExecutionResultWrapper> for ffi::athcon_result {
-//   fn from(value: ExecutionResultWrapper) -> Self {
-//     let output = value.0.output.unwrap_or_else(Vec::new);
-//     let output_size = output.len();
-
-//     // in order to ensure that a slice can be reconstructed from empty output,
-//     // we need some trickery here. see std::slice::from_raw_parts for more details.
-//     let output_data = if output_size > 0 {
-//       output.as_ptr()
-//     } else {
-//       core::ptr::NonNull::<u8>::dangling().as_ptr()
-//     };
-
-//     let gas_left = value.0.gas_left as i64;
-//     let create_address = value.0.create_address.map_or_else(
-//       || ffi::athcon_address::default(),
-//       |address| AddressWrapper(address).into(),
-//     );
-//     let status_code = StatusCodeWrapper(value.0.status_code).into();
-//     let release = None;
-//     ffi::athcon_result {
-//       output_data,
-//       output_size,
-//       gas_left,
-//       create_address,
-//       status_code,
-//       release,
-//     }
-//   }
-// }
 
 fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
   match status {

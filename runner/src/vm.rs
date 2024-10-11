@@ -1,7 +1,9 @@
+extern crate hex;
+
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, MethodSelector, SetOptionError, StatusCode, VmInterface, METHOD_SELECTOR_LENGTH,
+  HostInterface, SetOptionError, StatusCode, VmInterface, METHOD_SELECTOR_LENGTH,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -60,8 +62,8 @@ where
       // write the remainder to stdin
       stdin.write_vec(input_data[METHOD_SELECTOR_LENGTH..].to_vec());
       tracing::info!(
-        "Executing method selector {:?} with input length {}",
-        method_selector,
+        "Executing method selector 0x{} with input length {}",
+        hex::encode(method_selector),
         input_data.len() - METHOD_SELECTOR_LENGTH
       );
       self.client.execute_function(
