@@ -1,14 +1,14 @@
-use athena_interface::{Address, Balance, MethodSelector};
+use athena_interface::{
+  Address, Balance, MethodSelector, MethodSelectorAsString, METHOD_SELECTOR_DEFAULT,
+};
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 
-pub fn call(
-  address: Address,
-  input: Option<Vec<u8>>,
-  mut method: Option<MethodSelector>,
-  amount: Balance,
-) {
+pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<&String>, amount: Balance) {
   let address = address_to_32bit_words(address);
   let amount = balance_to_32bit_words(amount);
+
+  // Convert method name to method selector
+  let method = method.map(|m| MethodSelector::from(MethodSelectorAsString::from(m)));
 
   // add the method selector, if present, to the input vector
   // for now, require input to be word-aligned
@@ -17,13 +17,13 @@ pub fn call(
     assert!(input.len() % 4 == 0, "input is not 4-byte-aligned");
     // concatenate the method selector to the input
     let input: Vec<u8> = method
-      .unwrap_or_default()
+      .unwrap_or(METHOD_SELECTOR_DEFAULT)
       .into_iter()
       .chain(input.into_iter())
       .collect();
     Some((crate::bytes_to_u32_vec(&input), input.len()))
   } else {
-    method.take().map(|m| (crate::bytes_to_u32_vec(&m), 4))
+    method.map(|m| (crate::bytes_to_u32_vec(&m), 4))
   };
 
   let (input, input_len) = input32.map_or((std::ptr::null(), 0), |(v, l)| (v.as_ptr(), l));

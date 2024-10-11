@@ -12,5 +12,5 @@ pub fn main() {
   // recurse forever
   let address = address_to_32bit_words(ADDRESS_ALICE);
   let value: [u32; 2] = [0, 0];
-  call(address.as_ptr(), null(), 0, null(), 0, value.as_ptr());
+  call(address.as_ptr(), null(), 0, value.as_ptr());
 }

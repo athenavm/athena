@@ -15,10 +15,9 @@ impl EntrypointTest {
     let input = athena_vm::io::read_vec();
     let address =
       bincode::deserialize(&input).expect("input address malformed, failed to deserialize");
-    let method = "athexp_test2".as_bytes().to_vec();
 
     // recursive call to self
-    call(address, None, Some(method), 0);
+    call(address, None, Some(&String::from("athexp_test2")), 0);
   }
 
   #[callable]
