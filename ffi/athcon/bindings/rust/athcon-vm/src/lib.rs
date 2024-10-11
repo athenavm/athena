@@ -1,13 +1,15 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::too_many_arguments)]
 
+pub mod bytes;
 mod container;
 pub mod encode_tx;
 mod types;
-pub mod vec;
 
+use core::ptr::null;
 use core::slice;
 
 pub use athcon_sys as ffi;
+use bytes::{allocate_output_data, deallocate_output_data};
 pub use container::AthconContainer;
 pub use types::*;
 
@@ -258,19 +260,19 @@ impl<'a> ExecutionContext<'a> {
     let (input_data, input_size) = if let Some(input) = input {
       (input.as_ptr(), input.len())
     } else {
-      (std::ptr::null(), 0)
+      (null(), 0)
     };
     let (method_name, method_name_size) = if let Some(method) = message.method() {
       (method.as_ptr(), method.len())
     } else {
-      (std::ptr::null(), 0)
+      (null(), 0)
     };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
     let code_data = if let Some(code) = code {
       code.as_ptr()
     } else {
-      std::ptr::null()
+      null()
     };
     // Cannot use a nice from trait here because that complicates memory management,
     // athcon_message doesn't have a release() method we could abstract it with.
@@ -343,34 +345,6 @@ impl From<ffi::athcon_result> for ExecutionResult {
   }
 }
 
-fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
-  match output {
-    Some(buf) if !buf.is_empty() => {
-      let buf_len = buf.len();
-
-      // Manually allocate heap memory for the new home of the output buffer.
-      let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
-      let new_buf = unsafe { std::alloc::alloc(memlayout) };
-      unsafe {
-        // Copy the data into the allocated buffer.
-        std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
-      }
-
-      (new_buf as *const u8, buf_len)
-    }
-    _ => (core::ptr::null(), 0),
-  }
-}
-
-unsafe fn deallocate_output_data(ptr: *const u8, size: usize) {
-  // be careful with dangling, aligned pointers here; they are not null but
-  // not valid and cannot be deallocated!
-  if !ptr.is_null() && size > 0 {
-    let buf_layout = std::alloc::Layout::from_size_align(size, 1).expect("Bad layout");
-    std::alloc::dealloc(ptr as *mut u8, buf_layout);
-  }
-}
-
 /// Returns a pointer to a heap-allocated athcon_result.
 impl From<ExecutionResult> for *const ffi::athcon_result {
   fn from(value: ExecutionResult) -> Self {
@@ -391,7 +365,7 @@ extern "C" fn release_heap_result(result: *const ffi::athcon_result) {
 /// Returns a pointer to a stack-allocated athcon_result.
 impl From<ExecutionResult> for ffi::athcon_result {
   fn from(value: ExecutionResult) -> Self {
-    let (buffer, len) = allocate_output_data(value.output.as_ref());
+    let (buffer, len) = value.output.map_or((null(), 0), allocate_output_data);
     Self {
       status_code: value.status_code,
       gas_left: value.gas_left,
@@ -526,7 +500,7 @@ mod tests {
       assert!(!(*f).output_data.is_null());
       assert_eq!((*f).output_size, 5);
       assert_eq!(
-        std::slice::from_raw_parts((*f).output_data, 5) as &[u8],
+        slice::from_raw_parts((*f).output_data, 5) as &[u8],
         &[0xc0, 0xff, 0xee, 0x71, 0x75]
       );
       assert_eq!((*f).create_address.bytes, [0u8; 24]);
@@ -569,7 +543,7 @@ mod tests {
       assert!(!f.output_data.is_null());
       assert_eq!(f.output_size, 5);
       assert_eq!(
-        std::slice::from_raw_parts(f.output_data, 5) as &[u8],
+        slice::from_raw_parts(f.output_data, 5) as &[u8],
         &[0xc0, 0xff, 0xee, 0x71, 0x75]
       );
       assert_eq!(f.create_address.bytes, [0u8; 24]);

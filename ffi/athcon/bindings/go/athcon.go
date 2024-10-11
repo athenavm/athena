@@ -66,9 +66,13 @@ type Library struct {
 	// handle to the opened shared library. Must be closed with Dlclose.
 	libHandle uintptr
 
-	create     func() *C.struct_athcon_vm
-	encodeTx   func(*C.athcon_address, *C.athcon_address, *C.uchar, C.size_t, C.uint64_t, *C.uchar, C.size_t) *C.athcon_vector
-	freeVector func(*C.athcon_vector)
+	create func() *C.struct_athcon_vm
+
+	encodeTx      func(*C.athcon_address, *C.athcon_address, *C.uchar, C.size_t, C.uint64_t, *C.uchar, C.size_t) *C.athcon_bytes
+	encodeTxSpawn func(*C.athcon_bytes32) *C.athcon_bytes
+	encodeTxSend  func(*C.athcon_address, C.uint64_t) *C.athcon_bytes
+
+	freeBytes func(*C.athcon_bytes)
 }
 
 func LoadLibrary(path string) (*Library, error) {
@@ -86,7 +90,9 @@ func LoadLibrary(path string) (*Library, error) {
 	}
 	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create_"+vmName)
 	purego.RegisterLibFunc(&lib.encodeTx, libHandle, "athcon_encode_tx")
-	purego.RegisterLibFunc(&lib.freeVector, libHandle, "athcon_free_vector")
+	purego.RegisterLibFunc(&lib.encodeTxSpawn, libHandle, "athcon_encode_tx_spawn")
+	purego.RegisterLibFunc(&lib.encodeTxSend, libHandle, "athcon_encode_tx_send")
+	purego.RegisterLibFunc(&lib.freeBytes, libHandle, "athcon_free_bytes")
 	return lib, nil
 }
 
@@ -252,7 +258,7 @@ func (vm *VM) Execute(
 }
 
 func athconBytes32(in Bytes32) *C.athcon_bytes32 {
-	out := C.athcon_bytes32{}
+	var out C.athcon_bytes32
 	for i := 0; i < len(in); i++ {
 		out.bytes[i] = C.uint8_t(in[i])
 	}
@@ -260,11 +266,11 @@ func athconBytes32(in Bytes32) *C.athcon_bytes32 {
 }
 
 func athconAddress(address Address) *C.athcon_address {
-	r := C.athcon_address{}
+	var out C.athcon_address
 	for i := 0; i < len(address); i++ {
-		r.bytes[i] = C.uint8_t(address[i])
+		out.bytes[i] = C.uint8_t(address[i])
 	}
-	return &r
+	return &out
 }
 
 func (l *Library) EncodeTx(principal Address, template *Address, nonce uint64, method []byte, args []byte) []byte {
@@ -288,9 +294,23 @@ func (l *Library) EncodeTx(principal Address, template *Address, nonce uint64, m
 		(*C.uchar)(cArgs),
 		C.size_t(len(args)),
 	)
+	defer l.freeBytes(encoded)
 
-	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.len))
-	l.freeVector(encoded)
+	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
 
+	return tx
+}
+
+func (l *Library) EncodeTxSpawn(pubkey Bytes32) []byte {
+	encoded := l.encodeTxSpawn(athconBytes32(pubkey))
+	defer l.freeBytes(encoded)
+	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
+	return tx
+}
+
+func (l *Library) EncodeTxSend(principal Address, nonce uint64) []byte {
+	encoded := l.encodeTxSend(athconAddress(principal), C.uint64_t(nonce))
+	defer l.freeBytes(encoded)
+	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
 	return tx
 }

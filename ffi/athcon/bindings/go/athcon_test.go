@@ -100,4 +100,12 @@ func TestLibraryEncodeTx(t *testing.T) {
 		tx := lib.EncodeTx(Address{1, 2, 3, 4}, nil, 1222, nil, nil)
 		require.NotEmpty(t, tx)
 	})
+	t.Run("spawn", func(t *testing.T) {
+		tx := lib.EncodeTxSpawn(Bytes32{9, 8, 7, 6})
+		require.NotEmpty(t, tx)
+	})
+	t.Run("send", func(t *testing.T) {
+		tx := lib.EncodeTxSend(Address{1, 2, 3, 4}, 191239)
+		require.NotEmpty(t, tx)
+	})
 }

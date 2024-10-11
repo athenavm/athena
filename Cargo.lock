@@ -146,6 +146,7 @@ version = "0.4.1"
 dependencies = [
  "athcon-sys",
  "athena-interface",
+ "athena-vm-sdk",
 ]
 
 [[package]]

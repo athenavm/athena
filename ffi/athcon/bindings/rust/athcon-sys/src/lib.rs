@@ -31,33 +31,23 @@ impl Default for athcon_bytes32 {
   }
 }
 
-impl athcon_vector_t {
-  /// Convert Vec<u8> into athcon_vector, releasing ownership of the memory.
-  ///
-  /// # Safety
-  /// the caller is responsible for freeing the returned vector
-  /// via the `athcon_free_vector` function.
-  pub unsafe fn from_vec(v: Vec<u8>) -> Self {
-    let (ptr, len, cap) = (v.as_ptr(), v.len(), v.capacity());
-    std::mem::forget(v);
-    Self { ptr, len, cap }
-  }
-
-  /// Convert athcon_vector into Vec<u8>, claiming ownership of the memory.
-  ///
-  /// # Safety
-  /// The self must have been constructed from a Vec<u8>.
-  pub unsafe fn to_vec(self) -> Vec<u8> {
-    Vec::from_raw_parts(self.ptr as *mut u8, self.len, self.cap)
-  }
-
-  /// Convert athcon_vector into slice
+impl athcon_bytes_t {
+  /// Convert athcon_bytes_t into slice
   ///
   /// # Safety
   /// The ptr and len must satisfy the safety requirements of
   /// std::slice::from_raw_parts.
   pub unsafe fn as_slice(&self) -> &[u8] {
-    std::slice::from_raw_parts(self.ptr, self.len)
+    std::slice::from_raw_parts(self.ptr, self.size)
+  }
+}
+
+impl From<&[u8]> for athcon_bytes_t {
+  fn from(value: &[u8]) -> Self {
+    Self {
+      ptr: value.as_ptr(),
+      size: value.len(),
+    }
   }
 }
 
@@ -75,9 +65,9 @@ mod tests {
   }
 
   #[test]
-  fn vector_conversion() {
-    let v = vec![1, 2, 3];
-    let athcon_vec = unsafe { athcon_vector_t::from_vec(v.clone()) };
-    assert_eq!(unsafe { athcon_vec.to_vec() }, v);
+  fn bytes_as_slice() {
+    let s = &[1, 2, 3];
+    let bytes = athcon_bytes_t::from(s.as_slice());
+    assert_eq!(unsafe { bytes.as_slice() }, s);
   }
 }

@@ -10,3 +10,7 @@ edition.workspace = true
 [dependencies]
 athcon-sys = { path = "../athcon-sys" }
 athena-interface = { path = "../../../../../interface" }
+# TODO:
+# This is needed to encode SingleSig wallet TX arguments
+# perhaps encoding TXs should be in vmlib to avoid this dep here?
+athena-vm-sdk = { path = "../../../../../vm/sdk" }

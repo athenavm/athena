@@ -820,16 +820,15 @@ extern "C"
   struct athcon_vm *athcon_create_example_vm(void);
 #endif
 
-  typedef struct athcon_vector_t
+  typedef struct athcon_bytes_t
   {
     const uint8_t* ptr;
-    size_t len;
-    size_t cap;
-  } athcon_vector;
+    size_t size;
+  } athcon_bytes;
 
-  void athcon_free_vector(athcon_vector* v);
+  void athcon_free_bytes(athcon_bytes* v);
 
-  athcon_vector* athcon_encode_tx(
+  athcon_bytes* athcon_encode_tx(
     const athcon_address* principal_account,
     athcon_address* template_addresss,
     uint8_t* method,
@@ -838,6 +837,9 @@ extern "C"
     uint8_t* args,
     size_t args_size
   );
+
+  athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
+  athcon_bytes* athcon_encode_tx_send(const athcon_address* recipient, uint64_t amount);
 
 #ifdef __cplusplus
 }

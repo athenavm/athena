@@ -1,6 +1,7 @@
 //! Implements athcon_encode_tx
 use athcon_sys as ffi;
 use athena_interface::transaction::{Encode, Transaction};
+use athena_vm_sdk::{Pubkey, SendArguments};
 
 /// Encode Athena Transaction into bytes.
 ///
@@ -23,7 +24,7 @@ unsafe extern "C" fn athcon_encode_tx(
   nonce: u64,
   args: *const u8,
   args_size: usize,
-) -> *mut ffi::athcon_vector {
+) -> *mut ffi::athcon_bytes {
   let principal = &(*principal).bytes;
   let template_o = template.as_ref().map(|t| t.bytes);
   let method = if method.is_null() {
@@ -39,7 +40,34 @@ unsafe extern "C" fn athcon_encode_tx(
 
   let tx = Transaction::new(nonce, *principal, template_o, method, args);
 
-  Box::into_raw(Box::new(ffi::athcon_vector::from_vec(tx.encode())))
+  let (ptr, size) = crate::allocate_output_data(tx.encode());
+
+  Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
+}
+
+#[no_mangle]
+unsafe extern "C" fn athcon_encode_tx_spawn(
+  pubkey: *const ffi::athcon_bytes32,
+) -> *mut ffi::athcon_bytes {
+  let encoded = Pubkey((*pubkey).bytes).encode();
+  let (ptr, size) = crate::allocate_output_data(encoded);
+
+  Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
+}
+
+#[no_mangle]
+unsafe extern "C" fn athcon_encode_tx_send(
+  recipient: *const ffi::athcon_address,
+  amount: u64,
+) -> *mut ffi::athcon_bytes {
+  let args = SendArguments {
+    recipient: (*recipient).bytes,
+    amount,
+  };
+
+  let (ptr, size) = crate::allocate_output_data(args.encode());
+
+  Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
 }
 
 #[cfg(test)]
@@ -66,7 +94,7 @@ mod tests {
       .as_ref()
       .map(|a| a as *const _)
       .unwrap_or(std::ptr::null());
-    let encoded_vec = unsafe {
+    let encoded_bytes = unsafe {
       super::athcon_encode_tx(
         &principal as *const _,
         template_ptr,
@@ -78,9 +106,9 @@ mod tests {
       )
     };
 
-    let encoded_slice = unsafe { (*encoded_vec).as_slice() };
+    let encoded_slice = unsafe { (*encoded_bytes).as_slice() };
     assert_eq!(encoded_slice, encoded);
-    unsafe { crate::vec::athcon_free_vector(encoded_vec) };
+    unsafe { crate::bytes::athcon_free_bytes(encoded_bytes) };
   }
 
   #[test]
@@ -90,7 +118,7 @@ mod tests {
 
     // encode via the C interface
     let principal = ffi::athcon_address::from(tx.principal_account);
-    let encoded_vec = unsafe {
+    let encoded_bytes = unsafe {
       super::athcon_encode_tx(
         &principal as *const _,
         std::ptr::null(),
@@ -102,8 +130,8 @@ mod tests {
       )
     };
 
-    let encoded_slice = unsafe { (*encoded_vec).as_slice() };
+    let encoded_slice = unsafe { (*encoded_bytes).as_slice() };
     assert_eq!(encoded_slice, encoded);
-    unsafe { crate::vec::athcon_free_vector(encoded_vec) };
+    unsafe { crate::bytes::athcon_free_bytes(encoded_bytes) };
   }
 }
