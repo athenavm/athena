@@ -66,6 +66,29 @@ impl AthconVm for AthenaVMWrapper {
         .execute(&mut host, RevisionWrapper::from(rev).0, athena_msg.0, code);
     ExecutionResultWrapper(execution_result).into()
   }
+
+  // maxspend provides transaction-related metadata: the maximum amount that may be spent by this transaction.
+  fn maxspend(&self, rev: Revision, message: &AthconExecutionMessage, code: &[u8]) -> u64 {
+    // note that host context is allowed to be null. it's opaque and totally up to the host
+    // whether and how to use it.
+    if message.kind() != AthconMessageKind::ATHCON_CALL || code.is_empty() {
+      return AthconExecutionResult::failure();
+    }
+
+    // Perform the conversion from `ffi::athcon_message` to `AthenaMessage`
+    let athena_msg = AthenaMessageWrapper::from(message);
+
+    // Unpack the context
+    let execution_context = ExecutionContext::new(host, context);
+    let mut host = WrappedHostInterface::new(execution_context);
+
+    // Execute the code and proxy the result back to the caller
+    let execution_result =
+      self
+        .athena_vm
+        .execute(&mut host, RevisionWrapper::from(rev).0, athena_msg.0, code);
+    0
+  }
 }
 
 struct RevisionWrapper(AthenaRevision);

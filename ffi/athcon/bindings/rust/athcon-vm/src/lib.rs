@@ -28,6 +28,9 @@ pub trait AthconVm {
     host: &ffi::athcon_host_interface,
     context: *mut ffi::athcon_host_context,
   ) -> ExecutionResult;
+
+  // Message-related metadata.
+  fn maxspend(&self, revision: Revision, message: &ExecutionMessage, code: &[u8]) -> u64;
 }
 
 /// Error codes for set_option.
