@@ -8,6 +8,7 @@ mod syscall;
 #[macro_use]
 mod utils;
 
+use athena_interface::MethodSelector;
 pub use instruction::*;
 pub use opcode::*;
 pub use program::*;
@@ -706,6 +707,22 @@ impl<'host> Runtime<'host> {
   pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
+      Some(offset) => *offset,
+      None => return Err(ExecutionError::UnknownSymbol()),
+    };
+    self.state.pc = offset;
+
+    // Hand over to execute
+    self.execute()
+  }
+
+  /// Execute an exported function using method selector. Does the same work as execute().
+  pub fn execute_selector(
+    &mut self,
+    selector: MethodSelector,
+  ) -> Result<Option<u32>, ExecutionError> {
+    // Make sure the selector exists, and set the program counter
+    let offset = match self.program.selector_table.get(&selector) {
       Some(offset) => *offset,
       None => return Err(ExecutionError::UnknownSymbol()),
     };

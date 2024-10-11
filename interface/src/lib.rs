@@ -11,10 +11,28 @@ use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
+pub const METHOD_SELECTOR_LENGTH: usize = 4;
 pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
+pub type MethodSelector = [u8; METHOD_SELECTOR_LENGTH];
+
+pub struct MethodSelectorAsString(MethodSelector);
+
+impl From<&String> for MethodSelectorAsString {
+  fn from(value: &String) -> Self {
+    let mut hasher = Hasher::new();
+    hasher.update(value.as_bytes());
+    MethodSelectorAsString(hasher.finalize().as_bytes()[..4].try_into().unwrap())
+  }
+}
+
+impl From<MethodSelectorAsString> for MethodSelector {
+  fn from(value: MethodSelectorAsString) -> Self {
+    value.0
+  }
+}
 
 pub struct Bytes32AsU64(Bytes32);
 
@@ -181,7 +199,7 @@ pub struct AthenaMessage {
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
-  pub method: Option<Vec<u8>>,
+  pub method: Option<MethodSelector>,
   pub value: Balance,
   // code is currently unused, and it seems redundant.
   // it's not in the yellow paper.
@@ -198,7 +216,7 @@ impl AthenaMessage {
     recipient: Address,
     sender: Address,
     input_data: Option<Vec<u8>>,
-    method: Option<Vec<u8>>,
+    method: Option<MethodSelector>,
     value: Balance,
     code: Vec<u8>,
   ) -> Self {

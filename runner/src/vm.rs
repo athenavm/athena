@@ -54,20 +54,11 @@ where
     }
 
     // method name is also optional
-    let execution_result = if let Some(method_name) = msg.method {
-      // TODO: use a fixed-length method selector here rather than a string
-      // https://github.com/athenavm/athena/issues/113
-      let method_name_str = match std::str::from_utf8(&method_name) {
-        Ok(name) => name,
-        Err(err) => {
-          tracing::info!("malformed utf-8 method name: {err:?}");
-          return ExecutionResult::new(StatusCode::Failure, 0, None, None);
-        }
-      };
-      tracing::info!("Executing method {method_name_str} with input data");
+    let execution_result = if let Some(method_selector) = msg.method {
+      tracing::info!("Executing method selector {method_selector} with input data");
       self.client.execute_function(
         code,
-        method_name_str,
+        &method_selector,
         stdin,
         Some(host),
         Some(msg.gas),

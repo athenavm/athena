@@ -10,6 +10,7 @@ use athcon_vm::{
 use athena_interface::{
   Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
   HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
+  METHOD_SELECTOR_LENGTH,
 };
 use athena_runner::AthenaVm;
 
@@ -138,18 +139,27 @@ struct AthenaMessageWrapper(AthenaMessage);
 
 impl From<ffi::athcon_message> for AthenaMessageWrapper {
   fn from(item: ffi::athcon_message) -> Self {
-    // Convert input_data pointer and size to Vec<u8>
-    let input_data = if !item.input_data.is_null() && item.input_size > 0 {
-      Some(unsafe { std::slice::from_raw_parts(item.input_data, item.input_size) }.to_vec())
+    // Extract method selector from input, if present.
+    let (input_data, method_selector) = if !item.input_data.is_null() && item.input_size > 0 {
+      assert!(
+        item.input_size >= METHOD_SELECTOR_LENGTH,
+        "Input data too short"
+      );
+      // Convert input_data pointer and size to Vec<u8>
+      (
+        Some(
+          unsafe {
+            std::slice::from_raw_parts(
+              item.input_data.as_ptr().add(METHOD_SELECTOR_LENGTH),
+              item.input_size - METHOD_SELECTOR_LENGTH,
+            )
+          }
+          .to_vec(),
+        ),
+        Some(&item.input_data[..METHOD_SELECTOR_LENGTH]),
+      )
     } else {
-      None
-    };
-
-    // Convert method pointer and size to Vec<u8>
-    let method = if !item.method_name.is_null() && item.method_name_size > 0 {
-      Some(unsafe { std::slice::from_raw_parts(item.method_name, item.method_name_size) }.to_vec())
-    } else {
-      None
+      (None, None)
     };
 
     // Convert code pointer and size to Vec<u8>
@@ -168,7 +178,7 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
-      method,
+      method: method_selector,
       value: Bytes32AsU64::new(byteswrapper.0).into(),
       code,
     })

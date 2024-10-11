@@ -55,7 +55,6 @@ pub struct ExecutionMessage {
   recipient: Address,
   sender: Address,
   input: Option<Vec<u8>>,
-  method: Option<Vec<u8>>,
   value: Uint256,
   code: Option<Vec<u8>>,
 }
@@ -138,7 +137,6 @@ impl ExecutionMessage {
       recipient,
       sender,
       input: input.map(|s| s.to_vec()),
-      method: method.map(|s| s.to_vec()),
       value,
       code: code.map(|s| s.to_vec()),
     }
@@ -172,11 +170,6 @@ impl ExecutionMessage {
   /// Read the optional input message.
   pub fn input(&self) -> Option<&Vec<u8>> {
     self.input.as_ref()
-  }
-
-  /// Read the optional method.
-  pub fn method(&self) -> Option<&Vec<u8>> {
-    self.method.as_ref()
   }
 
   /// Read the value of the message.
@@ -258,11 +251,6 @@ impl<'a> ExecutionContext<'a> {
     } else {
       (std::ptr::null(), 0)
     };
-    let (method_name, method_name_size) = if let Some(method) = message.method() {
-      (method.as_ptr(), method.len())
-    } else {
-      (std::ptr::null(), 0)
-    };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
     let code_data = if let Some(code) = code {
@@ -280,8 +268,6 @@ impl<'a> ExecutionContext<'a> {
       sender: *message.sender(),
       input_data,
       input_size,
-      method_name,
-      method_name_size,
       value: *message.value(),
       code: code_data,
       code_size,
@@ -432,18 +418,6 @@ impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
         None
       } else {
         Some(unsafe { slice::from_raw_parts(message.input_data, message.input_size).to_vec() })
-      },
-      method: if message.method_name.is_null() {
-        if message.method_name_size != 0 {
-          return Err("msg.method_data is null but msg.method_size is not 0".to_string());
-        }
-        None
-      } else if message.method_name_size == 0 {
-        None
-      } else {
-        Some(unsafe {
-          slice::from_raw_parts(message.method_name, message.method_name_size).to_vec()
-        })
       },
       value: message.value,
       code: if message.code.is_null() {
@@ -665,8 +639,6 @@ mod tests {
       sender,
       input_data: std::ptr::null(),
       input_size: 0,
-      method_name: std::ptr::null(),
-      method_name_size: 0,
       value,
       code: std::ptr::null(),
       code_size: 0,

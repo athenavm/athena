@@ -24,7 +24,7 @@ pub trait HostContext {
     sender: &Address,
     value: &Bytes32,
     input: &Bytes,
-    method: &Bytes,
+    method: &MethodSelector,
     gas: i64,
     depth: i32,
   ) -> (Vec<u8>, i64, Address, StatusCode);
@@ -156,22 +156,37 @@ pub unsafe extern "C" fn call(
   msg: *const ffi::athcon_message,
 ) -> ffi::athcon_result {
   let msg = *msg;
+  let (input_data, method_selector) = if msg.input_data.is_null() || msg.input_size == 0 {
+    (&[], &[])
+  } else {
+    // if we do have an input payload, ensure it's at least four bytes long
+    if (msg.input_size >= METHOD_SELECTOR_LENGTH) {
+      (
+        std::slice::from_raw_parts(
+          msg.input_data.as_ptr().add(METHOD_SELECTOR_LENGTH),
+          msg.input_size - METHOD_SELECTOR_LENGTH,
+        ),
+        &msg.input_data[..METHOD_SELECTOR_LENGTH],
+      )
+    } else {
+      return ffi::athcon_result {
+        status_code: ffi::athcon_status_code::ATHCON_FAILURE,
+        gas_left: 0,
+        output_data: std::ptr::null(),
+        output_size: 0,
+        release: None,
+        create_address: ffi::athcon_address { bytes: [0; 20] },
+      };
+    }
+  };
   let (output, gas_left, create_address, status_code) =
     (*(context as *mut ExtendedContext)).hctx.call(
       msg.kind,
       &msg.recipient.bytes,
       &msg.sender.bytes,
       &msg.value.bytes,
-      if !msg.input_data.is_null() && msg.input_size > 0 {
-        std::slice::from_raw_parts(msg.input_data, msg.input_size)
-      } else {
-        &[]
-      },
-      if !msg.method_name.is_null() && msg.method_name_size > 0 {
-        std::slice::from_raw_parts(msg.method_name, msg.method_name_size)
-      } else {
-        &[]
-      },
+      input_data,
+      method_selector,
       msg.gas,
       msg.depth,
     );

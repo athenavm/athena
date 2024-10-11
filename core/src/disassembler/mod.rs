@@ -9,12 +9,15 @@ use std::{collections::BTreeMap, fs::File, io::Read};
 
 use crate::runtime::{Instruction, Program};
 
+use athena_interface::{MethodSelector, MethodSelectorAsString};
+
 impl Program {
   /// Create a new program.
   pub const fn new(instructions: Vec<Instruction>, pc_start: u32, pc_base: u32) -> Self {
     Self {
       instructions,
       symbol_table: BTreeMap::new(),
+      selector_table: BTreeMap::new(),
       pc_start,
       pc_base,
       memory_image: BTreeMap::new(),
@@ -33,10 +36,18 @@ impl Program {
       // Transpile the RV32IM instructions.
       let instructions = transpile(&elf.instructions);
 
+      // Construct the selector table from the symbol table.
+      let mut selector_table = BTreeMap::new();
+      for (symbol, address) in &elf.symbol_table {
+        let selector = MethodSelector::from(MethodSelectorAsString::from(symbol));
+        selector_table.insert(selector, *address);
+      }
+
       // Return the program.
       Program {
         instructions,
         symbol_table: elf.symbol_table,
+        selector_table,
         pc_start: elf.pc_start,
         pc_base: elf.pc_base,
         memory_image: elf.memory_image,

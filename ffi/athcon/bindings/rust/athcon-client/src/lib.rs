@@ -53,7 +53,6 @@ impl AthconVm {
     destination: &Address,
     sender: &Address,
     input: &[u8],
-    method: &[u8],
     value: &[u8; 32],
     code: &[u8],
   ) -> (Vec<u8>, i64, StatusCode) {
@@ -68,8 +67,6 @@ impl AthconVm {
       sender: ffi::athcon_address { bytes: *sender },
       input_data: input.as_ptr(),
       input_size: input.len(),
-      method_name: method.as_ptr(),
-      method_name_size: method.len(),
       value: ffi::athcon_uint256be { bytes: *value },
       code: code.as_ptr(),
       code_size: code.len(),
