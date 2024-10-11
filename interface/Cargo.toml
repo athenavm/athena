@@ -11,3 +11,4 @@ edition.workspace = true
 blake3 = "1.5.3"
 bytemuck = "1.16.0"
 tracing = "0.1.40"
+parity-scale-codec = { version = "3.6.12", features = ["derive"] }

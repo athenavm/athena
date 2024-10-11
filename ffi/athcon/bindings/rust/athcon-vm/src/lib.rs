@@ -1,7 +1,9 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::too_many_arguments)]
 
 mod container;
+pub mod encode_tx;
 mod types;
+pub mod vec;
 
 use core::slice;
 

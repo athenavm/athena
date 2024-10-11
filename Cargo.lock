@@ -145,6 +145,7 @@ name = "athcon-vm"
 version = "0.4.1"
 dependencies = [
  "athcon-sys",
+ "athena-interface",
 ]
 
 [[package]]
@@ -220,6 +221,7 @@ version = "0.4.1"
 dependencies = [
  "blake3",
  "bytemuck",
+ "parity-scale-codec",
  "tracing",
 ]
 

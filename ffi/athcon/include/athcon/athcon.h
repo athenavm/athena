@@ -820,6 +820,25 @@ extern "C"
   struct athcon_vm *athcon_create_example_vm(void);
 #endif
 
+  typedef struct athcon_vector_t
+  {
+    const uint8_t* ptr;
+    size_t len;
+    size_t cap;
+  } athcon_vector;
+
+  void athcon_free_vector(athcon_vector* v);
+
+  athcon_vector* athcon_encode_tx(
+    const athcon_address* principal_account,
+    athcon_address* template_addresss,
+    uint8_t* method,
+    size_t method_size,
+    uint64_t nonce,
+    uint8_t* args,
+    size_t args_size
+  );
+
 #ifdef __cplusplus
 }
 #endif

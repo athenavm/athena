@@ -9,3 +9,4 @@ edition.workspace = true
 
 [dependencies]
 athcon-sys = { path = "../athcon-sys" }
+athena-interface = { path = "../../../../../interface" }
