@@ -3,12 +3,12 @@ use athena_interface::{
 };
 use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
 
-pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<&String>, amount: Balance) {
+pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<&str>, amount: Balance) {
   let address = address_to_32bit_words(address);
   let amount = balance_to_32bit_words(amount);
 
   // Convert method name to method selector
-  let method = method.map(|m| MethodSelector::from(MethodSelectorAsString::from(m)));
+  let method = method.map(|m| MethodSelector::from(MethodSelectorAsString::new(m)));
 
   // add the method selector, if present, to the input vector
   // for now, require input to be word-aligned
@@ -27,6 +27,5 @@ pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<&String>, a
   };
 
   let (input, input_len) = input32.map_or((std::ptr::null(), 0), |(v, l)| (v.as_ptr(), l));
-
   athena_vm::syscalls::call(address.as_ptr(), input, input_len, amount.as_ptr());
 }

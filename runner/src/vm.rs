@@ -142,6 +142,7 @@ mod tests {
 
   #[test]
   fn test_method_selector() {
+    setup_logger();
     let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
 
     // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
@@ -170,8 +171,7 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
-    let selector =
-      MethodSelector::from(MethodSelectorAsString::from(&String::from("athexp_test1")));
+    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_test1"));
     let mut combined_input = selector.to_vec();
     combined_input.extend_from_slice(&input);
     let result = AthenaVm::new().execute(
@@ -193,8 +193,7 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let selector =
-      MethodSelector::from(MethodSelectorAsString::from(&String::from("athexp_test2")));
+    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_test2"));
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -214,8 +213,7 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let selector =
-      MethodSelector::from(MethodSelectorAsString::from(&String::from("athexp_test3")));
+    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_test3"));
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,

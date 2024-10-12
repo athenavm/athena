@@ -23,9 +23,14 @@ pub struct MethodSelectorAsString(MethodSelector);
 
 impl MethodSelectorAsString {
   pub fn new(value: &str) -> Self {
-    let mut hasher = Hasher::new();
-    hasher.update(value.as_bytes());
-    MethodSelectorAsString(hasher.finalize().as_bytes()[..4].try_into().unwrap())
+    // work around https://github.com/athenavm/athena/issues/149
+    // let res = MethodSelectorAsString(hash(value.as_bytes()).as_bytes()[..4].try_into().unwrap());
+    let vbytes = value.as_bytes();
+    MethodSelectorAsString(
+      vbytes[vbytes.len() - METHOD_SELECTOR_LENGTH..]
+        .try_into()
+        .unwrap(),
+    )
   }
 }
 
