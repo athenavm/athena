@@ -21,8 +21,8 @@ pub const METHOD_SELECTOR_DEFAULT: MethodSelector = [0u8; METHOD_SELECTOR_LENGTH
 
 pub struct MethodSelectorAsString(MethodSelector);
 
-impl From<&String> for MethodSelectorAsString {
-  fn from(value: &String) -> Self {
+impl MethodSelectorAsString {
+  pub fn new(value: &str) -> Self {
     let mut hasher = Hasher::new();
     hasher.update(value.as_bytes());
     MethodSelectorAsString(hasher.finalize().as_bytes()[..4].try_into().unwrap())

@@ -1,9 +1,9 @@
-extern crate hex;
+use hex;
 
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, SetOptionError, StatusCode, VmInterface, METHOD_SELECTOR_LENGTH,
+  HostInterface, MethodSelector, SetOptionError, StatusCode, VmInterface, METHOD_SELECTOR_LENGTH,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -57,7 +57,8 @@ where
         tracing::info!("Method selector missing from input");
         return ExecutionResult::new(StatusCode::Failure, 0, None, None);
       }
-      let method_selector = input_data[..METHOD_SELECTOR_LENGTH].try_into().unwrap();
+      let method_selector: MethodSelector =
+        input_data[..METHOD_SELECTOR_LENGTH].try_into().unwrap();
 
       // write the remainder to stdin
       stdin.write_vec(input_data[METHOD_SELECTOR_LENGTH..].to_vec());
@@ -316,7 +317,8 @@ mod tests {
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      Some(vec![8u8, 0, 0, 0]),
+      // four byte method selector followed by four byte input
+      Some(vec![0, 0, 0, 0, 8, 0, 0, 0]),
       0,
       vec![],
     );

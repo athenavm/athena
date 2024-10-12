@@ -17,7 +17,7 @@ impl EntrypointTest {
       bincode::deserialize(&input).expect("input address malformed, failed to deserialize");
 
     // recursive call to self
-    call(address, None, Some(&String::from("athexp_test2")), 0);
+    call(address, None, Some("athexp_test2"), 0);
   }
 
   #[callable]

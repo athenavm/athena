@@ -8,8 +8,8 @@
 use std::error::Error;
 
 use athena_interface::{
-  Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost,
-  ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+  Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MethodSelector,
+  MethodSelectorAsString, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{Pubkey, SendArguments};
@@ -43,9 +43,12 @@ fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> 
   let mut stdin = AthenaStdin::new();
   stdin.write(&owner.0);
 
+  // calculate method selector
+  let method_selector = MethodSelector::from(MethodSelectorAsString::new("athexp_spawn"));
+
   let client = ExecutionClient::new();
   let (mut result, _) =
-    client.execute_function(ELF, "athexp_spawn", stdin, Some(host), None, None)?;
+    client.execute_function(ELF, &method_selector, stdin, Some(host), None, None)?;
 
   Ok(result.read())
 }
@@ -91,10 +94,12 @@ fn main() {
     hex::encode(context.address()),
     hex::encode(args.recipient),
   );
+  // calculate method selector
+  let method_selector = MethodSelector::from(MethodSelectorAsString::new("athexp_send"));
   let (_, gas_cost) = ExecutionClient::new()
     .execute_function(
       ELF,
-      "athexp_send",
+      &method_selector,
       stdin,
       Some(&mut host),
       Some(25000),

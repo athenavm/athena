@@ -1,3 +1,5 @@
+use hex;
+
 mod elf;
 mod instruction;
 
@@ -39,7 +41,12 @@ impl Program {
       // Construct the selector table from the symbol table.
       let mut selector_table = BTreeMap::new();
       for (symbol, address) in &elf.symbol_table {
-        let selector = MethodSelector::from(MethodSelectorAsString::from(symbol));
+        let selector = MethodSelector::from(MethodSelectorAsString::new(symbol));
+        tracing::info!(
+          "adding selector table entry for symbol {}: 0x{}",
+          symbol,
+          hex::encode(selector),
+        );
         selector_table.insert(selector, *address);
       }
 

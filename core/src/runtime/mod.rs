@@ -910,7 +910,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &2106680
+      &2106660
     );
     assert_eq!(
       runtime
@@ -919,7 +919,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &2106732
+      &2106712
     );
 
     // now attempt to execute each function in turn
@@ -1136,18 +1136,8 @@ pub mod tests {
       Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
     );
     instructions.push(
-      // X13 is arg4 (ptr to method name)
-      // zero pointer
-      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X14 is arg5 (method name len)
-      // no input
-      Instruction::new(Opcode::ADD, Register::X14 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X15 is arg6 (value ptr)
-      Instruction::new(Opcode::ADD, Register::X15 as u32, 0, memloc2, false, true),
+      // X13 is arg4 (value ptr)
+      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, memloc2, false, true),
     );
     instructions.push(
       // X5 is syscall ID
