@@ -90,7 +90,7 @@ mod tests {
     _context: *mut athcon_sys::athcon_host_context,
   ) -> athcon_sys::athcon_tx_context {
     athcon_sys::athcon_tx_context {
-      tx_gas_price: Uint256::default(),
+      tx_gas_price: 0,
       tx_origin: Address::default(),
       block_height: 0,
       block_timestamp: 0,
@@ -123,7 +123,7 @@ mod tests {
       input_size: 0,
       method_name: std::ptr::null(),
       method_name_size: 0,
-      value: ::athcon_sys::athcon_uint256be::default(),
+      value: 0,
       code: std::ptr::null(),
       code_size: 0,
     };
