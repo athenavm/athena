@@ -1,0 +1,10 @@
+[workspace]
+[package]
+name = "hasher-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }
+blake3 = "1.5.3"
+hex = "0.4.3"
