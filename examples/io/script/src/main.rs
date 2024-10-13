@@ -1,4 +1,4 @@
-use athena_sdk::{utils, AthenaPublicValues, AthenaStdin, ExecutionClient};
+use athena_sdk::{AthenaStdin, ExecutionClient};
 use serde::{Deserialize, Serialize};
 
 /// The ELF we want to execute inside the zkVM.
@@ -12,8 +12,7 @@ struct MyPointUnaligned {
 }
 
 fn main() {
-  // Setup a tracer for logging.
-  utils::setup_logger();
+  tracing_subscriber::fmt::init();
 
   // Create an input stream.
   let mut stdin = AthenaStdin::new();

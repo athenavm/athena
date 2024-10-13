@@ -17,40 +17,36 @@ impl<'h> Runtime<'h> {
       }
     }
 
-    // If RUST_LOG is set to "trace", then log the current state of the runtime every cycle.
-    let width = 12;
-    log::trace!(
-            "clk={} [pc=0x{:x?}] {:<width$?} |         x0={:<width$} x1={:<width$} x2={:<width$} x3={:<width$} x4={:<width$} x5={:<width$} x6={:<width$} x7={:<width$} x8={:<width$} x9={:<width$} x10={:<width$} x11={:<width$} x12={:<width$} x13={:<width$} x14={:<width$} x15={:<width$} x16={:<width$} x17={:<width$} x18={:<width$}",
-            self.state.global_clk,
-            self.state.pc,
-            instruction,
-            self.register(Register::X0),
-            self.register(Register::X1),
-            self.register(Register::X2),
-            self.register(Register::X3),
-            self.register(Register::X4),
-            self.register(Register::X5),
-            self.register(Register::X6),
-            self.register(Register::X7),
-            self.register(Register::X8),
-            self.register(Register::X9),
-            self.register(Register::X10),
-            self.register(Register::X11),
-            self.register(Register::X12),
-            self.register(Register::X13),
-            self.register(Register::X14),
-            self.register(Register::X15),
-            self.register(Register::X16),
-            self.register(Register::X17),
-            self.register(Register::X18),
-        );
+    tracing::trace!(
+        clk = self.state.global_clk,
+        pc = format_args!("0x{:x}", self.state.pc),
+        instruction = ?instruction,
+        x0 = self.register(Register::X0),
+        x1 = self.register(Register::X1),
+        x2 = self.register(Register::X2),
+        x3 = self.register(Register::X3),
+        x4 = self.register(Register::X4),
+        x5 = self.register(Register::X5),
+        x6 = self.register(Register::X6),
+        x7 = self.register(Register::X7),
+        x8 = self.register(Register::X8),
+        x9 = self.register(Register::X9),
+        x10 = self.register(Register::X10),
+        x11 = self.register(Register::X11),
+        x12 = self.register(Register::X12),
+        x13 = self.register(Register::X13),
+        x14 = self.register(Register::X14),
+        x15 = self.register(Register::X15),
+        x16 = self.register(Register::X16),
+        x17 = self.register(Register::X17),
+        x18 = self.register(Register::X18),
+    );
 
     if !self.unconstrained && self.state.global_clk % 10_000_000 == 0 {
-      log::info!(
-        "clk = {} global_clk = {} pc = 0x{:x?}",
-        self.state.clk,
-        self.state.global_clk,
-        self.state.pc
+      tracing::trace!(
+        clk = self.state.clk,
+        global_clk = self.state.global_clk,
+        pc = self.state.pc,
       );
     }
   }

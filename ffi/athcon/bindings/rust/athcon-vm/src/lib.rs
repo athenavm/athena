@@ -3,6 +3,8 @@
 mod container;
 mod types;
 
+use core::slice;
+
 pub use athcon_sys as ffi;
 pub use container::AthconContainer;
 pub use types::*;
@@ -53,7 +55,8 @@ pub struct ExecutionMessage {
   recipient: Address,
   sender: Address,
   input: Option<Vec<u8>>,
-  value: Uint256,
+  method: Option<Vec<u8>>,
+  value: u64,
   code: Option<Vec<u8>>,
 }
 
@@ -124,7 +127,8 @@ impl ExecutionMessage {
     recipient: Address,
     sender: Address,
     input: Option<&[u8]>,
-    value: Uint256,
+    method: Option<&[u8]>,
+    value: u64,
     code: Option<&[u8]>,
   ) -> Self {
     ExecutionMessage {
@@ -134,6 +138,7 @@ impl ExecutionMessage {
       recipient,
       sender,
       input: input.map(|s| s.to_vec()),
+      method: method.map(|s| s.to_vec()),
       value,
       code: code.map(|s| s.to_vec()),
     }
@@ -169,9 +174,14 @@ impl ExecutionMessage {
     self.input.as_ref()
   }
 
+  /// Read the optional method.
+  pub fn method(&self) -> Option<&Vec<u8>> {
+    self.method.as_ref()
+  }
+
   /// Read the value of the message.
-  pub fn value(&self) -> &Uint256 {
-    &self.value
+  pub fn value(&self) -> u64 {
+    self.value
   }
 
   /// Read the optional init code.
@@ -231,7 +241,7 @@ impl<'a> ExecutionContext<'a> {
   }
 
   /// Get balance of an account.
-  pub fn get_balance(&self, address: &Address) -> Uint256 {
+  pub fn get_balance(&self, address: &Address) -> u64 {
     unsafe {
       assert!(self.host.get_balance.is_some());
       self.host.get_balance.unwrap()(self.context, address as *const Address)
@@ -243,15 +253,15 @@ impl<'a> ExecutionContext<'a> {
     // There is no need to make any kind of copies here, because the caller
     // won't go out of scope and ensures these pointers remain valid.
     let input = message.input();
-    let input_size = if let Some(input) = input {
-      input.len()
+    let (input_data, input_size) = if let Some(input) = input {
+      (input.as_ptr(), input.len())
     } else {
-      0
+      (std::ptr::null(), 0)
     };
-    let input_data = if let Some(input) = input {
-      input.as_ptr()
+    let (method_name, method_name_size) = if let Some(method) = message.method() {
+      (method.as_ptr(), method.len())
     } else {
-      std::ptr::null()
+      (std::ptr::null(), 0)
     };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
@@ -270,7 +280,9 @@ impl<'a> ExecutionContext<'a> {
       sender: *message.sender(),
       input_data,
       input_size,
-      value: *message.value(),
+      method_name,
+      method_name_size,
+      value: message.value,
       code: code_data,
       code_size,
     };
@@ -292,6 +304,13 @@ impl<'a> ExecutionContext<'a> {
   pub fn spawn(&self, code: &[u8]) -> Address {
     unsafe { self.host.spawn.unwrap()(self.context, code.as_ptr(), code.len()) }
   }
+
+  /// Deploy a new template
+  /// Returns the newly-deployed template address, which is calculated as the hash of the template code
+  /// The code is a pointer to the code buffer.
+  pub fn deploy(&self, code: &[u8]) -> Address {
+    unsafe { self.host.deploy.unwrap()(self.context, code.as_ptr(), code.len()) }
+  }
 }
 
 impl From<ffi::athcon_result> for ExecutionResult {
@@ -305,7 +324,7 @@ impl From<ffi::athcon_result> for ExecutionResult {
       } else if result.output_size == 0 {
         None
       } else {
-        Some(from_buf_raw::<u8>(result.output_data, result.output_size))
+        Some(unsafe { slice::from_raw_parts(result.output_data, result.output_size).to_vec() })
       },
       // Consider it is always valid.
       create_address: Some(result.create_address),
@@ -394,45 +413,51 @@ extern "C" fn release_stack_result(result: *const ffi::athcon_result) {
   }
 }
 
-impl From<&ffi::athcon_message> for ExecutionMessage {
-  fn from(message: &ffi::athcon_message) -> Self {
-    ExecutionMessage {
+impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
+  type Error = String;
+
+  fn try_from(message: &ffi::athcon_message) -> Result<Self, Self::Error> {
+    Ok(ExecutionMessage {
       kind: message.kind,
       depth: message.depth,
       gas: message.gas,
       recipient: message.recipient,
       sender: message.sender,
       input: if message.input_data.is_null() {
-        assert_eq!(message.input_size, 0);
+        if message.input_size != 0 {
+          return Err("msg.input_data is null but msg.input_size is not 0".to_string());
+        }
         None
       } else if message.input_size == 0 {
         None
       } else {
-        Some(from_buf_raw::<u8>(message.input_data, message.input_size))
+        Some(unsafe { slice::from_raw_parts(message.input_data, message.input_size).to_vec() })
+      },
+      method: if message.method_name.is_null() {
+        if message.method_name_size != 0 {
+          return Err("msg.method_data is null but msg.method_size is not 0".to_string());
+        }
+        None
+      } else if message.method_name_size == 0 {
+        None
+      } else {
+        Some(unsafe {
+          slice::from_raw_parts(message.method_name, message.method_name_size).to_vec()
+        })
       },
       value: message.value,
       code: if message.code.is_null() {
-        assert_eq!(message.code_size, 0);
+        if message.code_size != 0 {
+          return Err("msg.code is null but msg.code_size is not 0".to_string());
+        }
         None
       } else if message.code_size == 0 {
         None
       } else {
-        Some(from_buf_raw::<u8>(message.code, message.code_size))
+        Some(unsafe { slice::from_raw_parts(message.code, message.code_size).to_vec() })
       },
-    }
+    })
   }
-}
-
-fn from_buf_raw<T>(ptr: *const T, size: usize) -> Vec<T> {
-  // Pre-allocate a vector.
-  let mut buf = Vec::with_capacity(size);
-  unsafe {
-    // Copy from the C buffer to the vec's buffer.
-    std::ptr::copy(ptr, buf.as_mut_ptr(), size);
-    // Set the len of the vec manually.
-    buf.set_len(size);
-  }
-  buf
 }
 
 #[cfg(test)]
@@ -574,7 +599,7 @@ mod tests {
     let input = vec![0xc0, 0xff, 0xee];
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
+    let value = 77;
 
     let ret = ExecutionMessage::new(
       MessageKind::ATHCON_CALL,
@@ -583,6 +608,7 @@ mod tests {
       recipient,
       sender,
       Some(&input),
+      None,
       value,
       None,
     );
@@ -594,14 +620,14 @@ mod tests {
     assert_eq!(*ret.sender(), sender);
     assert!(ret.input().is_some());
     assert_eq!(*ret.input().unwrap(), input);
-    assert_eq!(*ret.value(), value);
+    assert_eq!(ret.value, value);
   }
 
   #[test]
   fn message_new_with_code() {
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
+    let value = 0;
     let code = vec![0x5f, 0x5f, 0xfd];
 
     let ret = ExecutionMessage::new(
@@ -610,6 +636,7 @@ mod tests {
       4466,
       recipient,
       sender,
+      None,
       None,
       value,
       Some(&code),
@@ -620,18 +647,17 @@ mod tests {
     assert_eq!(ret.gas(), 4466);
     assert_eq!(*ret.recipient(), recipient);
     assert_eq!(*ret.sender(), sender);
-    assert_eq!(*ret.value(), value);
+    assert_eq!(ret.value, value);
     assert!(ret.code().is_some());
     assert_eq!(*ret.code().unwrap(), code);
   }
 
-  #[test]
-  fn message_from_ffi() {
+  fn valid_athcon_message() -> ffi::athcon_message {
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
+    let value = 0;
 
-    let msg = ffi::athcon_message {
+    ffi::athcon_message {
       kind: MessageKind::ATHCON_CALL,
       depth: 66,
       gas: 4466,
@@ -639,12 +665,18 @@ mod tests {
       sender,
       input_data: std::ptr::null(),
       input_size: 0,
+      method_name: std::ptr::null(),
+      method_name_size: 0,
       value,
       code: std::ptr::null(),
       code_size: 0,
-    };
+    }
+  }
 
-    let ret: ExecutionMessage = (&msg).into();
+  #[test]
+  fn message_from_ffi() {
+    let msg = &valid_athcon_message();
+    let ret: ExecutionMessage = msg.try_into().unwrap();
 
     assert_eq!(ret.kind(), msg.kind);
     assert_eq!(ret.depth(), msg.depth);
@@ -652,31 +684,21 @@ mod tests {
     assert_eq!(*ret.recipient(), msg.recipient);
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_none());
-    assert_eq!(*ret.value(), msg.value);
+    assert_eq!(ret.value, msg.value);
     assert!(ret.code().is_none());
   }
 
   #[test]
   fn message_from_ffi_with_input() {
     let input = vec![0xc0, 0xff, 0xee];
-    let recipient = Address { bytes: [32u8; 24] };
-    let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
 
-    let msg = ffi::athcon_message {
-      kind: MessageKind::ATHCON_CALL,
-      depth: 66,
-      gas: 4466,
-      recipient,
-      sender,
+    let msg = &ffi::athcon_message {
       input_data: input.as_ptr(),
       input_size: input.len(),
-      value,
-      code: std::ptr::null(),
-      code_size: 0,
+      ..valid_athcon_message()
     };
 
-    let ret: ExecutionMessage = (&msg).into();
+    let ret: ExecutionMessage = msg.try_into().unwrap();
 
     assert_eq!(ret.kind(), msg.kind);
     assert_eq!(ret.depth(), msg.depth);
@@ -685,31 +707,21 @@ mod tests {
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_some());
     assert_eq!(*ret.input().unwrap(), input);
-    assert_eq!(*ret.value(), msg.value);
+    assert_eq!(ret.value, msg.value);
     assert!(ret.code().is_none());
   }
 
   #[test]
   fn message_from_ffi_with_code() {
-    let recipient = Address { bytes: [32u8; 24] };
-    let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
     let code = vec![0x5f, 0x5f, 0xfd];
 
-    let msg = ffi::athcon_message {
-      kind: MessageKind::ATHCON_CALL,
-      depth: 66,
-      gas: 4466,
-      recipient,
-      sender,
-      input_data: std::ptr::null(),
-      input_size: 0,
-      value,
+    let msg = &ffi::athcon_message {
       code: code.as_ptr(),
       code_size: code.len(),
+      ..valid_athcon_message()
     };
 
-    let ret: ExecutionMessage = (&msg).into();
+    let ret: ExecutionMessage = msg.try_into().unwrap();
 
     assert_eq!(ret.kind(), msg.kind);
     assert_eq!(ret.depth(), msg.depth);
@@ -717,16 +729,38 @@ mod tests {
     assert_eq!(*ret.recipient(), msg.recipient);
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_none());
-    assert_eq!(*ret.value(), msg.value);
+    assert_eq!(ret.value, msg.value);
     assert!(ret.code().is_some());
     assert_eq!(*ret.code().unwrap(), code);
+  }
+
+  #[test]
+  fn message_from_ffi_code_size_must_be_0_when_no_code() {
+    let msg = &ffi::athcon_message {
+      code: std::ptr::null(),
+      code_size: 10,
+      ..valid_athcon_message()
+    };
+    let ret: Result<ExecutionMessage, _> = msg.try_into();
+    assert!(ret.is_err());
+  }
+
+  #[test]
+  fn message_from_ffi_input_size_must_be_0_when_no_input() {
+    let msg = &ffi::athcon_message {
+      input_data: std::ptr::null(),
+      input_size: 10,
+      ..valid_athcon_message()
+    };
+    let ret: Result<ExecutionMessage, _> = msg.try_into();
+    assert!(ret.is_err());
   }
 
   unsafe extern "C" fn get_dummy_tx_context(
     _context: *mut ffi::athcon_host_context,
   ) -> ffi::athcon_tx_context {
     ffi::athcon_tx_context {
-      tx_gas_price: Uint256 { bytes: [0u8; 32] },
+      tx_gas_price: 0,
       tx_origin: Address { bytes: [0u8; 24] },
       block_height: 42,
       block_timestamp: 235117,
@@ -735,19 +769,11 @@ mod tests {
     }
   }
 
-  // unsafe extern "C" fn get_dummy_code_size(
-  //   _context: *mut ffi::athcon_host_context,
-  //   _addr: *const Address,
-  // ) -> usize {
-  //   105023_usize
-  // }
-
   unsafe extern "C" fn execute_call(
     _context: *mut ffi::athcon_host_context,
-    _msg: *const ffi::athcon_message,
+    msg: *const ffi::athcon_message,
   ) -> ffi::athcon_result {
-    // Some dumb validation for testing.
-    let msg = *_msg;
+    let msg = &*msg;
     let success = if msg.input_size != 0 && msg.input_data.is_null() {
       false
     } else {
@@ -780,6 +806,7 @@ mod tests {
       get_tx_context: Some(get_dummy_tx_context),
       get_block_hash: None,
       spawn: None,
+      deploy: None,
     }
   }
 
@@ -812,7 +839,8 @@ mod tests {
       test_addr,
       test_addr,
       None,
-      Uint256::default(),
+      None,
+      0,
       None,
     );
 
@@ -842,7 +870,8 @@ mod tests {
       test_addr,
       test_addr,
       Some(&data),
-      Uint256::default(),
+      None,
+      0,
       None,
     );
 

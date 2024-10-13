@@ -3,7 +3,7 @@ use athena_interface::{
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
   HostInterface, SetOptionError, StatusCode, VmInterface,
 };
-use athena_sdk::{utils::setup_logger, AthenaStdin, ExecutionClient};
+use athena_sdk::{AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
   client: ExecutionClient,
@@ -43,8 +43,6 @@ where
     // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
-    setup_logger();
-
     // construct context object
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
@@ -55,11 +53,34 @@ where
       stdin.write_vec(input_data);
     }
 
-    log::info!("Executing code with input data");
-    match self
-      .client
-      .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
-    {
+    // method name is also optional
+    let execution_result = if let Some(method_name) = msg.method {
+      // TODO: use a fixed-length method selector here rather than a string
+      // https://github.com/athenavm/athena/issues/113
+      let method_name_str = match std::str::from_utf8(&method_name) {
+        Ok(name) => name,
+        Err(err) => {
+          tracing::info!("malformed utf-8 method name: {err:?}");
+          return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+        }
+      };
+      tracing::info!("Executing method {method_name_str} with input data");
+      self.client.execute_function(
+        code,
+        method_name_str,
+        stdin,
+        Some(host),
+        Some(msg.gas),
+        Some(context),
+      )
+    } else {
+      tracing::info!("Executing default method with input data");
+      self
+        .client
+        .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+    };
+
+    match execution_result {
       Ok((public_values, gas_left)) => ExecutionResult::new(
         StatusCode::Success,
         gas_left.unwrap(),
@@ -68,10 +89,10 @@ where
       ),
       // map error to execution result
       Err(e) => {
-        log::info!("Execution error: {:?}", e);
+        tracing::info!("Execution error: {e:?}");
         match e {
           ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
-          ExecutionError::HostCallFailed(code) => ExecutionResult::new(code, 0, None, None),
+          ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None, None),
           // general error
           _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
         }
@@ -88,7 +109,13 @@ mod tests {
     Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
     SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
-  use athena_sdk::utils;
+
+  fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
+  }
 
   #[test]
   #[should_panic]
@@ -104,6 +131,7 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
+        None,
         Balance::default(),
         vec![],
       ),
@@ -111,11 +139,103 @@ mod tests {
     );
   }
 
+  #[test]
+  fn test_method_selector() {
+    let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
+
+    // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
+    let vm = AthenaVm::new();
+    let mut host = MockHost::new_with_vm(&vm);
+    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let input = bincode::serialize(&ADDRESS_ALICE).unwrap();
+
+    // this will execute from the default entry point
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        None,
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should fail: in noentrypoint mode, this panics.
+    assert_eq!(result.status_code, StatusCode::Failure);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        Some(input),
+        Some("athexp_test1".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should succeed
+    assert_eq!(result.status_code, StatusCode::Success);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        Some("athexp_test2".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should also succeed
+    assert_eq!(result.status_code, StatusCode::Success);
+
+    // this will execute a specific method
+    let result = AthenaVm::new().execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        1000000,
+        Address::default(),
+        Address::default(),
+        None,
+        Some("athexp_test3".as_bytes().to_vec()),
+        Balance::default(),
+        vec![],
+      ),
+      elf,
+    );
+    // this should fail, as this method is not `callable`
+    assert_eq!(result.status_code, StatusCode::Failure);
+  }
+
   // Note: we run this test here, as opposed to at a lower level (inside the SDK), since recursive host calls
   // require access to an actual VM instance.
   #[test]
   fn test_recursive_call() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
@@ -133,7 +253,7 @@ mod tests {
         elf,
         stdin,
         Some(&mut host),
-        Some(150_000),
+        Some(200_000),
         Some(ctx.clone()),
       )
       .unwrap();
@@ -152,7 +272,8 @@ mod tests {
 
   #[test]
   fn test_minimal() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/minimal/getbalance.bin");
     let stdin = AthenaStdin::new();
@@ -169,7 +290,8 @@ mod tests {
 
   #[test]
   fn test_recursive_call_fail() {
-    utils::setup_logger();
+    setup_logger();
+
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let vm = AthenaVm::new();
 
@@ -191,6 +313,7 @@ mod tests {
       ADDRESS_ALICE,
       ADDRESS_ALICE,
       Some(vec![8u8, 0, 0, 0]),
+      None,
       0,
       vec![],
     );
@@ -210,7 +333,8 @@ mod tests {
 
   #[test]
   fn test_stack_depth() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
     let stdin = AthenaStdin::new();
@@ -221,7 +345,7 @@ mod tests {
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     match res {
       Ok(_) => panic!("expected stack depth error"),
-      Err(ExecutionError::HostCallFailed(StatusCode::CallDepthExceeded)) => (),
+      Err(ExecutionError::SyscallFailed(StatusCode::CallDepthExceeded)) => (),
       Err(_) => panic!("expected stack depth error"),
     }
   }

@@ -7,7 +7,7 @@ pub use context::*;
 
 use blake3::Hasher;
 
-use std::{collections::BTreeMap, convert::TryFrom, fmt};
+use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -15,37 +15,6 @@ pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
-
-pub struct Bytes32AsU64(Bytes32);
-
-impl Bytes32AsU64 {
-  pub fn new(bytes: Bytes32) -> Self {
-    Bytes32AsU64(bytes)
-  }
-}
-
-impl From<Bytes32AsU64> for u64 {
-  fn from(bytes: Bytes32AsU64) -> Self {
-    // take most significant 8 bytes, assume little-endian
-    let slice = &bytes.0[..8];
-    u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
-  }
-}
-
-impl From<Bytes32AsU64> for Bytes32 {
-  fn from(bytes: Bytes32AsU64) -> Self {
-    bytes.0
-  }
-}
-
-impl From<u64> for Bytes32AsU64 {
-  fn from(value: u64) -> Self {
-    let mut bytes = [0u8; 32];
-    let value_bytes = value.to_le_bytes();
-    bytes[..8].copy_from_slice(&value_bytes);
-    Bytes32AsU64(bytes)
-  }
-}
 
 pub struct AddressWrapper(Address);
 
@@ -124,6 +93,24 @@ pub enum StorageStatus {
   StorageModifiedRestored,
 }
 
+impl TryFrom<u32> for StorageStatus {
+  type Error = &'static str;
+  fn try_from(value: u32) -> Result<Self, Self::Error> {
+    match value {
+      0 => Ok(StorageStatus::StorageAssigned),
+      1 => Ok(StorageStatus::StorageAdded),
+      2 => Ok(StorageStatus::StorageDeleted),
+      3 => Ok(StorageStatus::StorageModified),
+      4 => Ok(StorageStatus::StorageDeletedAdded),
+      5 => Ok(StorageStatus::StorageModifiedDeleted),
+      6 => Ok(StorageStatus::StorageDeletedRestored),
+      7 => Ok(StorageStatus::StorageAddedDeleted),
+      8 => Ok(StorageStatus::StorageModifiedRestored),
+      _ => Err("Invalid storage status"),
+    }
+  }
+}
+
 impl fmt::Display for StorageStatus {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
@@ -163,6 +150,7 @@ pub struct AthenaMessage {
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
+  pub method: Option<Vec<u8>>,
   pub value: Balance,
   // code is currently unused, and it seems redundant.
   // it's not in the yellow paper.
@@ -179,6 +167,7 @@ impl AthenaMessage {
     recipient: Address,
     sender: Address,
     input_data: Option<Vec<u8>>,
+    method: Option<Vec<u8>>,
     value: Balance,
     code: Vec<u8>,
   ) -> Self {
@@ -189,6 +178,7 @@ impl AthenaMessage {
       recipient,
       sender,
       input_data,
+      method,
       value,
       code,
     }
@@ -219,6 +209,8 @@ pub enum StatusCode {
   InternalError,
   Rejected,
   OutOfMemory,
+  InsufficientInput,
+  InvalidSyscallArgument,
 }
 
 impl TryFrom<u32> for StatusCode {
@@ -278,6 +270,8 @@ impl fmt::Display for StatusCode {
       StatusCode::InternalError => write!(f, "Athena implementation generic internal error."),
       StatusCode::Rejected => write!(f, "The execution of the given code and/or message has been rejected by the Athena implementation."),
       StatusCode::OutOfMemory => write!(f, "The VM failed to allocate the amount of memory needed for execution."),
+      StatusCode::InsufficientInput => write!(f, "Tried to read more input than was available."),
+      StatusCode::InvalidSyscallArgument => write!(f, "Invalid syscall arguments."),
     }
   }
 }
@@ -312,6 +306,7 @@ pub trait HostInterface {
   fn get_balance(&self, addr: &Address) -> Balance;
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
   fn spawn(&mut self, blob: Vec<u8>) -> Address;
+  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>>;
 }
 
 // Calculates a spawned program address on the basis of the template address, state blob,
@@ -444,7 +439,7 @@ impl<'a> MockHost<'a> {
     nonce: u64,
   ) -> Address {
     let address = calculate_address(template, &blob, principal, nonce);
-    log::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
+    tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
 
     self.programs.insert(address, blob.clone());
     self.spawn_result = Some(SpawnResult {
@@ -463,6 +458,10 @@ impl<'a> MockHost<'a> {
 
   pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
     self.programs.get(address)
+  }
+
+  pub fn template(&self, address: &Address) -> Option<&Vec<u8>> {
+    self.templates.get(address)
   }
 
   pub fn deploy_code(&mut self, address: Address, code: Vec<u8>) {
@@ -548,9 +547,9 @@ impl<'a> HostInterface for MockHost<'a> {
     self.balance.get(addr).copied().unwrap_or(0)
   }
 
+  #[tracing::instrument(skip(self), fields(id = self as *const Self as usize, depth = msg.depth))]
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
-    let depth = msg.depth;
-    log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
+    tracing::info!(msg = ?msg);
 
     // don't go too deep!
     if msg.depth > 10 {
@@ -560,10 +559,8 @@ impl<'a> HostInterface for MockHost<'a> {
     // take snapshots of the state in case we need to roll back
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
-    log::info!(
-      "MockHost::call:id {:?} depth {} before backup storage item is :: {:?}",
-      self as *const Self as usize,
-      depth,
+    tracing::debug!(
+      "before backup storage item is {:?}",
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
     let backup_storage = self.storage.clone();
@@ -610,10 +607,8 @@ impl<'a> HostInterface for MockHost<'a> {
 
     self.dynamic_context = old_dynamic_context;
 
-    log::info!(
-      "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
-      self as *const Self as usize,
-      depth,
+    tracing::debug!(
+      "finished with storage item {:?}",
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
     if res.status_code != StatusCode::Success {
@@ -621,10 +616,8 @@ impl<'a> HostInterface for MockHost<'a> {
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.templates = backup_programs;
-      log::info!(
-        "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
-        self as *const Self as usize,
-        depth,
+      tracing::debug!(
+        "after restore storage item is {:?}",
         self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
       );
     }
@@ -653,6 +646,19 @@ impl<'a> HostInterface for MockHost<'a> {
       &static_context.principal.clone(),
       static_context.nonce,
     )
+  }
+
+  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>> {
+    // template_address := HASH(template_code)
+    let hash = blake3::hash(&code);
+    let hash_bytes = hash.as_bytes().as_slice();
+    let address = Address::try_from(&hash_bytes[..ADDRESS_LENGTH]).unwrap();
+
+    if self.templates.contains_key(&address) {
+      return Err("template already exists".into());
+    }
+    self.deploy_code(address, code);
+    Ok(address)
   }
 }
 
@@ -755,6 +761,7 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
+      None,
       0,
       vec![],
     );
@@ -770,6 +777,7 @@ mod tests {
       1000,
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
+      None,
       None,
       100,
       vec![],
@@ -787,6 +795,7 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
+      None,
       SOME_COINS,
       vec![],
     );
@@ -803,6 +812,7 @@ mod tests {
       ADDRESS_BOB,
       ADDRESS_ALICE,
       None,
+      None,
       100,
       vec![],
     );
@@ -818,5 +828,17 @@ mod tests {
     let blob = vec![1, 2, 3, 4];
     let address = host.spawn_program(&ADDRESS_ALICE, blob.clone(), &ADDRESS_ALICE, 0);
     assert_eq!(host.programs.get(&address), Some(&blob));
+  }
+
+  #[test]
+  fn test_deploy() {
+    let mut host = MockHost::new();
+    let blob = vec![1, 2, 3, 4];
+    let address = host.deploy(blob.clone());
+    assert_eq!(host.template(&address.unwrap()), Some(&blob));
+
+    // deploying again should fail
+    let address = host.deploy(blob.clone());
+    assert!(address.is_err());
   }
 }

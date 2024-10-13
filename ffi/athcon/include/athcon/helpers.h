@@ -257,6 +257,10 @@ extern "C"
       return "rejected";
     case ATHCON_OUT_OF_MEMORY:
       return "out of memory";
+    case ATHCON_INSUFFICIENT_INPUT:
+      return "insufficient input";
+    case ATHCON_INVALID_SYSCALL_ARGUMENT:
+      return "invalid syscall argument";
     }
     return "<unknown>";
   }

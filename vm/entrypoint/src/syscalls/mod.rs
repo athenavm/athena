@@ -31,3 +31,4 @@ pub const HOST_WRITE: u32 = 0x00_00_00_A1;
 pub const HOST_CALL: u32 = 0x00_00_00_A2;
 pub const HOST_GETBALANCE: u32 = 0x00_00_00_A3;
 pub const HOST_SPAWN: u32 = 0x00_00_00_A4;
+pub const HOST_DEPLOY: u32 = 0x00_00_00_A5;

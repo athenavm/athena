@@ -47,8 +47,9 @@ impl<'host> Runtime<'host> {
 #[cfg(test)]
 pub mod tests {
   use super::*;
+  use crate::runtime::tests::setup_logger;
   use crate::runtime::Program;
-  use crate::utils::{setup_logger, tests::IO_ELF, AthenaCoreOpts};
+  use crate::utils::{tests::IO_ELF, AthenaCoreOpts};
   use serde::Deserialize;
 
   #[derive(Serialize, Deserialize, Debug, PartialEq)]

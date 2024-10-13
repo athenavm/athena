@@ -1,12 +1,10 @@
 use anstyle::*;
 use anyhow::Result;
 use athena_builder::{build_program, BuildArgs};
-use athena_core::io::AthenaStdin;
-use athena_core::utils::{setup_logger, setup_tracer};
-use athena_sdk::ExecutionClient;
+use athena_sdk::{AthenaStdin, ExecutionClient};
 use clap::Parser;
 use std::time::Instant;
-use std::{env, fs::File, io::Read, path::PathBuf, str::FromStr};
+use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use crate::util::{elapsed, write_status};
 
@@ -58,12 +56,6 @@ pub struct ExecuteCmd {
   #[clap(long, value_parser)]
   input: Option<Input>,
 
-  #[clap(long, action)]
-  profile: bool,
-
-  #[clap(long, action)]
-  verbose: bool,
-
   #[clap(flatten)]
   build_args: BuildArgs,
 }
@@ -72,19 +64,7 @@ impl ExecuteCmd {
   pub fn run(&self) -> Result<()> {
     let elf_path = build_program(&self.build_args, None)?;
 
-    if !self.profile {
-      match env::var("RUST_LOG") {
-        Ok(_) => {}
-        Err(_) => env::set_var("RUST_LOG", "info"),
-      }
-      setup_logger();
-    } else {
-      match env::var("RUST_TRACER") {
-        Ok(_) => {}
-        Err(_) => env::set_var("RUST_TRACER", "info"),
-      }
-      setup_tracer();
-    }
+    tracing_subscriber::fmt::init();
 
     let mut elf = Vec::new();
     File::open(elf_path.as_path().as_str())

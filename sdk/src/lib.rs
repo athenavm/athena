@@ -2,10 +2,6 @@
 //!
 //! A library for interacting with the Athena RISC-V VM.
 
-pub mod utils {
-  pub use athena_core::utils::setup_logger;
-}
-
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{ExecutionError, Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
@@ -170,12 +166,20 @@ impl Default for ExecutionClient {
 #[cfg(test)]
 mod tests {
 
-  use crate::{utils, AthenaStdin, ExecutionClient};
+  use crate::{AthenaStdin, ExecutionClient};
   use athena_interface::{AthenaContext, MockHost, ADDRESS_ALICE};
+
+  fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
+  }
 
   #[test]
   fn test_execute() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
@@ -185,7 +189,8 @@ mod tests {
 
   #[test]
   fn test_host() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
@@ -199,7 +204,8 @@ mod tests {
   #[test]
   #[should_panic]
   fn test_missing_host() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/host/elf/host-test");
     let stdin = AthenaStdin::new();
@@ -209,7 +215,8 @@ mod tests {
   #[test]
   #[should_panic]
   fn test_execute_panic() {
-    utils::setup_logger();
+    setup_logger();
+
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/panic/elf/panic-test");
     let mut stdin = AthenaStdin::new();

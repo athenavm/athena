@@ -1,41 +1,48 @@
-use athena_interface::{Address, Balance, Bytes32, BYTES32_LENGTH};
-use athena_vm::helpers::{address_to_32bit_words, balance_to_32bit_words};
-use borsh_derive::{BorshDeserialize, BorshSerialize};
+use athena_interface::{Address, Bytes32};
+use cfg_if::cfg_if;
+use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
-mod spawn;
-pub use spawn::spawn;
+cfg_if! {
+  if #[cfg(target_os = "zkvm")] {
+    mod spawn;
+    pub use spawn::spawn;
+    mod call;
+    pub use call::call;
+    mod deploy;
+    pub use deploy::deploy;
+    mod io;
+    pub use io::read_storage;
+    pub use io::write_storage;
+  }
+}
 
-// This type needs to be serializable
-#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
 pub struct Pubkey(pub Bytes32);
-pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
-pub fn call(address: Address, input: Option<Vec<u8>>, amount: Balance) {
-  let address = address_to_32bit_words(address);
-  let amount = balance_to_32bit_words(amount);
+#[allow(dead_code)] // Used by RISC-V targets and tests
+/// Convert a slice of bytes to a vector of u32 little-endian values.
+/// In case the length of the input slice is not a multiple of 4, the remaining bytes are
+/// zero-padded and appended as the last u32 value.
+pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
+  let mut chunks = bytes.as_ref().chunks_exact(4);
+  let mut result = chunks
+    .by_ref()
+    .map(|chunk| {
+      let mut bytes = [0u8; 4];
+      bytes.copy_from_slice(chunk);
+      u32::from_le_bytes(bytes)
+    })
+    .collect::<Vec<u32>>();
 
-  // for now, require input to be word-aligned
-  // we can pad the input but need to know more about the contents
-  let input32 = if let Some(input) = input {
-    assert!(input.len() % 4 == 0, "input is not 4 byte-aligned");
+  let remainder = chunks.remainder();
+  if !remainder.is_empty() {
+    let mut bytes = [0u8; 4];
+    bytes[..remainder.len()].copy_from_slice(remainder);
+    result.push(u32::from_le_bytes(bytes));
+  }
 
-    let v = input
-      .chunks(4)
-      .map(|chunk| {
-        let mut bytes = [0u8; 4];
-        bytes.copy_from_slice(chunk);
-        u32::from_le_bytes(bytes)
-      })
-      .collect::<Vec<u32>>();
-    Some(v)
-  } else {
-    None
-  };
-
-  let (input, input_len) = input32.map_or((std::ptr::null(), 0), |v| (v.as_ptr(), v.len()));
-
-  athena_vm::syscalls::call(address.as_ptr(), input, input_len, amount.as_ptr());
+  result
 }
 
 // These traits define the reference wallet interface.
@@ -44,9 +51,44 @@ pub trait VerifiableTemplate {
   fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
 }
 
+#[derive(Clone, Copy, Debug, Default, Encode, Decode)]
+pub struct SendArguments {
+  pub recipient: Address,
+  pub amount: u64,
+}
+
 pub trait WalletProgram {
-  fn spawn();
-  fn send(&self);
+  fn spawn(owner: Pubkey) -> Address;
+  fn send(&self, args: SendArguments);
   fn proxy(&self, destination: Address, args: &[u8]);
-  fn deploy(&self, code: &[u8]);
+  fn deploy(&self, code: Vec<u8>) -> Address;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn convert_empty_slice() {
+    let result = bytes_to_u32_vec([]);
+    assert_eq!(result, Vec::new());
+  }
+
+  #[test]
+  fn convert_exact_multiple_of_4() {
+    let result = bytes_to_u32_vec([1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(result, vec![0x04030201, 0x08070605]);
+  }
+
+  #[test]
+  fn covnert_not_a_multiple_of_4() {
+    let result = bytes_to_u32_vec([1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(result, vec![0x04030201, 0x00070605]);
+  }
+
+  #[test]
+  fn convert_single_byte() {
+    let result = bytes_to_u32_vec([1]);
+    assert_eq!(result, vec![0x00_00_00_01]);
+  }
 }

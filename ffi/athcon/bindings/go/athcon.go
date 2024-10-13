@@ -170,7 +170,8 @@ func (vm *VM) Execute(
 	gas int64,
 	recipient, sender Address,
 	input []byte,
-	value Bytes32,
+	method []byte,
+	value uint64,
 	code []byte,
 ) (res Result, err error) {
 	if len(code) == 0 {
@@ -182,23 +183,24 @@ func (vm *VM) Execute(
 		gas:       C.int64_t(gas),
 		recipient: athconAddress(recipient),
 		sender:    athconAddress(sender),
-		value:     athconBytes32(value),
+		value:     C.uint64_t(value),
 	}
 	if len(input) > 0 {
 		// Allocate memory for input data in C.
 		// Otherwise, the Go garbage collector may move the data around and
 		// invalidate the pointer passed to the C code.
 		// Without this, the CGO complains `cgo argument has Go pointer to unpinned Go pointer`.
-		cInputData := C.malloc(C.size_t(len(input)))
-		if cInputData == nil {
-			return res, fmt.Errorf("failed to allocate memory for input data")
-		}
+		cInputData := C.CBytes(input)
 		defer C.free(cInputData)
-
-		cSlice := unsafe.Slice((*byte)(cInputData), len(input))
-		copy(cSlice, input)
-		msg.input_data = (*C.uchar)(unsafe.Pointer(&cSlice[0]))
+		msg.input_data = (*C.uchar)(cInputData)
 		msg.input_size = C.size_t(len(input))
+	}
+	if len(method) > 0 {
+		// Allocate memory for method name in C.
+		cMethodName := C.CBytes(method)
+		defer C.free(cMethodName)
+		msg.method_name = (*C.uchar)(cMethodName)
+		msg.method_name_size = C.size_t(len(method))
 	}
 
 	ctxHandle := cgo.NewHandle(ctx)
@@ -207,7 +209,7 @@ func (vm *VM) Execute(
 	result := C.athcon_execute(
 		vm.handle,
 		hostInterface,
-		(*C.struct_athcon_host_context)(unsafe.Pointer(uintptr(ctxHandle))),
+		(*C.struct_athcon_host_context)(unsafe.Pointer(&ctxHandle)),
 		uint32(rev),
 		&msg,
 		(*C.uint8_t)(unsafe.Pointer(&code[0])),

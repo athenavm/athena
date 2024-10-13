@@ -6,3 +6,5 @@ members = [
   "wallet/script",
 ]
 resolver = "2"
+
+exclude = ["wallet/program"]

@@ -113,11 +113,26 @@ extern "C"
     size_t input_size;
 
     /**
+     * The destination program method to call.
+     *
+     * The arbitrary length byte array of the method name of the call.
+     * This MAY be NULL.
+     */
+    const uint8_t *method_name;
+
+    /**
+     * The size of the method name data.
+     *
+     * If method_name is NULL this MUST be 0.
+     */
+    size_t method_name_size;
+
+    /**
      * The number of coins transferred with the message.
      *
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.
      */
-    athcon_uint256be value;
+    uint64_t value;
 
     /**
      * The code to be executed.
@@ -133,7 +148,7 @@ extern "C"
   /** The transaction and block data for execution. */
   struct athcon_tx_context
   {
-    athcon_uint256be tx_gas_price; /**< The transaction gas price. */
+    uint64_t tx_gas_price;         /**< The transaction gas price. */
     athcon_address tx_origin;      /**< The transaction origin account. */
     int64_t block_height;          /**< The block height. */
     int64_t block_timestamp;       /**< The block timestamp. */
@@ -186,6 +201,19 @@ extern "C"
    *                  if the spawn failed.
    */
   typedef athcon_address (*athcon_spawn_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
+
+    /**
+   * Deploy program callback function.
+   *
+   * This callback function is used by a VM to deploy a new program template
+   *
+   * @param context   The pointer to the Host execution context.
+   * @param blob      The program's template (bytecode).
+   * @param blob_size The length of the blob, in bytes.
+   * @return          The newly-created template address or null bytes
+   *                  if the deploy failed.
+   */
+  typedef athcon_address (*athcon_deploy_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
 
   /**
    * The execution status code.
@@ -274,6 +302,12 @@ extern "C"
 
     /** The caller does not have enough funds for value transfer. */
     ATHCON_INSUFFICIENT_BALANCE = 17,
+
+    /** A system call tried to read more from STDIN than was available. */
+    ATHCON_INSUFFICIENT_INPUT = 18,
+
+    /** A system call was called with invalid arguments. */
+    ATHCON_INVALID_SYSCALL_ARGUMENT = 19,
 
     /** Athena implementation generic internal error. */
     ATHCON_INTERNAL_ERROR = -1,
@@ -534,8 +568,8 @@ extern "C"
    * @param address  The address of the account.
    * @return         The balance of the given account or 0 if the account does not exist.
    */
-  typedef athcon_uint256be (*athcon_get_balance_fn)(struct athcon_host_context *context,
-                                                    const athcon_address *address);
+  typedef uint64_t (*athcon_get_balance_fn)(struct athcon_host_context *context,
+                                            const athcon_address *address);
 
   /**
    * Pointer to the callback function supporting Athena calls.
@@ -580,6 +614,9 @@ extern "C"
 
     /** Spawn program callback function. */
     athcon_spawn_fn spawn;
+
+    /** Deploy program template callback function. */
+    athcon_deploy_fn deploy;
   };
 
   /* Forward declaration. */

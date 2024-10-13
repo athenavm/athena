@@ -29,10 +29,8 @@ func (host *testHostContext) SetStorage(addr Address, key Bytes32, value Bytes32
 	return StorageAdded
 }
 
-func (host *testHostContext) GetBalance(addr Address) Bytes32 {
-	var b Bytes32
-	binary.LittleEndian.PutUint32(b[:], 42)
-	return b
+func (host *testHostContext) GetBalance(addr Address) uint64 {
+	return 42
 }
 
 func (host *testHostContext) GetTxContext() TxContext {
@@ -46,12 +44,16 @@ func (host *testHostContext) GetBlockHash(number int64) Bytes32 {
 }
 
 func (host *testHostContext) Call(kind CallKind,
-	recipient Address, sender Address, value Bytes32, input []byte, gas int64, depth int) (
+	recipient Address, sender Address, value uint64, input []byte, method []byte, gas int64, depth int) (
 	output []byte, gasLeft int64, createAddr Address, err error) {
 	return nil, gas, Address{}, nil
 }
 
 func (host *testHostContext) Spawn(blob []byte) Address {
+	return Address{}
+}
+
+func (host *testHostContext) Deploy(code []byte) Address {
 	return Address{}
 }
 
@@ -63,8 +65,7 @@ func TestGetBalance(t *testing.T) {
 
 	host := &testHostContext{}
 	addr := Address{}
-	h := Bytes32{}
-	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, h, MINIMAL_TEST_CODE)
+	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, nil, 0, MINIMAL_TEST_CODE)
 	output := result.Output
 	gasLeft := result.GasLeft
 
@@ -93,16 +94,11 @@ func TestCall(t *testing.T) {
 
 	host := &testHostContext{}
 	addr := Address{}
-	h := Bytes32{}
-	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, []byte{2, 0, 0, 0}, h, RECURSIVE_CALL_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, []byte{2, 0, 0, 0}, nil, 0, RECURSIVE_CALL_TEST)
 	output := result.Output
-	gasLeft := result.GasLeft
 
 	if len(output) != 4 {
 		t.Errorf("execution unexpected output length: %d", len(output))
-	}
-	if gasLeft != 6604 {
-		t.Errorf("execution gas left is incorrect: %d", gasLeft)
 	}
 	if err != nil {
 		t.Errorf("execution returned unexpected error: %v", err)

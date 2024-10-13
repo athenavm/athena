@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use athcon_declare::athcon_declare_vm;
 use athcon_sys as ffi;
 use athcon_vm::{
@@ -6,8 +8,8 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
-  HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
+  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, ExecutionResult, HostInterface,
+  MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
 use athena_runner::AthenaVm;
 
@@ -19,6 +21,9 @@ pub struct AthenaVMWrapper {
 
 impl AthconVm for AthenaVMWrapper {
   fn init() -> Self {
+    let _ = tracing_subscriber::fmt()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
     Self {
       athena_vm: AthenaVm::new(),
     }
@@ -107,12 +112,6 @@ impl From<Bytes32Wrapper> for Bytes32 {
   }
 }
 
-impl From<Bytes32Wrapper> for u64 {
-  fn from(bytes: Bytes32Wrapper) -> Self {
-    Bytes32AsU64::new(bytes.0).into()
-  }
-}
-
 impl From<ffi::athcon_bytes32> for Bytes32Wrapper {
   fn from(bytes: ffi::athcon_bytes32) -> Self {
     Bytes32Wrapper(bytes.bytes)
@@ -140,6 +139,13 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       None
     };
 
+    // Convert method pointer and size to Vec<u8>
+    let method = if !item.method_name.is_null() && item.method_name_size > 0 {
+      Some(unsafe { std::slice::from_raw_parts(item.method_name, item.method_name_size) }.to_vec())
+    } else {
+      None
+    };
+
     // Convert code pointer and size to Vec<u8>
     let code = if !item.code.is_null() && item.code_size > 0 {
       unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
@@ -148,7 +154,6 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     };
 
     let kind: MessageKindWrapper = item.kind.into();
-    let byteswrapper: Bytes32Wrapper = item.value.into();
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: u32::try_from(item.depth).expect("Depth value out of range"),
@@ -156,7 +161,8 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
-      value: Bytes32AsU64::new(byteswrapper.0).into(),
+      method,
+      value: item.value,
       code,
     })
   }
@@ -202,7 +208,6 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
     let kind = match item.0.kind {
       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
     };
-    let value: Bytes32AsU64 = item.0.value.into();
     let code = if !item.0.code.is_empty() {
       Some(item.0.code.as_slice())
     } else {
@@ -215,7 +220,8 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       AddressWrapper(item.0.recipient).into(),
       AddressWrapper(item.0.sender).into(),
       item.0.input_data.as_deref(),
-      Bytes32Wrapper(value.into()).into(),
+      item.0.method.as_deref(),
+      item.0.value,
       code,
     )
   }
@@ -224,16 +230,16 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
 impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
   fn from(item: &AthconExecutionMessage) -> Self {
     let kind: MessageKindWrapper = item.kind().into();
-    let byteswrapper = Bytes32Wrapper::from(*item.value());
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
-      recipient: AddressWrapper::from(*item.recipient()).into(),
-      sender: AddressWrapper::from(*item.sender()).into(),
+      recipient: item.recipient().bytes,
+      sender: item.sender().bytes,
       input_data: item.input().cloned(),
-      value: Bytes32AsU64::new(byteswrapper.0).into(),
-      code: item.code().map_or(Vec::new(), |c| c.to_vec()),
+      method: item.method().cloned(),
+      value: item.value(),
+      code: item.code().cloned().unwrap_or_default(),
     })
   }
 }
@@ -298,6 +304,12 @@ impl From<ffi::athcon_status_code> for StatusCodeWrapper {
       }
       ffi::athcon_status_code::ATHCON_REJECTED => StatusCodeWrapper(StatusCode::Rejected),
       ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY => StatusCodeWrapper(StatusCode::OutOfMemory),
+      ffi::athcon_status_code::ATHCON_INSUFFICIENT_INPUT => {
+        StatusCodeWrapper(StatusCode::InsufficientInput)
+      }
+      ffi::athcon_status_code::ATHCON_INVALID_SYSCALL_ARGUMENT => {
+        StatusCodeWrapper(StatusCode::InvalidSyscallArgument)
+      }
     }
   }
 }
@@ -328,6 +340,10 @@ impl From<StatusCodeWrapper> for ffi::athcon_status_code {
       StatusCode::InternalError => ffi::athcon_status_code::ATHCON_INTERNAL_ERROR,
       StatusCode::Rejected => ffi::athcon_status_code::ATHCON_REJECTED,
       StatusCode::OutOfMemory => ffi::athcon_status_code::ATHCON_OUT_OF_MEMORY,
+      StatusCode::InsufficientInput => ffi::athcon_status_code::ATHCON_INSUFFICIENT_INPUT,
+      StatusCode::InvalidSyscallArgument => {
+        ffi::athcon_status_code::ATHCON_INVALID_SYSCALL_ARGUMENT
+      }
     }
   }
 }
@@ -422,7 +438,7 @@ impl From<TransactionContextWrapper> for TransactionContext {
   fn from(context: TransactionContextWrapper) -> Self {
     let tx_context = context.0;
     TransactionContext {
-      gas_price: Bytes32Wrapper::from(tx_context.tx_gas_price).into(),
+      gas_price: tx_context.tx_gas_price,
       origin: AddressWrapper::from(tx_context.tx_origin).into(),
       block_height: tx_context.block_height,
       block_timestamp: tx_context.block_timestamp,
@@ -460,8 +476,7 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
   }
 
   fn get_balance(&self, addr: &Address) -> Balance {
-    let balance = self.context.get_balance(&AddressWrapper(*addr).into());
-    Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
+    self.context.get_balance(&AddressWrapper(*addr).into())
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
@@ -473,5 +488,9 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
 
   fn spawn(&mut self, blob: Vec<u8>) -> Address {
     AddressWrapper::from(self.context.spawn(&blob)).into()
+  }
+
+  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>> {
+    Ok(AddressWrapper::from(self.context.deploy(&code)).into())
   }
 }

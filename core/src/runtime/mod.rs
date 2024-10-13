@@ -92,8 +92,8 @@ pub enum MemoryAccessPosition {
 pub enum ExecutionError {
   #[error("execution failed with exit code {0}")]
   HaltWithNonZeroExitCode(u32),
-  #[error("host call failed with status code {0}")]
-  HostCallFailed(StatusCode),
+  #[error("syscall failed with status code {0}")]
+  SyscallFailed(StatusCode),
   #[error("invalid memory access for opcode {0} and address {1}")]
   InvalidMemoryAccess(Opcode, u32),
   #[error("unimplemented syscall {0}")]
@@ -550,48 +550,35 @@ impl<'host> Runtime<'host> {
         b = self.rr(Register::X10, MemoryAccessPosition::B);
         let syscall = SyscallCode::from_u32(syscall_id);
 
-        let syscall_impl = self.get_syscall(syscall).cloned();
-        let mut precompile_rt = SyscallContext::new(self);
-        let (precompile_next_pc, precompile_cycles, _returned_exit_code) =
-          if let Some(syscall_impl) = syscall_impl {
-            // Executing a syscall optionally returns a value to write to the t0 register.
-            // If it returns None, we just keep the syscall_id in t0.
-            let res = syscall_impl.execute(&mut precompile_rt, b, c);
-            if let Some(val) = res {
-              a = val;
-            } else {
-              a = syscall_id;
-            }
+        let syscall_impl = self
+          .get_syscall(syscall)
+          .ok_or(ExecutionError::UnsupportedSyscall(syscall_id))?
+          .clone();
+        let mut ctx = SyscallContext::new(self);
 
-            // Check for failure from the call host function.
-            if syscall == SyscallCode::HOST_CALL {
-              let return_code = res.unwrap();
-              let status_code = StatusCode::try_from(return_code).unwrap();
-              if status_code != StatusCode::Success {
-                return Err(ExecutionError::HostCallFailed(status_code));
-              }
-            }
+        // Executing a syscall optionally returns a value to write to the t0 register.
+        // If it returns None, we just keep the syscall_id in t0.
+        let result = syscall_impl
+          .execute(&mut ctx, b, c)
+          .map_err(ExecutionError::SyscallFailed)?;
 
-            // If the syscall is `HALT` and the exit code is non-zero, return an error.
-            if syscall == SyscallCode::HALT && precompile_rt.exit_code != 0 {
-              return Err(ExecutionError::HaltWithNonZeroExitCode(
-                precompile_rt.exit_code,
-              ));
+        match result {
+          Outcome::Result(value) => {
+            if let Some(value) = value {
+              self.rw(t0, value);
             }
-
-            (
-              precompile_rt.next_pc,
-              syscall_impl.num_extra_cycles(),
-              precompile_rt.exit_code,
-            )
-          } else {
-            return Err(ExecutionError::UnsupportedSyscall(syscall_id));
-          };
+            next_pc = self.state.pc.wrapping_add(4);
+          }
+          Outcome::Exit(0) => {
+            next_pc = 0;
+          }
+          Outcome::Exit(code) => {
+            return Err(ExecutionError::HaltWithNonZeroExitCode(code));
+          }
+        };
 
         // Allow the syscall impl to modify state.clk/pc (exit unconstrained does this)
-        self.rw(t0, a);
-        next_pc = precompile_next_pc;
-        self.state.clk += precompile_cycles;
+        self.state.clk += syscall_impl.num_extra_cycles();
       }
       Opcode::EBREAK => {
         return Err(ExecutionError::Breakpoint());
@@ -676,7 +663,7 @@ impl<'host> Runtime<'host> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
-    log::debug!("Executing cycle with instruction: {:?}", instruction);
+    tracing::debug!(instruction = ?instruction, "executing cycle");
 
     // Log the current state of the runtime.
     self.log(&instruction);
@@ -747,7 +734,7 @@ impl<'host> Runtime<'host> {
   pub fn execute(&mut self) -> Result<Option<u32>, ExecutionError> {
     // If it's the first cycle, initialize the program.
     if self.state.global_clk == 0 {
-      log::info!("Initializing");
+      tracing::info!("initializing");
       self.initialize();
     }
 
@@ -757,7 +744,7 @@ impl<'host> Runtime<'host> {
         break;
       }
     }
-    log::info!("Execution finished");
+    tracing::info!("execution finished");
 
     self.postprocess();
 
@@ -807,10 +794,7 @@ impl<'host> Runtime<'host> {
 pub mod tests {
 
   use crate::{
-    io::AthenaStdin,
-    runtime::ExecutionError,
-    runtime::MemoryAccessPosition,
-    utils::{self, with_max_gas},
+    io::AthenaStdin, runtime::ExecutionError, runtime::MemoryAccessPosition, utils::with_max_gas,
   };
   use athena_interface::{
     calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
@@ -818,8 +802,8 @@ pub mod tests {
     ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
-  use borsh::to_vec;
-  use wallet_common::SendArguments;
+  use athena_vm_sdk::SendArguments;
+  use parity_scale_codec::Encode;
 
   use crate::{
     runtime::Register,
@@ -855,6 +839,13 @@ pub mod tests {
 
   pub fn wallet_program() -> Program {
     Program::from(WALLET_ELF)
+  }
+
+  pub(crate) fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
   }
 
   #[test]
@@ -917,7 +908,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &2102260
+      &2106680
     );
     assert_eq!(
       runtime
@@ -926,7 +917,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &2102288
+      &2106732
     );
 
     // now attempt to execute each function in turn
@@ -959,7 +950,7 @@ pub mod tests {
     let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
     let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
     stdin.write_vec(spawn_result.blob.clone());
-    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    stdin.write_vec(send_args.encode());
     runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
@@ -967,10 +958,10 @@ pub mod tests {
     match res {
       Ok(_) => panic!("expected execution error"),
       Err(e) => match e {
-        ExecutionError::HostCallFailed(status) => {
+        ExecutionError::SyscallFailed(status) => {
           assert_eq!(status, StatusCode::InsufficientBalance);
         }
-        _ => panic!("expected HostCallFailed error"),
+        _ => panic!("expected SyscallFailed error"),
       },
     }
     drop(runtime);
@@ -990,7 +981,7 @@ pub mod tests {
     let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
     let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
     stdin.write_vec(spawn_result.blob);
-    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    stdin.write_vec(send_args.encode());
     runtime.write_vecs(&stdin.buffer);
 
     // do the send again
@@ -1007,7 +998,7 @@ pub mod tests {
 
   #[test]
   fn test_host() {
-    utils::setup_logger();
+    setup_logger();
     let program = host_program();
     let ctx = AthenaContext::new(ADDRESS_ALICE, Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
@@ -1037,7 +1028,7 @@ pub mod tests {
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(544)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(568)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -1047,7 +1038,7 @@ pub mod tests {
     let mut runtime = Runtime::new(
       program.clone(),
       None,
-      AthenaCoreOpts::default().with_options(vec![with_max_gas(545)]),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(569)]),
       Some(ctx.clone()),
     );
     let gas_left = runtime.execute().unwrap();
@@ -1056,7 +1047,7 @@ pub mod tests {
 
   #[test]
   fn test_call_send() {
-    utils::setup_logger();
+    setup_logger();
 
     // recipient address
     let address_words = address_to_32bit_words(ADDRESS_CHARLIE);
@@ -1143,8 +1134,18 @@ pub mod tests {
       Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
     );
     instructions.push(
-      // X13 is arg4 (value ptr)
-      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, memloc2, false, true),
+      // X13 is arg4 (ptr to method name)
+      // zero pointer
+      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, 0, false, true),
+    );
+    instructions.push(
+      // X14 is arg5 (method name len)
+      // no input
+      Instruction::new(Opcode::ADD, Register::X14 as u32, 0, 0, false, true),
+    );
+    instructions.push(
+      // X15 is arg6 (value ptr)
+      Instruction::new(Opcode::ADD, Register::X15 as u32, 0, memloc2, false, true),
     );
     instructions.push(
       // X5 is syscall ID
@@ -1180,7 +1181,7 @@ pub mod tests {
 
   #[test]
   fn test_bad_call() {
-    utils::setup_logger();
+    setup_logger();
 
     let instructions = vec![
       // X10 is arg1 (ptr to address)
@@ -1220,7 +1221,7 @@ pub mod tests {
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     match runtime.execute() {
       Err(e) => match e {
-        ExecutionError::HostCallFailed(code) => {
+        ExecutionError::SyscallFailed(code) => {
           assert_eq!(code, athena_interface::StatusCode::Failure);
         }
         _ => panic!("unexpected error: {:?}", e),
@@ -1231,7 +1232,7 @@ pub mod tests {
 
   #[test]
   fn test_get_balance() {
-    utils::setup_logger();
+    setup_logger();
 
     // arbitrary memory location
     let memloc = 0x12345678;

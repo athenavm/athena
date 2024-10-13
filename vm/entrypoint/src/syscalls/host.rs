@@ -1,27 +1,39 @@
 #[cfg(target_os = "zkvm")]
 use core::arch::asm;
 
+use athena_interface::StorageStatus;
+
 /// Call a function in a foreign program.
 ///
-/// `address` is the callee address, `input` is a bytearray to be passed to the
-/// callee function, and `len` is the number of bytes to read from the input bytearray.
+/// `address` is the callee address, `input_ptr` is a bytearray to be passed to the
+/// callee function, and `input_len` is the number of bytes to read from the input bytearray.
+/// `method_ptr` is the name of the function to call, and `method_len` is the length of
+/// the method name in bytes.
 /// `amount` is the number of coins to transfer to the callee.
 /// For now there is no return value and no return status code. The caller can assume
 /// that, if this function returns, the call was successful.
 ///
 /// See https://github.com/athenavm/athena/issues/5 for more information.
 #[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn call(address: *const u32, input: *const u32, len: usize, amount: *const u32) {
+pub fn call(
+  address: *const u32,
+  input_ptr: *const u32,
+  input_len: usize,
+  method_ptr: *const u32,
+  method_len: usize,
+  amount: *const u32,
+) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_CALL,
         in("a0") address,
-        in("a1") input,
-        in("a2") len,
-        in("a3") amount,
+        in("a1") input_ptr,
+        in("a2") input_len,
+        in("a3") method_ptr,
+        in("a4") method_len,
+        in("a5") amount,
     )
   }
 
@@ -30,18 +42,17 @@ pub extern "C" fn call(address: *const u32, input: *const u32, len: usize, amoun
 }
 
 /// Read from host storage at the given address and key.
-///
-/// The output is stored in the `key` pointer.
 #[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn read_storage(key: *mut u32) {
+pub fn read_storage(key: &[u32; 8]) -> [u32; 8] {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let mut result = *key;
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_READ,
-        in("a0") key,
-    )
+        in("a0") result.as_mut_ptr(),
+    );
+    return result;
   }
 
   #[cfg(not(target_os = "zkvm"))]
@@ -49,19 +60,19 @@ pub extern "C" fn read_storage(key: *mut u32) {
 }
 
 /// Write to host storage at the given address and key.
-///
-/// The result status code is stored in the `key` pointer.
 #[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn write_storage(key: *mut u32, value: *const u32) {
+pub fn write_storage(key: &[u32; 8], value: &[u32; 8]) -> StorageStatus {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let status: u32;
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_WRITE,
-        in("a0") key,
-        in("a1") value,
-    )
+        in("a0") key.as_ptr(),
+        in("a1") value.as_ptr(),
+        lateout("t0") status,
+    );
+    return status.try_into().unwrap();
   }
 
   #[cfg(not(target_os = "zkvm"))]
@@ -69,18 +80,16 @@ pub extern "C" fn write_storage(key: *mut u32, value: *const u32) {
 }
 
 /// Get the current account balance
-///
-/// The result status code is stored in the `value` pointer.
-#[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn get_balance(value: *mut u32) {
+pub fn get_balance() -> u64 {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let mut balance = std::mem::MaybeUninit::<u64>::uninit();
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_GETBALANCE,
-        in("a0") value,
-    )
+        in("a0") balance.as_mut_ptr(),
+    );
+    balance.assume_init()
   }
 
   #[cfg(not(target_os = "zkvm"))]
@@ -89,7 +98,8 @@ pub extern "C" fn get_balance(value: *mut u32) {
 
 /// Spawn a new instance of a template.
 ///
-/// No return value. It either succeeds or reverts.
+/// It either succeeds or reverts.
+/// In case of success, returns the address of the spawned program.
 /// The host calculates the new program address based on the template,
 /// the state blob, and the principal nonce. The template and nonce are
 /// available in its context and don't need to be passed here. The
@@ -98,19 +108,52 @@ pub extern "C" fn get_balance(value: *mut u32) {
 ///
 /// The blob is a pointer to a serialized version of the instantiated template (struct) state.
 /// The len is the number of **bytes** to read from the blob.
-#[allow(unused_variables)]
-#[no_mangle]
-pub extern "C" fn spawn(blob: *const u32, len: usize) {
-  #[cfg(target_os = "zkvm")]
+///
+/// The address of spawned program is obtained via sharing a
+/// variable located on the stack. The host must write the address,
+/// initializing the variable.
+#[cfg(target_os = "zkvm")]
+pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
+  let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
+
   unsafe {
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_SPAWN,
-        in("a0") blob,
-        in("a1") len,
+        in("a0") blob.as_ptr(),
+        in("a1") bytes_len,
+        in("a2") result.as_mut_ptr(),
     )
   }
 
-  #[cfg(not(target_os = "zkvm"))]
-  unreachable!()
+  // SAFETY: the host initialized the data in the `result` variable
+  // by writing to the memory address pointed to in the `a2` register.
+  // In the case the host failed it would not return here.
+  unsafe { result.assume_init() }
+}
+
+/// Deploy a new template.
+///
+/// Returns the newly-deployed template address, which is calculated as the hash of the template code
+///
+/// The blob contains the template code.
+///
+/// The address of the deployed template is obtained via sharing a
+/// variable located on the stack. The host must write the address,
+/// initializing the variable.
+#[cfg(target_os = "zkvm")]
+pub fn deploy(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
+  let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
+
+  unsafe {
+    asm!(
+        "ecall",
+        in("t0") crate::syscalls::HOST_DEPLOY,
+        in("a0") blob.as_ptr(),
+        in("a1") bytes_len,
+        in("a2") result.as_mut_ptr(),
+    )
+  }
+
+  unsafe { result.assume_init() }
 }
