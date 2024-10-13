@@ -47,7 +47,7 @@ impl<'h> Breakpoints for Runtime<'h> {
 
 impl<'h> SingleThreadSingleStep for Runtime<'h> {
   fn step(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
-    log::trace!("single stepping");
+    tracing::trace!("single stepping");
     let _ = self.execute_cycle();
     Ok(())
   }
@@ -55,7 +55,7 @@ impl<'h> SingleThreadSingleStep for Runtime<'h> {
 
 impl<'h> SingleThreadResume for Runtime<'h> {
   fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
-    log::trace!("resuming");
+    tracing::trace!("resuming");
     Ok(())
   }
 
@@ -72,7 +72,7 @@ impl<'h> SwBreakpoint for Runtime<'h> {
     addr: <Self::Arch as gdbstub::arch::Arch>::Usize,
     _kind: <Self::Arch as gdbstub::arch::Arch>::BreakpointKind,
   ) -> gdbstub::target::TargetResult<bool, Self> {
-    log::trace!("adding sw breakpoint at {:#x}", addr);
+    tracing::trace!("adding sw breakpoint at {:#x}", addr);
     self.breakpoints.insert(addr as u32);
     Ok(true)
   }
@@ -82,7 +82,7 @@ impl<'h> SwBreakpoint for Runtime<'h> {
     addr: <Self::Arch as gdbstub::arch::Arch>::Usize,
     _kind: <Self::Arch as gdbstub::arch::Arch>::BreakpointKind,
   ) -> gdbstub::target::TargetResult<bool, Self> {
-    log::trace!("removing sw breakpoint at {:#x}", addr);
+    tracing::trace!("removing sw breakpoint at {:#x}", addr);
     self.breakpoints.remove(&(addr as u32));
     Ok(true)
   }
@@ -93,7 +93,7 @@ impl<'h> SingleThreadBase for Runtime<'h> {
     &mut self,
     regs: &mut <Self::Arch as gdbstub::arch::Arch>::Registers,
   ) -> gdbstub::target::TargetResult<(), Self> {
-    log::trace!("reading registers");
+    tracing::trace!("reading registers");
     regs.x.copy_from_slice(&self.registers()[..16]);
     regs.pc = self.state.pc;
     Ok(())
@@ -103,7 +103,7 @@ impl<'h> SingleThreadBase for Runtime<'h> {
     &mut self,
     regs: &<Self::Arch as gdbstub::arch::Arch>::Registers,
   ) -> gdbstub::target::TargetResult<(), Self> {
-    log::trace!("writing registers: {regs:?}");
+    tracing::trace!("writing registers: {regs:?}");
     for (reg, value) in regs.x.iter().enumerate() {
       self.rw(Register::from_u32(reg as u32), *value)
     }
@@ -116,7 +116,7 @@ impl<'h> SingleThreadBase for Runtime<'h> {
     start_addr: <Self::Arch as gdbstub::arch::Arch>::Usize,
     mut data: &mut [u8],
   ) -> gdbstub::target::TargetResult<usize, Self> {
-    log::trace!(
+    tracing::trace!(
       "reading memory {start_addr:#x} - {:#x}",
       start_addr as usize + data.len()
     );
@@ -146,7 +146,7 @@ impl<'h> SingleThreadBase for Runtime<'h> {
     start_addr: <Self::Arch as gdbstub::arch::Arch>::Usize,
     data: &[u8],
   ) -> gdbstub::target::TargetResult<(), Self> {
-    log::trace!(
+    tracing::trace!(
       "writing memory {start_addr:#x} - {:#x}",
       start_addr + data.len() as u32
     );
@@ -276,7 +276,7 @@ impl<'h> run_blocking::BlockingEventLoop for GdbBlockingEventLoop<'h> {
         Ok(run_blocking::Event::IncomingData(byte))
       }
       RunEvent::Event(event) => {
-        log::trace!("received event {event:?}");
+        tracing::trace!("received event {event:?}");
 
         let stop_reason = match event {
           Event::DoneStep => SingleThreadStopReason::DoneStep,
@@ -287,10 +287,10 @@ impl<'h> run_blocking::BlockingEventLoop for GdbBlockingEventLoop<'h> {
         Ok(run_blocking::Event::TargetStopped(stop_reason))
       }
       RunEvent::ExecutionError(err) => {
-        log::debug!("received execution error {err:?}");
+        tracing::debug!("received execution error {err:?}");
 
         let stop_reason = match err {
-          ExecutionError::HostCallFailed(code) => SingleThreadStopReason::Exited(code as u8),
+          ExecutionError::SyscallFailed(code) => SingleThreadStopReason::Exited(code as u8),
           ExecutionError::OutOfGas() => SingleThreadStopReason::Exited(StatusCode::OutOfGas as u8),
           ExecutionError::HaltWithNonZeroExitCode(code) => {
             SingleThreadStopReason::Exited(code as u8)
@@ -329,7 +329,7 @@ pub fn gdb_event_loop_thread<'h>(
   match debugger.run_blocking::<GdbBlockingEventLoop<'h>>(runtime) {
     Ok(disconnect_reason) => match disconnect_reason {
       DisconnectReason::Disconnect => {
-        log::info!("GDB client disconnected. Running to completion...");
+        tracing::info!("GDB client disconnected. Running to completion...");
         loop {
           match runtime.execute_cycle() {
             Ok(Some(crate::runtime::Event::Halted)) => break,
@@ -339,13 +339,13 @@ pub fn gdb_event_loop_thread<'h>(
         }
       }
       DisconnectReason::TargetExited(code) => {
-        log::info!("Target exited with code {}!", code);
+        tracing::info!("Target exited with code {}!", code);
         if code != 0 {
           return Err(ExecutionError::HaltWithNonZeroExitCode(code as u32));
         }
       }
       DisconnectReason::TargetTerminated(sig) => {
-        log::info!("Target terminated with signal {}!", sig);
+        tracing::info!("Target terminated with signal {}!", sig);
         match sig {
           Signal::SIGILL => return Err(ExecutionError::Unimplemented()),
           Signal::EXC_BAD_ACCESS => {

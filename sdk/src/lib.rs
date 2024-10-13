@@ -125,6 +125,7 @@ impl ExecutionClient {
     })
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub fn execute_function_with_gdb(
     &self,
     elf: &[u8],
