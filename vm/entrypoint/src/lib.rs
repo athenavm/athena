@@ -3,9 +3,7 @@ extern crate alloc;
 pub mod heap;
 pub mod helpers;
 pub mod syscalls;
-pub mod host {
-  pub use athena_hostfunctions::*;
-}
+
 #[cfg(feature = "lib")]
 pub mod io {
   pub use athena_lib::io::*;

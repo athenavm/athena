@@ -788,7 +788,7 @@ pub mod tests {
   };
   use athena_vm::helpers::address_to_32bit_words;
   use athena_vm_sdk::SendArguments;
-  use borsh::to_vec;
+  use parity_scale_codec::Encode;
 
   use crate::{
     runtime::Register,
@@ -893,7 +893,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_spawn")
         .unwrap(),
-      &2103464
+      &2106680
     );
     assert_eq!(
       runtime
@@ -902,7 +902,7 @@ pub mod tests {
         .symbol_table
         .get("athexp_send")
         .unwrap(),
-      &2103516
+      &2106732
     );
 
     // now attempt to execute each function in turn
@@ -935,7 +935,7 @@ pub mod tests {
     let ctx = AthenaContext::new(wallet_template, ADDRESS_ALICE, 0);
     let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
     stdin.write_vec(spawn_result.blob.clone());
-    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    stdin.write_vec(send_args.encode());
     runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
@@ -966,7 +966,7 @@ pub mod tests {
     let ctx = AthenaContext::new(spawn_result.address, ADDRESS_ALICE, 0);
     let mut runtime = Runtime::new(program.clone(), Some(&mut host), opts, Some(ctx));
     stdin.write_vec(spawn_result.blob);
-    stdin.write_vec(to_vec(&send_args).expect("failed to serialize wallet send arguments"));
+    stdin.write_vec(send_args.encode());
     runtime.write_vecs(&stdin.buffer);
 
     // do the send again
