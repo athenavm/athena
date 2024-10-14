@@ -194,6 +194,7 @@ dependencies = [
  "cfg-if",
  "elf",
  "hex",
+ "mockall",
  "nohash-hasher",
  "parity-scale-codec",
  "rrs-lib",

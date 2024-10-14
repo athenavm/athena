@@ -79,11 +79,13 @@ pub enum Outcome {
 
 pub(crate) type SyscallResult = Result<Outcome, StatusCode>;
 
+#[mockall::automock]
 pub trait Syscall: Send + Sync {
   /// Execute the syscall and return the result.
   ///  `arg1` and `arg2` are the first two arguments to the syscall. These are the
   /// values in registers X10 and X11, respectively. The implementations might read more
   /// arguments from registers X12..X15.
+  #[mockall::concretize]
   fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> SyscallResult;
 
   /// The number of extra cycles that the syscall takes to execute. Unless this syscall is complex
