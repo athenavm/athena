@@ -3,15 +3,30 @@
 #[cfg(target_os = "zkvm")]
 athena_vm::entrypoint!(main);
 
-fn main() {
-  {
-    let mut buf = [0; 64];
+use blake3::hash;
 
-    for (i, x) in buf.iter_mut().enumerate() {
-      *x = i as u8;
-    }
-    println!("{buf:?}");
-  }
-  let buf = [0; 64];
-  println!("{buf:?}");
+fn main() {
+  let value = "athexp_test2";
+
+  let res = hash(value.as_bytes());
+  println!(
+    "value: {}; as_bytes: {}; hash: {}",
+    value,
+    hex::encode(value.as_bytes()),
+    hex::encode(res.as_bytes())
+  );
+  let res = hash(value.as_bytes());
+  println!(
+    "value: {}; as_bytes: {}; hash: {}",
+    value,
+    hex::encode(value.as_bytes()),
+    hex::encode(res.as_bytes())
+  );
+  let res = hash(value.as_bytes());
+  println!(
+    "value: {}; as_bytes: {}; hash: {}",
+    value,
+    hex::encode(value.as_bytes()),
+    hex::encode(res.as_bytes())
+  );
 }
