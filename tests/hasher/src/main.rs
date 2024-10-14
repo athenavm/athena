@@ -1,34 +1,17 @@
-#![no_main]
+#![cfg_attr(target_os = "zkvm", no_main)]
+
+#[cfg(target_os = "zkvm")]
 athena_vm::entrypoint!(main);
 
-use blake3::hash;
-use hex;
+fn main() {
+  {
+    let mut buf = [0; 64];
 
-#[cfg(all(
-  any(target_arch = "riscv32", target_arch = "riscv64"),
-  target_feature = "e"
-))]
-pub fn main() {
-  let value = "athexp_test2";
-  let res = hash(value.as_bytes());
-  println!(
-    "value: {}; as_bytes: {}; hash: {}",
-    value,
-    hex::encode(value.as_bytes()),
-    hex::encode(res.as_bytes())
-  );
-  let res = hash(value.as_bytes());
-  println!(
-    "value: {}; as_bytes: {}; hash: {}",
-    value,
-    hex::encode(value.as_bytes()),
-    hex::encode(res.as_bytes())
-  );
-  let res = hash(value.as_bytes());
-  println!(
-    "value: {}; as_bytes: {}; hash: {}",
-    value,
-    hex::encode(value.as_bytes()),
-    hex::encode(res.as_bytes())
-  );
+    for (i, x) in buf.iter_mut().enumerate() {
+      *x = i as u8;
+    }
+    println!("{buf:?}");
+  }
+  let buf = [0; 64];
+  println!("{buf:?}");
 }
