@@ -1,3 +1,4 @@
+pub mod gdbstub;
 mod instruction;
 mod io;
 mod opcode;
@@ -17,6 +18,7 @@ pub use syscall::*;
 pub use utils::*;
 
 use std::collections::hash_map::Entry;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
@@ -71,6 +73,8 @@ pub struct Runtime<'host> {
 
   /// The maximum number of cycles for a syscall.
   pub max_syscall_cycles: u32,
+
+  breakpoints: BTreeSet<u32>,
 }
 
 /// An record of a write to a memory address.
@@ -157,6 +161,7 @@ impl<'host> Runtime<'host> {
       max_gas: opts.max_gas(),
       syscall_map,
       max_syscall_cycles,
+      breakpoints: BTreeSet::new(),
     }
   }
 
@@ -654,7 +659,7 @@ impl<'host> Runtime<'host> {
 
   /// Executes one cycle of the program, returning whether the program has finished.
   #[inline]
-  fn execute_cycle(&mut self) -> Result<bool, ExecutionError> {
+  fn execute_cycle(&mut self) -> Result<Option<Event>, ExecutionError> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
@@ -669,6 +674,10 @@ impl<'host> Runtime<'host> {
     // Increment the clock.
     self.state.global_clk += 1;
 
+    if self.breakpoints.contains(&self.state.pc) {
+      return Ok(Some(Event::Break));
+    }
+
     // We're allowed to spend all of our gas, but no more.
     // Gas checking is "lazy" here: it happens _after_ the instruction is executed.
     if let Some(gas_left) = self.gas_left() {
@@ -677,10 +686,12 @@ impl<'host> Runtime<'host> {
       }
     }
 
-    Ok(
-      self.state.pc.wrapping_sub(self.program.pc_base)
-        >= (self.program.instructions.len() * 4) as u32,
-    )
+    if self.state.pc.wrapping_sub(self.program.pc_base)
+      >= (self.program.instructions.len() * 4) as u32
+    {
+      return Ok(Some(Event::Halted));
+    }
+    Ok(None)
   }
 
   pub(crate) fn gas_left(&self) -> Option<i64> {
@@ -690,7 +701,7 @@ impl<'host> Runtime<'host> {
       .map(|max_gas| max_gas as i64 - self.state.clk as i64)
   }
 
-  fn initialize(&mut self) {
+  pub fn initialize(&mut self) {
     self.state.clk = 0;
 
     // TODO: do we want to load all of the memory when executing a particular function?
@@ -702,15 +713,19 @@ impl<'host> Runtime<'host> {
     tracing::info!("starting execution");
   }
 
-  /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+  pub(crate) fn jump_to_symbol(&mut self, symbol_name: &str) -> Result<(), ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
       Some(offset) => *offset,
       None => return Err(ExecutionError::UnknownSymbol()),
     };
     self.state.pc = offset;
+    Ok(())
+  }
 
+  /// Execute an exported function. Does the same work as execute().
+  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+    self.jump_to_symbol(symbol_name)?;
     // Hand over to execute
     self.execute()
   }
@@ -725,7 +740,7 @@ impl<'host> Runtime<'host> {
 
     // Loop until program finishes execution or until an error occurs, whichever comes first
     loop {
-      if self.execute_cycle()? {
+      if Some(Event::Halted) == self.execute_cycle()? {
         break;
       }
     }
@@ -1857,4 +1872,11 @@ pub mod tests {
     assert_eq!(runtime.register(Register::X12), 0x12346525);
     assert_eq!(runtime.register(Register::X11), 0x65256525);
   }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Event {
+  DoneStep,
+  Halted,
+  Break,
 }
