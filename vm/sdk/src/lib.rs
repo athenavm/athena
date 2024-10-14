@@ -97,14 +97,11 @@ mod tests {
   fn convert_method_selector() {
     let selector = MethodSelector::from(MethodSelectorAsString::new("test"));
     let result = bytes_to_u32_vec(&selector);
-    // work around https://github.com/athenavm/athena/issues/149
-    // assert_eq!(result, vec![0x04_CA_78_48]);
-    assert_eq!(result, vec![0x74_73_65_74]);
+    assert_eq!(result, vec![0x15_32_60_50]);
 
     let selector = MethodSelector::from(MethodSelectorAsString::new("test2"));
     let result = bytes_to_u32_vec(&selector);
-    // assert_eq!(result, vec![0x4C_4B_70_74]);
-    assert_eq!(result, vec![0x32_74_73_65]);
+    assert_eq!(result, vec![0x7A_CA_AC_F0]);
 
     let result = bytes_to_u32_vec(&METHOD_SELECTOR_DEFAULT);
     assert_eq!(result, vec![0x0]);

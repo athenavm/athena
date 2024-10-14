@@ -5,7 +5,7 @@
 mod context;
 pub use context::*;
 
-use blake3::Hasher;
+use blake3::{hash, Hasher};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -23,9 +23,8 @@ pub struct MethodSelectorAsString(MethodSelector);
 
 impl MethodSelectorAsString {
   pub fn new(value: &str) -> Self {
-    // work around https://github.com/athenavm/athena/issues/149
-    // let res = MethodSelectorAsString(hash(value.as_bytes()).as_bytes()[..4].try_into().unwrap());
-    let vbytes = value.as_bytes();
+    let h = hash(value.as_bytes());
+    let vbytes = h.as_bytes();
     MethodSelectorAsString(
       vbytes[vbytes.len() - METHOD_SELECTOR_LENGTH..]
         .try_into()
