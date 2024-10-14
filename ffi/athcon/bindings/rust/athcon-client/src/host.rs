@@ -153,11 +153,6 @@ pub unsafe extern "C" fn call(
   msg: *const ffi::athcon_message,
 ) -> ffi::athcon_result {
   let msg = *msg;
-  let input_data = if msg.input_data.is_null() || msg.input_size == 0 {
-    &[]
-  } else {
-    std::slice::from_raw_parts(msg.input_data, msg.input_size)
-  };
   let (output, gas_left, create_address, status_code) =
     (*(context as *mut ExtendedContext)).hctx.call(
       msg.kind,
