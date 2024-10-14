@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "fibonacci/script",
+  "hasher/script",
   "hello_world/script",
   "io/script",
   "wallet/script",

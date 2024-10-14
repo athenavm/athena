@@ -1,0 +1,11 @@
+[package]
+version = "0.1.0"
+name = "hasher-script"
+edition = "2021"
+
+[dependencies]
+athena-sdk = { path = "../../../sdk" }
+tracing-subscriber = "0.3.18"
+
+[build-dependencies]
+athena-helper = { path = "../../../helper" }
