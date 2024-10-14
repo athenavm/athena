@@ -4,7 +4,7 @@
 //
 // This was compiled into assembly with:
 //
-// riscv64-unknown-elf-gcc -march=rv32em -mabi=ilp32e -O3 -nostdlib -fno-builtin -funroll-loops -I../../obj/include -I../../include -S memcpy.c -o memcpy.s
+// clang-18 -target riscv32 -march=rv32em -mabi=ilp32e -O3 -nostdlib -fno-builtin -funroll-loops -S memcpy.c -o memcpy.s
 //
 // and labels manually updated to not conflict.
 //
@@ -201,763 +201,312 @@
 // negated the permissions granted in the license. In the spirit of
 // permissive licensing, and of not having licensing issues being an
 // obstacle to adoption, that text has been removed.
-	.file	"memcpy.c"
-	.option nopic
-	.attribute arch, "rv32em"
-	.attribute unaligned_access, 0
-	.attribute stack_align, 4
 	.text
-	.align	2
-	.globl	memcpy
-	.type	memcpy, @function
-memcpy:
-	addi	sp,sp,-44
-	sw	s1,36(sp)
-	sw	s0,40(sp)
-	andi	a5,a1,3
-	sw	a0,4(sp)
-	mv	s1,a2
-	beq	a5,zero,.LBBmemcpyL24
-	beq	a2,zero,.LBBmemcpyL12
-	andi	a4,a2,7
-	mv	a5,a0
-	addi	a2,a2,-1
-	beq	a4,zero,.LBBmemcpyL4
-	li	a3,1
-	beq	a4,a3,.LBBmemcpyL85
-	li	t0,2
-	beq	a4,t0,.LBBmemcpyL86
-	li	t1,3
-	beq	a4,t1,.LBBmemcpyL87
-	li	t2,4
-	beq	a4,t2,.LBBmemcpyL88
-	li	s0,5
-	beq	a4,s0,.LBBmemcpyL89
-	li	a3,6
-	bne	a4,a3,.LBBmemcpyL145
-.LBBmemcpyL90:
-	lbu	a2,0(a1)
-	addi	a1,a1,1
-	andi	t0,a1,3
-	sb	a2,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	t0,zero,.LBBmemcpyL2
-.LBBmemcpyL89:
-	lbu	t1,0(a1)
-	addi	a1,a1,1
-	andi	t2,a1,3
-	sb	t1,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	t2,zero,.LBBmemcpyL2
-.LBBmemcpyL88:
-	lbu	s0,0(a1)
-	addi	a1,a1,1
-	andi	a3,a1,3
-	sb	s0,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	a3,zero,.LBBmemcpyL2
-.LBBmemcpyL87:
-	lbu	a0,0(a1)
-	addi	a1,a1,1
-	andi	a4,a1,3
-	sb	a0,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	a4,zero,.LBBmemcpyL2
-.LBBmemcpyL86:
-	lbu	a2,0(a1)
-	addi	a1,a1,1
-	andi	t0,a1,3
-	sb	a2,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	t0,zero,.LBBmemcpyL2
-.LBBmemcpyL85:
-	lbu	t1,0(a1)
-	addi	a1,a1,1
-	andi	t2,a1,3
-	sb	t1,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	t2,zero,.LBBmemcpyL2
-.LBBmemcpyL142:
-	beq	s1,zero,.LBBmemcpyL12
-.LBBmemcpyL4:
-	lbu	s0,0(a1)
-	addi	a1,a1,1
-	addi	a5,a5,1
-	addi	s1,s1,-1
-	andi	a0,a1,3
-	sb	s0,-1(a5)
-	mv	a3,a1
-	mv	a4,a5
-	mv	a2,s1
-	beq	a0,zero,.LBBmemcpyL2
-	lbu	t0,0(a1)
-	addi	a1,a1,1
-	andi	t1,a1,3
-	sb	t0,0(a5)
-	addi	s1,s1,-1
-	addi	a5,a5,1
-	beq	t1,zero,.LBBmemcpyL2
-	lbu	a5,1(a3)
-	addi	a1,a3,2
-	andi	t2,a1,3
-	sb	a5,1(a4)
-	addi	s1,a2,-2
-	addi	a5,a4,2
-	beq	t2,zero,.LBBmemcpyL2
-	lbu	s1,2(a3)
-	addi	a1,a3,3
-	andi	s0,a1,3
-	sb	s1,2(a4)
-	addi	a5,a4,3
-	addi	s1,a2,-3
-	beq	s0,zero,.LBBmemcpyL2
-	lbu	t0,3(a3)
-	addi	a1,a3,4
-	andi	a0,a1,3
-	sb	t0,3(a4)
-	addi	a5,a4,4
-	addi	s1,a2,-4
-	beq	a0,zero,.LBBmemcpyL2
-	lbu	t1,4(a3)
-	addi	a1,a3,5
-	andi	t2,a1,3
-	sb	t1,4(a4)
-	addi	a5,a4,5
-	addi	s1,a2,-5
-	beq	t2,zero,.LBBmemcpyL2
-	lbu	a5,5(a3)
-	addi	a1,a3,6
-	andi	s0,a1,3
-	sb	a5,5(a4)
-	addi	s1,a2,-6
-	addi	a5,a4,6
-	beq	s0,zero,.LBBmemcpyL2
-	lbu	s1,6(a3)
-	addi	a1,a3,7
-	andi	a3,a1,3
-	sb	s1,6(a4)
-	addi	a5,a4,7
-	addi	s1,a2,-7
-	bne	a3,zero,.LBBmemcpyL142
-.LBBmemcpyL2:
-	andi	t0,a5,3
-	beq	t0,zero,.LBBmemcpyL146
-	li	a4,31
-	bleu	s1,a4,.LBBmemcpyL13
-	lw	a0,0(a1)
-	li	a2,2
-	lbu	s0,0(a1)
-	sw	a0,0(sp)
-	beq	t0,a2,.LBBmemcpyL14
-	li	t2,3
-	beq	t0,t2,.LBBmemcpyL15
-	addi	a3,s1,-20
-	andi	t2,a3,-16
-	addi	a2,t2,19
-	add	a4,a5,a2
-	addi	t2,a5,3
-	sub	t0,a4,t2
-	lbu	a0,1(a1)
-	lbu	t1,2(a1)
-	addi	a2,t0,-16
-	sw	a4,16(sp)
-	addi	t0,a1,3
-	srli	a4,a2,4
-	srli	a3,a3,4
-	sb	s0,0(a5)
-	sb	a0,1(a5)
-	sw	t2,24(sp)
-	sw	t0,20(sp)
-	sb	t1,2(a5)
-	andi	s0,a4,1
-	sw	a3,28(sp)
-	mv	a0,t2
-	bne	s0,zero,.LBBmemcpyL130
-	lw	a0,0(sp)
-	lw	t1,1(t0)
-	lw	a3,9(t0)
-	lw	t2,5(t0)
-	srli	s0,a0,24
-	lw	a0,13(t0)
-	slli	a2,t1,8
-	srli	a4,t1,24
-	slli	t0,t2,8
-	slli	t1,a3,8
-	srli	t2,t2,24
-	or	s0,s0,a2
-	sw	a0,0(sp)
-	or	a2,a4,t0
-	slli	a0,a0,8
-	or	a4,t2,t1
-	srli	a3,a3,24
-	lw	t2,24(sp)
-	or	t0,a3,a0
-	addi	a0,a5,19
-	lw	a5,16(sp)
-	sw	t0,12(t2)
-	sw	s0,0(t2)
-	sw	a2,4(t2)
-	sw	a4,8(t2)
-	addi	t0,a1,19
-	beq	a0,a5,.LBBmemcpyL124
-.LBBmemcpyL130:
-	sw	s1,32(sp)
-.LBBmemcpyL16:
-	lw	t1,5(t0)
-	lw	a4,13(t0)
-	lw	s1,0(sp)
-	lw	a2,29(t0)
-	lw	a1,1(t0)
-	lw	a3,9(t0)
-	srli	s0,s1,24
-	slli	a5,a4,8
-	slli	s1,t1,8
-	sw	a2,0(sp)
-	srli	a2,t1,24
-	lw	t1,17(t0)
-	sw	a5,12(sp)
-	slli	t2,a1,8
-	srli	a1,a1,24
-	or	a1,a1,s1
-	lw	s1,12(sp)
-	sw	s0,8(sp)
-	slli	a5,t1,8
-	slli	s0,a3,8
-	srli	a4,a4,24
-	or	a2,a2,s0
-	srli	a3,a3,24
-	or	s0,a4,a5
-	lw	a4,17(t0)
-	lw	t1,8(sp)
-	or	a3,a3,s1
-	sw	s0,8(sp)
-	lw	s1,21(t0)
-	lw	s0,25(t0)
-	srli	a5,a4,24
-	or	t2,t1,t2
-	srli	a4,s1,24
-	slli	t1,s1,8
-	sw	a5,12(sp)
-	slli	s1,s0,8
-	lw	a5,25(t0)
-	lw	s0,0(sp)
-	sw	a1,4(a0)
-	lw	a1,12(sp)
-	sw	t2,0(a0)
-	lw	t2,8(sp)
-	sw	a3,12(a0)
-	srli	a5,a5,24
-	or	a3,a4,s1
-	slli	s0,s0,8
-	lw	a4,16(sp)
-	sw	a2,8(a0)
-	or	a2,a1,t1
-	or	t1,a5,s0
-	sw	t2,16(a0)
-	sw	a2,20(a0)
-	sw	a3,24(a0)
-	sw	t1,28(a0)
-	addi	a0,a0,32
-	addi	t0,t0,32
-	bne	a0,a4,.LBBmemcpyL16
-	lw	s1,32(sp)
-.LBBmemcpyL124:
-	lw	t0,28(sp)
-	lw	a5,24(sp)
-	lw	t2,20(sp)
-	addi	a0,t0,1
-	slli	s0,a0,4
-	addi	s1,s1,-19
-	slli	t0,t0,4
-	sub	s1,s1,t0
-	add	a5,a5,s0
-	add	a1,t2,s0
-.LBBmemcpyL13:
-	andi	s0,s1,16
-	andi	a0,s1,8
-	andi	a3,s1,4
-	andi	a4,s1,2
-	andi	a2,s1,1
-	beq	s0,zero,.LBBmemcpyL27
-	lbu	s0,0(a1)
-	lbu	t2,1(a1)
-	lbu	t0,2(a1)
-	lbu	s1,3(a1)
-	sb	s0,0(a5)
-	sb	t2,1(a5)
-	lbu	s0,4(a1)
-	lbu	t2,5(a1)
-	sb	t0,2(a5)
-	lbu	t0,6(a1)
-	sb	s1,3(a5)
-	sb	s0,4(a5)
-	lbu	s1,7(a1)
-	lbu	s0,8(a1)
-	sb	t2,5(a5)
-	sb	t0,6(a5)
-	lbu	t2,9(a1)
-	lbu	t0,10(a1)
-	lbu	t1,15(a1)
-	sb	s1,7(a5)
-	sb	s0,8(a5)
-	lbu	s1,11(a1)
-	lbu	s0,12(a1)
-	sb	t2,9(a5)
-	sb	t0,10(a5)
-	lbu	t2,13(a1)
-	lbu	t0,14(a1)
-	sb	s1,11(a5)
-	sb	s0,12(a5)
-	sb	t0,14(a5)
-	sb	t2,13(a5)
-	addi	a1,a1,16
-	addi	t0,a5,16
-	sb	t1,15(a5)
-.LBBmemcpyL19:
-	beq	a0,zero,.LBBmemcpyL28
-	lbu	s0,0(a1)
-	lbu	t2,1(a1)
-	lbu	a0,3(a1)
-	lbu	t1,2(a1)
-	lbu	s1,4(a1)
-	lbu	a5,7(a1)
-	sb	s0,0(t0)
-	sb	t2,1(t0)
-	lbu	s0,5(a1)
-	lbu	t2,6(a1)
-	sb	a0,3(t0)
-	sb	t1,2(t0)
-	sb	s1,4(t0)
-	sb	s0,5(t0)
-	sb	t2,6(t0)
-	addi	a1,a1,8
-	addi	a0,t0,8
-	sb	a5,7(t0)
-.LBBmemcpyL20:
-	beq	a3,zero,.LBBmemcpyL29
-	lbu	s1,0(a1)
-	lbu	t1,1(a1)
-	lbu	a5,2(a1)
-	lbu	a3,3(a1)
-	sb	s1,0(a0)
-	sb	t1,1(a0)
-	sb	a5,2(a0)
-	addi	a1,a1,4
-	addi	t0,a0,4
-	sb	a3,3(a0)
-.LBBmemcpyL21:
-	beq	a4,zero,.LBBmemcpyL30
-	lbu	a0,0(a1)
-	lbu	s0,1(a1)
-	addi	a4,t0,2
-	addi	a1,a1,2
-	sb	a0,0(t0)
-	sb	s0,1(t0)
-.LBBmemcpyL22:
-	beq	a2,zero,.LBBmemcpyL12
-	lbu	a1,0(a1)
-	sb	a1,0(a4)
-.LBBmemcpyL12:
-	lw	s0,40(sp)
-	lw	a0,4(sp)
-	lw	s1,36(sp)
-	addi	sp,sp,44
-	jr	ra
-.LBBmemcpyL146:
-	li	a2,15
-	bleu	s1,a2,.LBBmemcpyL25
-	addi	t2,s1,-16
-	andi	t0,t2,-16
-	addi	t2,t0,16
-	addi	t1,t2,-16
-	srli	a3,t1,4
-	addi	a4,a3,1
-	andi	s0,a4,3
-	add	a3,a5,t2
-	mv	a4,a1
-	beq	s0,zero,.LBBmemcpyL7
-	li	a0,1
-	beq	s0,a0,.LBBmemcpyL91
-	li	a2,2
-	bne	s0,a2,.LBBmemcpyL147
-.LBBmemcpyL92:
-	lw	t0,4(a4)
-	lw	t1,8(a4)
-	lw	a2,12(a4)
-	lw	a0,0(a4)
-	sw	t0,4(a5)
-	sw	t1,8(a5)
-	sw	a0,0(a5)
-	sw	a2,12(a5)
-	addi	a4,a4,16
-	addi	a5,a5,16
-.LBBmemcpyL91:
-	lw	s0,4(a4)
-	lw	t0,8(a4)
-	lw	t1,12(a4)
-	lw	a2,0(a4)
-	sw	s0,4(a5)
-	sw	t0,8(a5)
-	sw	a2,0(a5)
-	sw	t1,12(a5)
-	addi	a5,a5,16
-	addi	a4,a4,16
-	beq	a3,a5,.LBBmemcpyL123
-.LBBmemcpyL7:
-	lw	t0,4(a4)
-	lw	s0,0(a4)
-	lw	a0,12(a4)
-	lw	a2,16(a4)
-	sw	s0,0(a5)
-	sw	t0,4(a5)
-	lw	s0,24(a4)
-	lw	t0,20(a4)
-	lw	t1,8(a4)
-	sw	a0,12(a5)
-	sw	a2,16(a5)
-	lw	a0,40(a4)
-	lw	a2,36(a4)
-	sw	t0,20(a5)
-	sw	s0,24(a5)
-	lw	t0,28(a4)
-	lw	s0,32(a4)
-	sw	t1,8(a5)
-	sw	t0,28(a5)
-	lw	t1,44(a4)
-	lw	t0,48(a4)
-	sw	s0,32(a5)
-	sw	a2,36(a5)
-	lw	s0,52(a4)
-	lw	a2,56(a4)
-	sw	a0,40(a5)
-	lw	a0,60(a4)
-	sw	t1,44(a5)
-	sw	t0,48(a5)
-	sw	s0,52(a5)
-	sw	a2,56(a5)
-	sw	a0,60(a5)
-	addi	a5,a5,64
-	addi	a4,a4,64
-	bne	a3,a5,.LBBmemcpyL7
-.LBBmemcpyL123:
-	andi	s1,s1,15
-	add	a1,a1,t2
-.LBBmemcpyL6:
-	andi	t2,s1,8
-	andi	a4,s1,4
-	andi	a5,s1,2
-	andi	s1,s1,1
-	beq	t2,zero,.LBBmemcpyL8
-	lw	t1,4(a1)
-	lw	t0,0(a1)
-	addi	a3,a3,8
-	addi	a1,a1,8
-	sw	t1,-4(a3)
-	sw	t0,-8(a3)
-.LBBmemcpyL8:
-	beq	a4,zero,.LBBmemcpyL9
-	lw	s0,0(a1)
-	addi	a3,a3,4
-	addi	a1,a1,4
-	sw	s0,-4(a3)
-.LBBmemcpyL9:
-	beq	a5,zero,.LBBmemcpyL26
-	lbu	a0,0(a1)
-	lbu	t2,1(a1)
-	addi	a2,a3,2
-	addi	a1,a1,2
-	sb	a0,0(a3)
-	sb	t2,1(a3)
-.LBBmemcpyL10:
-	beq	s1,zero,.LBBmemcpyL12
-	lbu	a1,0(a1)
-	lw	a0,4(sp)
-	sb	a1,0(a2)
-	lw	s0,40(sp)
-	lw	s1,36(sp)
-	addi	sp,sp,44
-	jr	ra
-.LBBmemcpyL15:
-	addi	a3,s1,-20
-	andi	t0,a3,-16
-	addi	a2,t0,17
-	add	t1,a5,a2
-	addi	a0,a5,1
-	sub	a4,t1,a0
-	addi	t2,a4,-16
-	srli	a2,t2,4
-	addi	t0,a1,1
-	srli	a3,a3,4
-	sb	s0,0(a5)
-	sw	a0,24(sp)
-	sw	t1,16(sp)
-	sw	t0,20(sp)
-	andi	s0,a2,1
-	sw	a3,28(sp)
-	bne	s0,zero,.LBBmemcpyL131
-	lw	a0,3(t0)
-	lw	a4,11(t0)
-	lw	t1,0(sp)
-	lw	t2,7(t0)
-	slli	a2,a0,24
-	srli	s0,t1,8
-	srli	a0,a0,8
-	lw	t1,15(t0)
-	slli	a3,a4,24
-	slli	t0,t2,24
-	srli	t2,t2,8
-	or	s0,s0,a2
-	or	a2,a0,t0
-	or	a0,t2,a3
-	lw	t2,24(sp)
-	sw	t1,0(sp)
-	srli	a4,a4,8
-	slli	t1,t1,24
-	sw	a0,8(t2)
-	addi	a0,a5,17
-	lw	a5,16(sp)
-	or	t0,a4,t1
-	sw	t0,12(t2)
-	sw	s0,0(t2)
-	sw	a2,4(t2)
-	addi	t0,a1,17
-	beq	a0,a5,.LBBmemcpyL125
-.LBBmemcpyL131:
-	sw	s1,32(sp)
-.LBBmemcpyL18:
-	lw	s1,3(t0)
-	lw	t1,7(t0)
-	lw	a4,15(t0)
-	lw	a1,0(sp)
-	lw	a2,31(t0)
-	lw	a3,11(t0)
-	srli	s0,a1,8
-	slli	a5,a4,24
-	sw	a2,0(sp)
-	slli	t2,s1,24
-	srli	a1,s1,8
-	srli	a2,t1,8
-	slli	s1,t1,24
-	lw	t1,19(t0)
-	sw	a5,12(sp)
-	or	a1,a1,s1
-	lw	s1,12(sp)
-	sw	s0,8(sp)
-	slli	a5,t1,24
-	slli	s0,a3,24
-	srli	a4,a4,8
-	or	a2,a2,s0
-	srli	a3,a3,8
-	or	s0,a4,a5
-	lw	a4,19(t0)
-	lw	t1,8(sp)
-	or	a3,a3,s1
-	sw	s0,8(sp)
-	lw	s1,23(t0)
-	lw	s0,27(t0)
-	srli	a5,a4,8
-	or	t2,t1,t2
-	srli	a4,s1,8
-	slli	t1,s1,24
-	sw	a5,12(sp)
-	slli	s1,s0,24
-	lw	a5,27(t0)
-	lw	s0,0(sp)
-	sw	a1,4(a0)
-	lw	a1,12(sp)
-	sw	t2,0(a0)
-	lw	t2,8(sp)
-	sw	a3,12(a0)
-	srli	a5,a5,8
-	or	a3,a4,s1
-	slli	s0,s0,24
-	lw	a4,16(sp)
-	sw	a2,8(a0)
-	or	a2,a1,t1
-	or	t1,a5,s0
-	sw	t2,16(a0)
-	sw	a2,20(a0)
-	sw	a3,24(a0)
-	sw	t1,28(a0)
-	addi	a0,a0,32
-	addi	t0,t0,32
-	bne	a0,a4,.LBBmemcpyL18
-	lw	s1,32(sp)
-.LBBmemcpyL125:
-	lw	t0,28(sp)
-	addi	s1,s1,-17
-	addi	a0,t0,1
-	slli	s0,a0,4
-.LBBmemcpyL143:
-	lw	a5,24(sp)
-	lw	t2,20(sp)
-	slli	t0,t0,4
-	sub	s1,s1,t0
-	add	a5,a5,s0
-	add	a1,t2,s0
-	j	.LBBmemcpyL13
-.LBBmemcpyL145:
-	lbu	a0,0(a1)
-	addi	a1,a1,1
-	andi	a4,a1,3
-	sb	a0,0(a5)
-	mv	s1,a2
-	addi	a5,a5,1
-	bne	a4,zero,.LBBmemcpyL90
-	j	.LBBmemcpyL2
-.LBBmemcpyL14:
-	addi	t2,s1,-20
-	andi	t1,t2,-16
-	addi	a3,t1,18
-	add	t0,a5,a3
-	addi	t1,a5,2
-	sub	a2,t0,t1
-	lbu	a4,1(a1)
-	addi	a0,a2,-16
-	srli	a3,a0,4
-	sw	t0,16(sp)
-	srli	t2,t2,4
-	addi	t0,a1,2
-	sb	s0,0(a5)
-	sw	t1,24(sp)
-	sw	t0,20(sp)
-	sb	a4,1(a5)
-	andi	s0,a3,1
-	sw	t2,28(sp)
-	mv	a0,t1
-	bne	s0,zero,.LBBmemcpyL132
-	lw	t1,0(sp)
-	lw	a0,2(t0)
-	lw	a3,6(t0)
-	lw	a4,10(t0)
-	srli	s0,t1,16
-	lw	t1,14(t0)
-	slli	a2,a0,16
-	slli	t0,a3,16
-	srli	t2,a3,16
-	srli	a0,a0,16
-	slli	a3,a4,16
-	or	s0,s0,a2
-	or	a2,a0,t0
-	or	a0,t2,a3
-	lw	t2,24(sp)
-	sw	t1,0(sp)
-	srli	a4,a4,16
-	slli	t1,t1,16
-	or	t0,a4,t1
-	sw	t0,12(t2)
-	addi	t0,a1,18
-	lw	a1,16(sp)
-	sw	a0,8(t2)
-	sw	s0,0(t2)
-	sw	a2,4(t2)
-	addi	a0,a5,18
-	beq	a0,a1,.LBBmemcpyL126
-.LBBmemcpyL132:
-	sw	s1,32(sp)
-.LBBmemcpyL17:
-	lw	s1,2(t0)
-	lw	t1,6(t0)
-	lw	a4,14(t0)
-	lw	a5,0(sp)
-	lw	a2,30(t0)
-	lw	a3,10(t0)
-	srli	s0,a5,16
-	sw	a2,0(sp)
-	lw	a5,18(t0)
-	slli	t2,s1,16
-	srli	a1,s1,16
-	srli	a2,t1,16
-	slli	s1,t1,16
-	slli	t1,a4,16
-	sw	t1,12(sp)
-	or	a1,a1,s1
-	lw	s1,12(sp)
-	sw	s0,8(sp)
-	srli	a4,a4,16
-	slli	s0,a3,16
-	slli	a5,a5,16
-	or	a2,a2,s0
-	srli	a3,a3,16
-	or	s0,a4,a5
-	lw	a4,18(t0)
-	lw	t1,8(sp)
-	or	a3,a3,s1
-	sw	s0,8(sp)
-	lw	s1,22(t0)
-	lw	s0,26(t0)
-	srli	a5,a4,16
-	or	t2,t1,t2
-	srli	a4,s1,16
-	slli	t1,s1,16
-	sw	a5,12(sp)
-	slli	s1,s0,16
-	lw	a5,26(t0)
-	lw	s0,0(sp)
-	sw	a1,4(a0)
-	lw	a1,12(sp)
-	sw	t2,0(a0)
-	lw	t2,8(sp)
-	sw	a3,12(a0)
-	srli	a5,a5,16
-	or	a3,a4,s1
-	slli	s0,s0,16
-	lw	a4,16(sp)
-	sw	a2,8(a0)
-	or	a2,a1,t1
-	or	t1,a5,s0
-	sw	t2,16(a0)
-	sw	a2,20(a0)
-	sw	a3,24(a0)
-	sw	t1,28(a0)
-	addi	a0,a0,32
-	addi	t0,t0,32
-	bne	a0,a4,.LBBmemcpyL17
-	lw	s1,32(sp)
-.LBBmemcpyL126:
-	lw	t0,28(sp)
-	addi	s1,s1,-18
-	addi	a0,t0,1
-	slli	s0,a0,4
-	j	.LBBmemcpyL143
-.LBBmemcpyL30:
-	mv	a4,t0
-	j	.LBBmemcpyL22
-.LBBmemcpyL28:
-	mv	a0,t0
-	j	.LBBmemcpyL20
-.LBBmemcpyL24:
-	mv	a5,a0
-	j	.LBBmemcpyL2
-.LBBmemcpyL147:
-	lw	a4,12(a1)
-	lw	t0,4(a1)
-	lw	t1,8(a1)
-	lw	s0,0(a1)
-	sw	a4,12(a5)
-	sw	t0,4(a5)
-	sw	t1,8(a5)
-	sw	s0,0(a5)
-	addi	a4,a1,16
-	addi	a5,a5,16
-	j	.LBBmemcpyL92
-.LBBmemcpyL25:
-	mv	a3,a5
-	j	.LBBmemcpyL6
-.LBBmemcpyL29:
-	mv	t0,a0
-	j	.LBBmemcpyL21
-.LBBmemcpyL27:
-	mv	t0,a5
-	j	.LBBmemcpyL19
-.LBBmemcpyL26:
-	mv	a2,a3
-	j	.LBBmemcpyL10
-	.size	memcpy, .-memcpy
-	.ident	"GCC: () 10.2.0"
+	.attribute	4, 4
+	.attribute	5, "rv32e2p0_m2p0"
+	.file	"memcpy.c"
+	.globl	memcpy                          # -- Begin function memcpy
+	.p2align	2
+	.type	memcpy,@function
+memcpy:                                 # @memcpy
+# %bb.0:
+	andi	a3, a1, 3
+	beqz	a3, .LBB0_16
+# %bb.1:
+	beqz	a2, .LBB0_5
+# %bb.2:
+	addi	a4, a1, 1
+	li	a5, 1
+	mv	a3, a0
+.LBB0_3:                                # =>This Inner Loop Header: Depth=1
+	lbu	t1, 0(a1)
+	mv	t0, a2
+	addi	a1, a1, 1
+	sb	t1, 0(a3)
+	addi	a3, a3, 1
+	andi	t1, a4, 3
+	addi	a2, a2, -1
+	beqz	t1, .LBB0_6
+# %bb.4:                                #   in Loop: Header=BB0_3 Depth=1
+	addi	a4, a4, 1
+	bne	t0, a5, .LBB0_3
+	j	.LBB0_6
+.LBB0_5:
+	mv	a3, a0
+.LBB0_6:
+	andi	a5, a3, 3
+	beqz	a5, .LBB0_17
+.LBB0_7:
+	li	a4, 32
+	bgeu	a2, a4, .LBB0_11
+# %bb.8:
+	li	a4, 16
+	bgeu	a2, a4, .LBB0_30
+.LBB0_9:
+	andi	a4, a2, 8
+	bnez	a4, .LBB0_31
+.LBB0_10:
+	andi	a4, a2, 4
+	bnez	a4, .LBB0_32
+	j	.LBB0_33
+.LBB0_11:
+	lw	a4, 0(a1)
+	li	t0, 3
+	beq	a5, t0, .LBB0_24
+# %bb.12:
+	li	t0, 2
+	bne	a5, t0, .LBB0_27
+# %bb.13:
+	sb	a4, 0(a3)
+	srli	a5, a4, 8
+	sb	a5, 1(a3)
+	addi	a3, a3, 2
+	addi	a2, a2, -2
+	addi	a1, a1, 16
+	li	a5, 17
+.LBB0_14:                               # =>This Inner Loop Header: Depth=1
+	lw	t0, -12(a1)
+	srli	a4, a4, 16
+	slli	t1, t0, 16
+	lw	t2, -8(a1)
+	or	a4, t1, a4
+	sw	a4, 0(a3)
+	srli	a4, t0, 16
+	slli	t0, t2, 16
+	lw	t1, -4(a1)
+	or	a4, t0, a4
+	sw	a4, 4(a3)
+	srli	t0, t2, 16
+	slli	t2, t1, 16
+	lw	a4, 0(a1)
+	or	t0, t2, t0
+	sw	t0, 8(a3)
+	srli	t0, t1, 16
+	slli	t1, a4, 16
+	or	t0, t1, t0
+	sw	t0, 12(a3)
+	addi	a3, a3, 16
+	addi	a2, a2, -16
+	addi	a1, a1, 16
+	bltu	a5, a2, .LBB0_14
+# %bb.15:
+	addi	a1, a1, -14
+	li	a4, 16
+	bltu	a2, a4, .LBB0_9
+	j	.LBB0_30
+.LBB0_16:
+	mv	a3, a0
+	andi	a5, a0, 3
+	bnez	a5, .LBB0_7
+.LBB0_17:
+	li	a4, 16
+	bltu	a2, a4, .LBB0_20
+# %bb.18:
+	li	a4, 15
+.LBB0_19:                               # =>This Inner Loop Header: Depth=1
+	lw	a5, 0(a1)
+	lw	t0, 4(a1)
+	lw	t1, 8(a1)
+	lw	t2, 12(a1)
+	sw	a5, 0(a3)
+	sw	t0, 4(a3)
+	sw	t1, 8(a3)
+	sw	t2, 12(a3)
+	addi	a1, a1, 16
+	addi	a2, a2, -16
+	addi	a3, a3, 16
+	bltu	a4, a2, .LBB0_19
+.LBB0_20:
+	li	a4, 8
+	bltu	a2, a4, .LBB0_22
+# %bb.21:
+	lw	a4, 0(a1)
+	lw	a5, 4(a1)
+	sw	a4, 0(a3)
+	sw	a5, 4(a3)
+	addi	a3, a3, 8
+	addi	a1, a1, 8
+.LBB0_22:
+	andi	a4, a2, 4
+	beqz	a4, .LBB0_33
+# %bb.23:
+	lw	a4, 0(a1)
+	sw	a4, 0(a3)
+	addi	a3, a3, 4
+	addi	a1, a1, 4
+	j	.LBB0_33
+.LBB0_24:
+	sb	a4, 0(a3)
+	addi	a3, a3, 1
+	addi	a2, a2, -1
+	addi	a1, a1, 16
+	li	a5, 18
+.LBB0_25:                               # =>This Inner Loop Header: Depth=1
+	lw	t0, -12(a1)
+	srli	a4, a4, 8
+	slli	t1, t0, 24
+	lw	t2, -8(a1)
+	or	a4, t1, a4
+	sw	a4, 0(a3)
+	srli	a4, t0, 8
+	slli	t0, t2, 24
+	lw	t1, -4(a1)
+	or	a4, t0, a4
+	sw	a4, 4(a3)
+	srli	t0, t2, 8
+	slli	t2, t1, 24
+	lw	a4, 0(a1)
+	or	t0, t2, t0
+	sw	t0, 8(a3)
+	srli	t0, t1, 8
+	slli	t1, a4, 24
+	or	t0, t1, t0
+	sw	t0, 12(a3)
+	addi	a3, a3, 16
+	addi	a2, a2, -16
+	addi	a1, a1, 16
+	bltu	a5, a2, .LBB0_25
+# %bb.26:
+	addi	a1, a1, -15
+	li	a4, 16
+	bltu	a2, a4, .LBB0_9
+	j	.LBB0_30
+.LBB0_27:
+	sb	a4, 0(a3)
+	srli	a5, a4, 8
+	sb	a5, 1(a3)
+	srli	a5, a4, 16
+	sb	a5, 2(a3)
+	addi	a3, a3, 3
+	addi	a2, a2, -3
+	addi	a1, a1, 16
+	li	a5, 16
+.LBB0_28:                               # =>This Inner Loop Header: Depth=1
+	lw	t0, -12(a1)
+	srli	a4, a4, 24
+	slli	t1, t0, 8
+	lw	t2, -8(a1)
+	or	a4, t1, a4
+	sw	a4, 0(a3)
+	srli	a4, t0, 24
+	slli	t0, t2, 8
+	lw	t1, -4(a1)
+	or	a4, t0, a4
+	sw	a4, 4(a3)
+	srli	t0, t2, 24
+	slli	t2, t1, 8
+	lw	a4, 0(a1)
+	or	t0, t2, t0
+	sw	t0, 8(a3)
+	srli	t0, t1, 24
+	slli	t1, a4, 8
+	or	t0, t1, t0
+	sw	t0, 12(a3)
+	addi	a3, a3, 16
+	addi	a2, a2, -16
+	addi	a1, a1, 16
+	bltu	a5, a2, .LBB0_28
+# %bb.29:
+	addi	a1, a1, -13
+	li	a4, 16
+	bltu	a2, a4, .LBB0_9
+.LBB0_30:
+	lbu	a4, 0(a1)
+	lbu	a5, 1(a1)
+	lbu	t0, 2(a1)
+	sb	a4, 0(a3)
+	sb	a5, 1(a3)
+	lbu	a4, 3(a1)
+	sb	t0, 2(a3)
+	lbu	a5, 4(a1)
+	lbu	t0, 5(a1)
+	sb	a4, 3(a3)
+	lbu	a4, 6(a1)
+	sb	a5, 4(a3)
+	sb	t0, 5(a3)
+	lbu	a5, 7(a1)
+	sb	a4, 6(a3)
+	lbu	a4, 8(a1)
+	lbu	t0, 9(a1)
+	sb	a5, 7(a3)
+	lbu	a5, 10(a1)
+	sb	a4, 8(a3)
+	sb	t0, 9(a3)
+	lbu	a4, 11(a1)
+	sb	a5, 10(a3)
+	lbu	a5, 12(a1)
+	lbu	t0, 13(a1)
+	sb	a4, 11(a3)
+	lbu	a4, 14(a1)
+	sb	a5, 12(a3)
+	sb	t0, 13(a3)
+	lbu	a5, 15(a1)
+	sb	a4, 14(a3)
+	addi	a1, a1, 16
+	addi	a4, a3, 16
+	sb	a5, 15(a3)
+	mv	a3, a4
+	andi	a4, a2, 8
+	beqz	a4, .LBB0_10
+.LBB0_31:
+	lbu	a4, 0(a1)
+	lbu	a5, 1(a1)
+	lbu	t0, 2(a1)
+	sb	a4, 0(a3)
+	sb	a5, 1(a3)
+	lbu	a4, 3(a1)
+	sb	t0, 2(a3)
+	lbu	a5, 4(a1)
+	lbu	t0, 5(a1)
+	sb	a4, 3(a3)
+	lbu	a4, 6(a1)
+	sb	a5, 4(a3)
+	sb	t0, 5(a3)
+	lbu	a5, 7(a1)
+	sb	a4, 6(a3)
+	addi	a1, a1, 8
+	addi	a4, a3, 8
+	sb	a5, 7(a3)
+	mv	a3, a4
+	andi	a4, a2, 4
+	beqz	a4, .LBB0_33
+.LBB0_32:
+	lbu	a4, 0(a1)
+	lbu	a5, 1(a1)
+	lbu	t0, 2(a1)
+	sb	a4, 0(a3)
+	sb	a5, 1(a3)
+	lbu	a4, 3(a1)
+	sb	t0, 2(a3)
+	addi	a1, a1, 4
+	addi	a5, a3, 4
+	sb	a4, 3(a3)
+	mv	a3, a5
+.LBB0_33:
+	andi	a4, a2, 2
+	bnez	a4, .LBB0_36
+# %bb.34:
+	andi	a2, a2, 1
+	bnez	a2, .LBB0_37
+.LBB0_35:
+	ret
+.LBB0_36:
+	lbu	a4, 0(a1)
+	lbu	a5, 1(a1)
+	sb	a4, 0(a3)
+	addi	a1, a1, 2
+	addi	a4, a3, 2
+	sb	a5, 1(a3)
+	mv	a3, a4
+	andi	a2, a2, 1
+	beqz	a2, .LBB0_35
+.LBB0_37:
+	lbu	a1, 0(a1)
+	sb	a1, 0(a3)
+	ret
+.Lfunc_end0:
+	.size	memcpy, .Lfunc_end0-memcpy
+                                        # -- End function
+	.ident	"clang version 18.1.8 (https://github.com/llvm/llvm-project.git 3b5b5c1ec4a3095ab096dd780e84d7ab81f3d7ff)"
+	.section	".note.GNU-stack","",@progbits
+	.addrsig

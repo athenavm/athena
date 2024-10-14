@@ -1,10 +1,10 @@
-// This is musl-libc memset commit 0784374d561435f7c787a555aeab8ede699ed298
+// This is musl-libc commit 0784374d561435f7c787a555aeab8ede699ed298
 //
 // src/string/memset.c
 //
 // This was compiled into assembly with:
 //
-// riscv64-unknown-elf-gcc -march=rv32em -mabi=ilp32e -O3 -nostdlib -fno-builtin -funroll-loops -I../../obj/include -I../../include -S memset.c -o memset.s
+// clang-18 -target riscv32 -march=rv32em -mabi=ilp32e -O3 -nostdlib -fno-builtin -funroll-loops -S memset.c -o memset.s
 //
 // and labels manually updated to not conflict.
 //
@@ -201,166 +201,69 @@
 // negated the permissions granted in the license. In the spirit of
 // permissive licensing, and of not having licensing issues being an
 // obstacle to adoption, that text has been removed.
-	.file	"memset.c"
-	.option nopic
-	.attribute arch, "rv32em"
-	.attribute unaligned_access, 0
-	.attribute stack_align, 4
 	.text
-	.align	2
-	.globl	memset
-	.type	memset, @function
-memset:
-	beq	a2,zero,.LBBmemsetL2
-	andi	a5,a1,0xff
-	sb	a5,0(a0)
-	add	a3,a0,a2
-	sb	a5,-1(a3)
-	li	a4,2
-	bleu	a2,a4,.LBBmemsetL2
-	sb	a5,1(a0)
-	sb	a5,2(a0)
-	sb	a5,-2(a3)
-	sb	a5,-3(a3)
-	li	t1,6
-	bleu	a2,t1,.LBBmemsetL2
-	sb	a5,3(a0)
-	sb	a5,-4(a3)
-	li	t0,8
-	bleu	a2,t0,.LBBmemsetL2
-	andi	a1,a1,255
-	slli	a3,a1,8
-	neg	t2,a0
-	andi	a5,t2,3
-	add	t1,a3,a1
-	sub	a2,a2,a5
-	slli	a1,t1,16
-	add	t2,a0,a5
-	add	a3,t1,a1
-	andi	a5,a2,-4
-	sw	a3,0(t2)
-	add	a2,t2,a5
-	sw	a3,-4(a2)
-	bleu	a5,t0,.LBBmemsetL2
-	sw	a3,4(t2)
-	sw	a3,8(t2)
-	sw	a3,-12(a2)
-	sw	a3,-8(a2)
-	li	t0,24
-	bleu	a5,t0,.LBBmemsetL2
-	andi	t1,t2,4
-	sw	a3,12(t2)
-	sw	a3,16(t2)
-	sw	a3,20(t2)
-	sw	a3,24(t2)
-	addi	t0,t1,24
-	sw	a3,-28(a2)
-	sw	a3,-24(a2)
-	sw	a3,-20(a2)
-	sw	a3,-16(a2)
-	li	a1,31
-	sub	a2,a5,t0
-	add	a5,t2,t0
-	bleu	a2,a1,.LBBmemsetL2
-	addi	t2,a2,-32
-	andi	t1,t2,-32
-	srli	a1,t1,5
-	addi	t2,a1,1
-	addi	a2,t1,32
-	andi	t0,t2,7
-	add	a2,a5,a2
-	beq	t0,zero,.LBBmemsetL3
-	li	t1,1
-	beq	t0,t1,.LBBmemsetL28
-	beq	t0,a4,.LBBmemsetL29
-	li	a4,3
-	beq	t0,a4,.LBBmemsetL30
-	li	a1,4
-	beq	t0,a1,.LBBmemsetL31
-	li	t2,5
-	beq	t0,t2,.LBBmemsetL32
-	li	t1,6
-	beq	t0,t1,.LBBmemsetL33
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-.LBBmemsetL33:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-.LBBmemsetL32:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-.LBBmemsetL31:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-.LBBmemsetL30:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-.LBBmemsetL29:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-.LBBmemsetL28:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	addi	a5,a5,32
-	beq	a5,a2,.LBBmemsetL38
-.LBBmemsetL3:
-	sw	a3,0(a5)
-	sw	a3,8(a5)
-	sw	a3,16(a5)
-	sw	a3,24(a5)
-	sw	a3,32(a5)
-	sw	a3,40(a5)
-	sw	a3,48(a5)
-	sw	a3,56(a5)
-	sw	a3,64(a5)
-	sw	a3,72(a5)
-	sw	a3,80(a5)
-	sw	a3,88(a5)
-	sw	a3,96(a5)
-	sw	a3,104(a5)
-	sw	a3,112(a5)
-	sw	a3,120(a5)
-	sw	a3,128(a5)
-	sw	a3,136(a5)
-	sw	a3,144(a5)
-	sw	a3,152(a5)
-	sw	a3,160(a5)
-	sw	a3,168(a5)
-	sw	a3,176(a5)
-	sw	a3,184(a5)
-	sw	a3,192(a5)
-	sw	a3,200(a5)
-	sw	a3,208(a5)
-	sw	a3,216(a5)
-	sw	a3,224(a5)
-	sw	a3,232(a5)
-	sw	a3,240(a5)
-	sw	a3,248(a5)
-	addi	a5,a5,256
-	bne	a5,a2,.LBBmemsetL3
-.LBBmemsetL2:
+	.attribute	4, 4
+	.attribute	5, "rv32e2p0_m2p0"
+	.file	"memset.c"
+	.globl	memset                          # -- Begin function memset
+	.p2align	2
+	.type	memset,@function
+memset:                                 # @memset
+# %bb.0:
+	beqz	a2, .LBB0memset_7
+# %bb.1:
+	sb	a1, 0(a0)
+	add	a3, a0, a2
+	li	a4, 3
+	sb	a1, -1(a3)
+	bltu	a2, a4, .LBB0memset_7
+# %bb.2:
+	sb	a1, 1(a0)
+	sb	a1, 2(a0)
+	sb	a1, -2(a3)
+	li	a4, 7
+	sb	a1, -3(a3)
+	bltu	a2, a4, .LBB0memset_7
+# %bb.3:
+	sb	a1, 3(a0)
+	li	a4, 9
+	sb	a1, -4(a3)
+	bltu	a2, a4, .LBB0memset_7
+# %bb.4:
+	neg	a3, a0
+	andi	a5, a3, 3
+	add	a3, a0, a5
+	sub	a2, a2, a5
+	andi	a5, a2, -4
+	andi	a1, a1, 255
+	lui	a2, 4112
+	addi	a2, a2, 257
+	mul	a1, a1, a2
+	sw	a1, 0(a3)
+	add	a2, a3, a5
+	sw	a1, -4(a2)
+	bltu	a5, a4, .LBB0memset_7
+# %bb.5:
+	sw	a1, 4(a3)
+	sw	a1, 8(a3)
+	sw	a1, -12(a2)
+	li	a4, 25
+	sw	a1, -8(a2)
+	bltu	a5, a4, .LBB0memset_7
+# %bb.6:
+	sw	a1, 12(a3)
+	sw	a1, 16(a3)
+	sw	a1, 20(a3)
+	sw	a1, 24(a3)
+	sw	a1, -28(a2)
+	sw	a1, -24(a2)
+	sw	a1, -20(a2)
+	sw	a1, -16(a2)
+.LBB0memset_7:
 	ret
-.LBBmemsetL38:
-	ret
-	.size	memset, .-memset
-	.ident	"GCC: () 10.2.0"
+.Lfunc_end0:
+	.size	memset, .Lfunc_end0-memset
+                                        # -- End function
+	.ident	"clang version 18.1.8 (https://github.com/llvm/llvm-project.git 3b5b5c1ec4a3095ab096dd780e84d7ab81f3d7ff)"
+	.section	".note.GNU-stack","",@progbits
+	.addrsig
