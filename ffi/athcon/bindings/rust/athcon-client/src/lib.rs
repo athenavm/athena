@@ -53,7 +53,7 @@ impl AthconVm {
     destination: &Address,
     sender: &Address,
     input: &[u8],
-    value: &[u8; 32],
+    value: u64,
     code: &[u8],
   ) -> (Vec<u8>, i64, StatusCode) {
     let ext_ctx = host::ExtendedContext { hctx: ctx };
@@ -67,7 +67,7 @@ impl AthconVm {
       sender: ffi::athcon_address { bytes: *sender },
       input_data: input.as_ptr(),
       input_size: input.len(),
-      value: ffi::athcon_uint256be { bytes: *value },
+      value,
       code: code.as_ptr(),
       code_size: code.len(),
     };

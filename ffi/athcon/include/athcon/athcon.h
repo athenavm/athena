@@ -117,7 +117,7 @@ extern "C"
      *
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.
      */
-    athcon_uint256be value;
+    uint64_t value;
 
     /**
      * The code to be executed.
@@ -133,7 +133,7 @@ extern "C"
   /** The transaction and block data for execution. */
   struct athcon_tx_context
   {
-    athcon_uint256be tx_gas_price; /**< The transaction gas price. */
+    uint64_t tx_gas_price;         /**< The transaction gas price. */
     athcon_address tx_origin;      /**< The transaction origin account. */
     int64_t block_height;          /**< The block height. */
     int64_t block_timestamp;       /**< The block timestamp. */
@@ -553,8 +553,8 @@ extern "C"
    * @param address  The address of the account.
    * @return         The balance of the given account or 0 if the account does not exist.
    */
-  typedef athcon_uint256be (*athcon_get_balance_fn)(struct athcon_host_context *context,
-                                                    const athcon_address *address);
+  typedef uint64_t (*athcon_get_balance_fn)(struct athcon_host_context *context,
+                                            const athcon_address *address);
 
   /**
    * Pointer to the callback function supporting Athena calls.
