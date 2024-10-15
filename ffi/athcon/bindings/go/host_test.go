@@ -4,10 +4,9 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/binary"
-	"testing"
-
-	"github.com/spacemeshos/go-scale"
+	"github.com/ChainSafe/gossamer/pkg/scale"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 //go:generate cp ../../../../tests/minimal/getbalance.bin .
@@ -98,13 +97,11 @@ func TestCall(t *testing.T) {
 	host := &testHostContext{}
 	addr := Address{}
 	payload := ExecutionPayload{
-		Args: []byte{2, 0, 0, 0},
+		Input: []byte{2, 0, 0, 0},
 	}
-	buf := bytes.NewBuffer(nil)
-	encoder := scale.NewEncoder(buf)
-	_, err := payload.EncodeScale(encoder)
+	encoded, err := scale.Marshal(payload)
 	require.NoError(t, err)
-	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, buf.Bytes(), 0, RECURSIVE_CALL_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 10000, addr, addr, encoded, 0, RECURSIVE_CALL_TEST)
 	output := result.Output
 
 	if len(output) != 4 {
