@@ -223,6 +223,7 @@ dependencies = [
  "bytemuck",
  "hex",
  "parity-scale-codec",
+ "serde",
  "tracing",
 ]
 

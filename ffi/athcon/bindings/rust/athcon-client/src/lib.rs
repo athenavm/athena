@@ -78,7 +78,6 @@ impl AthconVm {
       let result = execute_func(
         self.handle,
         &self.host_interface,
-        // ext_ctx as *mut ffi::athcon_host_context,
         std::mem::transmute::<&host::ExtendedContext, *mut ffi::athcon_host_context>(&ext_ctx),
         rev,
         &athcon_message,

@@ -131,32 +131,41 @@ impl Drop for HostContext {
   }
 }
 
-/// Test the Rust host interface to athcon
-/// We don't use this in production since Athena provides only the VM, not the Host, but
-/// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
-#[test]
-fn test_rust_host() {
-  let vm = AthconVm::new();
-  println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use athena_interface::ExecutionPayload;
 
-  let mut host = HostContext::new(vm);
+  /// Test the Rust host interface to athcon
+  /// We don't use this in production since Athena provides only the VM, not the Host, but
+  /// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
+  #[test]
+  fn test_rust_host() {
+    let vm = AthconVm::new();
+    println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
 
-  let (output, gas_left, status_code) = host.vm.clone().execute(
-    &mut host,
-    Revision::ATHCON_FRONTIER,
-    MessageKind::ATHCON_CALL,
-    0,
-    50000000,
-    &ADDRESS_ALICE,
-    &[128u8; ADDRESS_LENGTH],
-    // input payload consists of empty method selector (4 bytes) + simple LE integer argument (4 bytes)
-    [0u8, 0u8, 0u8, 0u8, 3u8, 0u8, 0u8, 0u8].as_ref(),
-    0,
-    CONTRACT_CODE,
-  );
-  println!("Output:  {:?}", hex::encode(&output));
-  println!("GasLeft: {:?}", gas_left);
-  println!("Status:  {:?}", status_code);
-  assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
-  assert_eq!(u32::from_le_bytes(output.as_slice().try_into().unwrap()), 2);
+    let mut host = HostContext::new(vm);
+    let payload = ExecutionPayload {
+      selector: None,
+      input: vec![3u8, 0, 0, 0],
+    };
+
+    let (output, gas_left, status_code) = host.vm.clone().execute(
+      &mut host,
+      Revision::ATHCON_FRONTIER,
+      MessageKind::ATHCON_CALL,
+      0,
+      50000000,
+      &ADDRESS_ALICE,
+      &[128u8; ADDRESS_LENGTH],
+      payload.to_scale().as_slice(),
+      0,
+      CONTRACT_CODE,
+    );
+    println!("Output:  {:?}", hex::encode(&output));
+    println!("GasLeft: {:?}", gas_left);
+    println!("Status:  {:?}", status_code);
+    assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
+    assert_eq!(u32::from_le_bytes(output.as_slice().try_into().unwrap()), 2);
+  }
 }

@@ -88,21 +88,18 @@ impl Syscall for SyscallHostCall {
 
     // read the input length from the next register
     let len = ctx.rt.register(Register::X12) as usize;
-    if len % 4 != 0 {
-      tracing::debug!("host system call input (a2/x12) not aligned to 4 bytes");
-      return Err(StatusCode::InvalidSyscallArgument);
-    }
 
     // `len` is denominated in number of bytes; we read words in chunks of four bytes
     // then convert into a byte array.
     let input = if len > 0 {
-      let input_words = ctx.slice(arg2, len / 4);
-      Some(
-        input_words
-          .into_iter()
-          .flat_map(|word| word.to_le_bytes())
-          .collect(),
-      )
+      // Round up the length to the nearest word boundary
+      let input_words = ctx.slice(arg2, (len + 3) / 4);
+      let input_bytes = input_words
+        .into_iter()
+        .flat_map(|word| word.to_le_bytes())
+        .collect::<Vec<u8>>();
+      // this removes any extra padding from the input
+      Some(input_bytes[..len].to_vec())
     } else {
       None
     };

@@ -47,7 +47,11 @@ where
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
     let mut stdin = AthenaStdin::new();
-    let execution_payload = match ExecutionPayload::from_scale(&msg.input_data) {
+    let execution_payload = match msg
+      .input_data
+      .map_or(Ok(ExecutionPayload::default()), |data| {
+        ExecutionPayload::from_scale(&data)
+      }) {
       Ok(p) => p,
       Err(e) => {
         tracing::info!("Failed to deserialize execution payload: {e:?}");
@@ -184,7 +188,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(payload.to_scale().unwrap()),
+        Some(payload.to_scale()),
         Balance::default(),
         vec![],
       ),
@@ -207,7 +211,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(payload.to_scale().unwrap()),
+        Some(payload.to_scale()),
         Balance::default(),
         vec![],
       ),
@@ -230,7 +234,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(payload.to_scale().unwrap()),
+        Some(payload.to_scale()),
         Balance::default(),
         vec![],
       ),
@@ -316,14 +320,17 @@ mod tests {
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
+    let payload = ExecutionPayload {
+      selector: None,
+      input: vec![8, 0, 0, 0],
+    };
     let msg = AthenaMessage::new(
       MessageKind::Call,
       0,
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      // four byte method selector followed by four byte input
-      Some(vec![0, 0, 0, 0, 8, 0, 0, 0]),
+      Some(payload.to_scale()),
       0,
       vec![],
     );

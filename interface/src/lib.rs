@@ -8,6 +8,7 @@ pub use context::*;
 use blake3::{hash, Hasher};
 use hex;
 use parity_scale_codec::{Decode, Encode};
+use serde::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -20,7 +21,7 @@ pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 pub type MethodSelectorBytes = [u8; METHOD_SELECTOR_LENGTH];
 
-#[derive(Clone, Debug, Decode, Encode, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
@@ -39,7 +40,7 @@ impl std::fmt::Display for MethodSelector {
   }
 }
 
-#[derive(Clone, Debug, Decode, Encode, PartialEq)]
+#[derive(Clone, Debug, Decode, Default, Encode, PartialEq)]
 pub struct ExecutionPayload {
   pub selector: Option<MethodSelector>,
   pub input: Vec<u8>,
@@ -878,10 +879,10 @@ mod tests {
   #[test]
   fn test_method_selector() {
     let selector = MethodSelector::from("test");
-    assert_eq!(selector.0, [0x15, 0x32, 0x60, 0x50]);
+    assert_eq!(selector.0, [72, 120, 202, 4]);
 
     let selector = MethodSelector::from("test2");
-    assert_eq!(selector.0, [0x7A, 0xCA, 0xAC, 0xF0]);
+    assert_eq!(selector.0, [116, 112, 75, 76]);
   }
 
   #[test]
