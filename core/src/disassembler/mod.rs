@@ -1,5 +1,3 @@
-use hex;
-
 mod elf;
 mod instruction;
 

@@ -221,7 +221,8 @@ dependencies = [
  "bincode",
  "blake3",
  "bytemuck",
- "serde",
+ "hex",
+ "parity-scale-codec",
  "tracing",
 ]
 

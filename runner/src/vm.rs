@@ -1,9 +1,7 @@
-use hex;
-
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
-  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, MethodSelector, SetOptionError, StatusCode, VmInterface, METHOD_SELECTOR_LENGTH,
+  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionPayload,
+  ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -49,36 +47,39 @@ where
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
     let mut stdin = AthenaStdin::new();
-
-    // input data is optional
-    let execution_result = if let Some(input_data) = msg.input_data {
-      // extract method selector from input data
-      if input_data.len() < METHOD_SELECTOR_LENGTH {
-        tracing::info!("Method selector missing from input");
+    let execution_payload = match ExecutionPayload::from_scale(&msg.input_data) {
+      Ok(p) => p,
+      Err(e) => {
+        tracing::info!("Failed to deserialize execution payload: {e:?}");
         return ExecutionResult::new(StatusCode::Failure, 0, None, None);
       }
-      let method_selector = MethodSelector::from(&input_data[..METHOD_SELECTOR_LENGTH]);
-
-      // write the remainder to stdin
-      stdin.write_vec(input_data[METHOD_SELECTOR_LENGTH..].to_vec());
-      tracing::info!(
-        "Executing method selector 0x{} with input length {}",
-        hex::encode(method_selector.bytes()),
-        input_data.len() - METHOD_SELECTOR_LENGTH
-      );
-      self.client.execute_function(
-        code,
-        &method_selector,
-        stdin,
-        Some(host),
-        Some(msg.gas),
-        Some(context),
-      )
-    } else {
-      tracing::info!("Executing default method without input");
-      self
-        .client
-        .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+    };
+    let input_len = execution_payload.input.len();
+    if input_len > 0 {
+      stdin.write_vec(execution_payload.input);
+    }
+    let execution_result = match execution_payload.selector {
+      Some(method) => {
+        tracing::info!(
+          "Executing method 0x{} with input length {}",
+          method,
+          input_len,
+        );
+        self.client.execute_function(
+          code,
+          &method,
+          stdin,
+          Some(host),
+          Some(msg.gas),
+          Some(context),
+        )
+      }
+      None => {
+        tracing::info!("Executing default method with input length {}", input_len,);
+        self
+          .client
+          .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+      }
     };
 
     match execution_result {
@@ -107,8 +108,8 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MethodSelector, MockHost,
-    ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, ExecutionPayload, MessageKind, MethodSelector,
+    MockHost, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -170,9 +171,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
-    let selector = MethodSelector::from("athexp_test1");
-    let mut combined_input = selector.bytes().to_vec();
-    combined_input.extend_from_slice(&input);
+    let payload = ExecutionPayload {
+      selector: Some(MethodSelector::from("athexp_test1")),
+      input: input.clone(),
+    };
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -182,7 +184,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(combined_input),
+        Some(payload.to_scale().unwrap()),
         Balance::default(),
         vec![],
       ),
@@ -192,7 +194,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let selector = MethodSelector::from("athexp_test2");
+    let payload = ExecutionPayload {
+      selector: Some(MethodSelector::from("athexp_test2")),
+      input: input.clone(),
+    };
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -202,7 +207,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(selector.bytes().to_vec()),
+        Some(payload.to_scale().unwrap()),
         Balance::default(),
         vec![],
       ),
@@ -212,7 +217,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let selector = MethodSelector::from("athexp_test3");
+    let payload = ExecutionPayload {
+      selector: Some(MethodSelector::from("athexp_test3")),
+      input,
+    };
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -222,7 +230,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(selector.bytes().to_vec()),
+        Some(payload.to_scale().unwrap()),
         Balance::default(),
         vec![],
       ),

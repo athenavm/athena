@@ -9,7 +9,7 @@ pub fn call(address: Address, input: Option<Vec<u8>>, method: Option<&str>, amou
     selector: method.map(MethodSelector::from),
     input: input.unwrap_or_default(),
   };
-  let input_payload = bincode::serialize(&payload).unwrap();
+  let input_payload = payload.to_scale();
   let input_len = input_payload.len();
   let input = crate::bytes_to_u32_vec(input_payload);
   athena_vm::syscalls::call(address.as_ptr(), input.as_ptr(), input_len, amount.as_ptr());

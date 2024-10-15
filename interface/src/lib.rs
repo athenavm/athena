@@ -6,7 +6,8 @@ mod context;
 pub use context::*;
 
 use blake3::{hash, Hasher};
-use serde::{Deserialize, Serialize};
+use hex;
+use parity_scale_codec::{Decode, Encode};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -19,7 +20,7 @@ pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 pub type MethodSelectorBytes = [u8; METHOD_SELECTOR_LENGTH];
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, Decode, Encode, Eq, PartialEq, PartialOrd, Ord)]
 pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
@@ -32,10 +33,28 @@ impl From<&str> for MethodSelector {
   }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl std::fmt::Display for MethodSelector {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", hex::encode(self.0))
+  }
+}
+
+#[derive(Clone, Debug, Decode, Encode, PartialEq)]
 pub struct ExecutionPayload {
   pub selector: Option<MethodSelector>,
   pub input: Vec<u8>,
+}
+
+impl ExecutionPayload {
+  // Encode the struct to a byte vector using SCALE
+  pub fn to_scale(&self) -> Vec<u8> {
+    self.encode()
+  }
+
+  // Decode the struct from a byte slice using SCALE
+  pub fn from_scale(bytes: &[u8]) -> Result<Self, parity_scale_codec::Error> {
+    Self::decode(&mut &*bytes)
+  }
 }
 
 pub struct AddressWrapper(Address);
@@ -714,7 +733,6 @@ pub trait VmInterface<T: HostInterface> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use bincode;
 
   #[test]
   fn test_get_storage() {
@@ -868,18 +886,47 @@ mod tests {
 
   #[test]
   fn test_execution_payload() {
+    let payload = ExecutionPayload {
+      selector: None,
+      input: vec![],
+    };
+    let encoded = payload.to_scale();
+    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
+    assert_eq!(decoded, payload);
+
     let selector = MethodSelector::from("test");
-    let input_bytes = vec![0u8, 1, 2, 3];
     let payload = ExecutionPayload {
       selector: Some(selector.clone()),
-      input: input_bytes.clone(),
+      input: vec![],
     };
-    let mut encoded_bytes = selector.0.to_vec();
-    encoded_bytes.extend(&input_bytes);
-    assert_eq!(
-      bincode::serialize(&payload).unwrap(),
-      vec![0x94, 0x04, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04]
-    );
-    assert_eq!(bincode::serialize(&payload).unwrap(), encoded_bytes);
+    let encoded = payload.to_scale();
+    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
+    assert_eq!(decoded, payload);
+
+    let selector = MethodSelector::from("test");
+    let payload = ExecutionPayload {
+      selector: Some(selector.clone()),
+      input: vec![0u8],
+    };
+    let encoded = payload.to_scale();
+    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
+    assert_eq!(decoded, payload);
+
+    let selector = MethodSelector::from("test");
+    let payload = ExecutionPayload {
+      selector: Some(selector.clone()),
+      input: vec![0u8, 1, 2, 3],
+    };
+    let encoded = payload.to_scale();
+    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
+    assert_eq!(decoded, payload);
+
+    let payload = ExecutionPayload {
+      selector: None,
+      input: vec![0u8, 1, 2, 3],
+    };
+    let encoded = payload.to_scale();
+    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
+    assert_eq!(decoded, payload);
   }
 }
