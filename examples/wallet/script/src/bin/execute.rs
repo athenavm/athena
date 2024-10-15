@@ -122,7 +122,10 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{Address, HostDynamicContext, HostStaticContext, MockHost, ADDRESS_ALICE};
+  use athena_interface::{
+    Address, HostDynamicContext, HostStaticContext, MethodSelector, MethodSelectorAsString,
+    MockHost, ADDRESS_ALICE,
+  };
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
   use parity_scale_codec::Encode;
@@ -147,9 +150,10 @@ mod tests {
     stdin.write_slice(wallet_state);
     stdin.write_vec(code.encode());
 
+    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_deploy"));
     let result = ExecutionClient::new().execute_function(
       super::ELF,
-      "athexp_deploy",
+      selector,
       stdin.clone(),
       Some(&mut host),
       Some(25000000),
