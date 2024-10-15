@@ -1,137 +1,91 @@
 //! Implements athcon_encode_tx
 use athcon_sys as ffi;
-use athena_interface::transaction::{Encode, Transaction};
-use athena_vm_sdk::{Pubkey, SendArguments};
+use athena_interface::{
+  transaction::{Encode, Payload},
+  MethodSelector,
+};
+use athena_vm_sdk::{Pubkey, SpendArguments};
 
-/// Encode Athena Transaction into bytes.
+/// Encode Athena Spawn transaction payload.
 ///
 /// # Arguments
-/// - `principal` - The transaction's principal account.
-/// - `template` - Optional transaction's template account.
-/// - (`method`, `method_size`) - Optional method to call
-/// - `nonce` - The transaction's nonce
-/// - (`args`, `args_size`) - Optional transaction's serialized arguments.
+/// - `pubkey`: The public key of the owner.
 ///
 /// # Safety
-/// - the caller is responsible for freeing the returned vector
-///   via the `athcon_free_vector` function.
-#[no_mangle]
-unsafe extern "C" fn athcon_encode_tx(
-  principal: *const ffi::athcon_address,
-  template: *const ffi::athcon_address,
-  method: *const u8,
-  method_size: usize,
-  nonce: u64,
-  args: *const u8,
-  args_size: usize,
-) -> *mut ffi::athcon_bytes {
-  let principal = &(*principal).bytes;
-  let template_o = template.as_ref().map(|t| t.bytes);
-  let method = if method.is_null() {
-    &[]
-  } else {
-    std::slice::from_raw_parts(method, method_size)
-  };
-  let args = if args.is_null() {
-    &[]
-  } else {
-    std::slice::from_raw_parts(args, args_size)
-  };
-
-  let tx = Transaction::new(nonce, *principal, template_o, method, args);
-
-  let (ptr, size) = crate::allocate_output_data(tx.encode());
-
-  Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
-}
-
+/// The caller is responsible for freeing the returned bytes
+/// via the `athcon_free_bytes` function.
 #[no_mangle]
 unsafe extern "C" fn athcon_encode_tx_spawn(
   pubkey: *const ffi::athcon_bytes32,
 ) -> *mut ffi::athcon_bytes {
-  let encoded = Pubkey((*pubkey).bytes).encode();
-  let (ptr, size) = crate::allocate_output_data(encoded);
+  let args = Pubkey((*pubkey).bytes);
+  let payload = Payload::new(Some(MethodSelector::from("athexp_spawn")), args.encode());
 
+  let (ptr, size) = crate::allocate_output_data(payload.encode());
   Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
 }
 
+/// Encode Athena Spend transaction payload.
+///
+/// # Arguments
+/// - `recipient`: The address of the recipient.
+/// - `amount`: The amount of tokens to send.
+///
+/// # Safety
+/// The caller is responsible for freeing the returned bytes
+/// via the `athcon_free_bytes` function.
 #[no_mangle]
-unsafe extern "C" fn athcon_encode_tx_send(
+unsafe extern "C" fn athcon_encode_tx_spend(
   recipient: *const ffi::athcon_address,
   amount: u64,
 ) -> *mut ffi::athcon_bytes {
-  let args = SendArguments {
+  let args = SpendArguments {
     recipient: (*recipient).bytes,
     amount,
   };
+  let payload = Payload::new(Some(MethodSelector::from("athexp_spend")), args.encode());
 
-  let (ptr, size) = crate::allocate_output_data(args.encode());
-
+  let (ptr, size) = crate::allocate_output_data(payload.encode());
   Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
 }
 
 #[cfg(test)]
 mod tests {
   use athcon_sys as ffi;
-  use athena_interface::transaction::Encode;
+  use athena_interface::{
+    transaction::{Decode, Payload},
+    MethodSelector,
+  };
+  use athena_vm_sdk::{Pubkey, SpendArguments};
+
+  use crate::encode_tx::{athcon_encode_tx_spawn, athcon_encode_tx_spend};
 
   #[test]
-  fn encoding_tx() {
-    let tx = athena_interface::transaction::Transaction::new(
-      42,
-      [12; 24],
-      Some([34; 24]),
-      vec![5, 6, 7],
-      [8, 9, 0],
-    );
+  fn encoding_spawn_tx() {
+    let pubkey = Pubkey([1; 32]);
+    let encoded_bytes = unsafe { athcon_encode_tx_spawn(&ffi::athcon_bytes32 { bytes: pubkey.0 }) };
 
-    let encoded = tx.encode();
-
-    // encode via the C interface
-    let principal = ffi::athcon_address::from(tx.principal_account);
-    let template = tx.template.map(ffi::athcon_address::from);
-    let template_ptr = template
-      .as_ref()
-      .map(|a| a as *const _)
-      .unwrap_or(std::ptr::null());
-    let encoded_bytes = unsafe {
-      super::athcon_encode_tx(
-        &principal as *const _,
-        template_ptr,
-        tx.method.as_ptr(),
-        tx.method.len(),
-        tx.nonce,
-        tx.args.as_ptr(),
-        tx.args.len(),
-      )
-    };
-
-    let encoded_slice = unsafe { (*encoded_bytes).as_slice() };
-    assert_eq!(encoded_slice, encoded);
+    let mut encoded_slice = unsafe { (*encoded_bytes).as_slice() };
+    let tx = Payload::decode(&mut encoded_slice).unwrap();
     unsafe { crate::bytes::athcon_free_bytes(encoded_bytes) };
+
+    assert_eq!(tx.method, Some(MethodSelector::from("athexp_spawn")));
+    assert_eq!(Pubkey::decode(&mut tx.args.as_slice()).unwrap(), pubkey);
   }
-
   #[test]
-  fn encoding_without_method_and_args() {
-    let tx = athena_interface::transaction::Transaction::new(42, [12; 24], None, [], []);
-    let encoded = tx.encode();
+  fn encoding_spend_tx() {
+    let address = [0x1C; 24];
+    let amount = 781237;
+    let encoded_bytes =
+      unsafe { athcon_encode_tx_spend(&ffi::athcon_address { bytes: address }, amount) };
 
-    // encode via the C interface
-    let principal = ffi::athcon_address::from(tx.principal_account);
-    let encoded_bytes = unsafe {
-      super::athcon_encode_tx(
-        &principal as *const _,
-        std::ptr::null(),
-        std::ptr::null(),
-        0,
-        tx.nonce,
-        std::ptr::null(),
-        0,
-      )
-    };
-
-    let encoded_slice = unsafe { (*encoded_bytes).as_slice() };
-    assert_eq!(encoded_slice, encoded);
+    let mut encoded_slice = unsafe { (*encoded_bytes).as_slice() };
+    let tx = Payload::decode(&mut encoded_slice).unwrap();
     unsafe { crate::bytes::athcon_free_bytes(encoded_bytes) };
+
+    assert_eq!(tx.method, Some(MethodSelector::from("athexp_spend")));
+    let args = SpendArguments::decode(&mut tx.args.as_slice()).unwrap();
+    assert_eq!(args.amount, amount);
+    assert_eq!(args.recipient, address);
   }
 }

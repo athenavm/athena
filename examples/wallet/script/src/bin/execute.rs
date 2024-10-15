@@ -12,7 +12,7 @@ use athena_interface::{
   ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use athena_vm_sdk::{Pubkey, SendArguments};
+use athena_vm_sdk::{Pubkey, SpendArguments};
 use clap::Parser;
 use parity_scale_codec::Encode;
 
@@ -77,7 +77,7 @@ fn main() {
 
   stdin.write_vec(wallet);
 
-  let args = SendArguments {
+  let args = SpendArguments {
     recipient: ADDRESS_CHARLIE,
     amount: 10,
   };
@@ -94,7 +94,7 @@ fn main() {
   let (_, gas_cost) = ExecutionClient::new()
     .execute_function(
       ELF,
-      "athexp_send",
+      "athexp_spend",
       stdin,
       Some(&mut host),
       Some(25000),

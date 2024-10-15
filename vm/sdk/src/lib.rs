@@ -17,7 +17,7 @@ cfg_if! {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Pubkey(pub Bytes32);
 
 #[allow(dead_code)] // Used by RISC-V targets and tests
@@ -52,14 +52,14 @@ pub trait VerifiableTemplate {
 }
 
 #[derive(Clone, Copy, Debug, Default, Encode, Decode)]
-pub struct SendArguments {
+pub struct SpendArguments {
   pub recipient: Address,
   pub amount: u64,
 }
 
 pub trait WalletProgram {
   fn spawn(owner: Pubkey) -> Address;
-  fn send(&self, args: SendArguments);
+  fn spend(&self, args: SpendArguments);
   fn proxy(&self, destination: Address, args: &[u8]);
   fn deploy(&self, code: Vec<u8>) -> Address;
 }

@@ -828,18 +828,8 @@ extern "C"
 
   void athcon_free_bytes(athcon_bytes* v);
 
-  athcon_bytes* athcon_encode_tx(
-    const athcon_address* principal_account,
-    athcon_address* template_addresss,
-    uint8_t* method,
-    size_t method_size,
-    uint64_t nonce,
-    uint8_t* args,
-    size_t args_size
-  );
-
   athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
-  athcon_bytes* athcon_encode_tx_send(const athcon_address* recipient, uint64_t amount);
+  athcon_bytes* athcon_encode_tx_spend(const athcon_address* recipient, uint64_t amount);
 
 #ifdef __cplusplus
 }

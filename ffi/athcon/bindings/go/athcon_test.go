@@ -90,21 +90,18 @@ func TestErrorMessage(t *testing.T) {
 func TestLibraryEncodeTx(t *testing.T) {
 	lib, err := LoadLibrary(modulePath)
 	require.NoError(t, err)
-	t.Run("different txs", func(t *testing.T) {
-		tx1 := lib.EncodeTx(Address{1, 2, 3, 4}, &Address{5, 6, 7, 8}, 1222, []byte("send"), []byte("data"))
-		tx2 := lib.EncodeTx(Address{1, 2, 3, 4}, &Address{5, 6, 7, 8}, 1222, []byte("deploy"), []byte("data"))
-		require.NotEqual(t, tx1, tx2)
-	})
-	t.Run("all optionals nil", func(t *testing.T) {
-		tx := lib.EncodeTx(Address{1, 2, 3, 4}, nil, 1222, nil, nil)
-		require.NotEmpty(t, tx)
-	})
 	t.Run("spawn", func(t *testing.T) {
 		tx := lib.EncodeTxSpawn(Bytes32{9, 8, 7, 6})
 		require.NotEmpty(t, tx)
+
+		tx2 := lib.EncodeTxSpawn(Bytes32{1, 2, 3, 4})
+		require.NotEqual(t, tx, tx2)
 	})
-	t.Run("send", func(t *testing.T) {
+	t.Run("spend", func(t *testing.T) {
 		tx := lib.EncodeTxSend(Address{1, 2, 3, 4}, 191239)
 		require.NotEmpty(t, tx)
+
+		tx2 := lib.EncodeTxSend(Address{1, 2, 3, 4}, 80972)
+		require.NotEqual(t, tx, tx2)
 	})
 }

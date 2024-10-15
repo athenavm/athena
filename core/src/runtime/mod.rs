@@ -787,7 +787,7 @@ pub mod tests {
     ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
-  use athena_vm_sdk::SendArguments;
+  use athena_vm_sdk::SpendArguments;
   use parity_scale_codec::Encode;
 
   use crate::{
@@ -871,7 +871,7 @@ pub mod tests {
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
     // set up send arguments
-    let send_args = SendArguments {
+    let send_args = SpendArguments {
       amount: amount_to_send,
       recipient: ADDRESS_CHARLIE,
     };
@@ -900,7 +900,7 @@ pub mod tests {
         .program
         .as_ref()
         .symbol_table
-        .get("athexp_send")
+        .get("athexp_spend")
         .unwrap(),
       &2106732
     );
@@ -939,7 +939,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
-    let res = runtime.execute_function("athexp_send");
+    let res = runtime.execute_function("athexp_spend");
     match res {
       Ok(_) => panic!("expected execution error"),
       Err(e) => match e {
@@ -970,7 +970,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // do the send again
-    runtime.execute_function("athexp_send").unwrap();
+    runtime.execute_function("athexp_spend").unwrap();
 
     // final balance check: some of alice's coins were sent to Charlie
     assert_eq!(
