@@ -198,7 +198,7 @@ func (vm *VM) Execute(
 	recipient, sender Address,
 	input []byte,
 	method []byte,
-	value Bytes32,
+	value uint64,
 	code []byte,
 ) (res Result, err error) {
 	if len(code) == 0 {
@@ -210,7 +210,7 @@ func (vm *VM) Execute(
 		gas:       C.int64_t(gas),
 		recipient: *athconAddress(recipient),
 		sender:    *athconAddress(sender),
-		value:     *athconBytes32(value),
+		value:     C.uint64_t(value),
 	}
 	if len(input) > 0 {
 		// Allocate memory for input data in C.

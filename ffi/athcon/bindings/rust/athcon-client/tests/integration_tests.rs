@@ -52,21 +52,14 @@ impl HostInterface for HostContext {
     StorageStatus::ATHCON_STORAGE_MODIFIED
   }
 
-  fn get_balance(&self, _addr: &Address) -> Bytes32 {
+  fn get_balance(&self, _addr: &Address) -> u64 {
     println!("Host: get_balance");
-    [0u8; BYTES32_LENGTH]
+    0
   }
 
-  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32) {
+  fn get_tx_context(&self) -> (u64, Address, i64, i64, i64, Bytes32) {
     println!("Host: get_tx_context");
-    (
-      [0u8; BYTES32_LENGTH],
-      [0u8; ADDRESS_LENGTH],
-      0,
-      0,
-      0,
-      [0u8; BYTES32_LENGTH],
-    )
+    (0, [0u8; ADDRESS_LENGTH], 0, 0, 0, [0u8; BYTES32_LENGTH])
   }
 
   fn get_block_hash(&self, _number: i64) -> Bytes32 {
@@ -79,7 +72,7 @@ impl HostInterface for HostContext {
     kind: MessageKind,
     destination: &Address,
     sender: &Address,
-    value: &Bytes32,
+    value: u64,
     input: &Bytes,
     method: &Bytes,
     gas: i64,
@@ -161,7 +154,7 @@ fn test_rust_host() {
     3u32.to_le_bytes().as_slice(),
     // empty method name
     &[],
-    &[0u8; BYTES32_LENGTH],
+    0,
     CONTRACT_CODE,
   );
   println!("Output:  {:?}", hex::encode(&output));

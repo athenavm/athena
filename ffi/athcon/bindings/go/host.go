@@ -11,7 +11,7 @@ package athcon
 bool accountExists(void *ctx, athcon_address *addr);
 athcon_bytes32 getStorage(void *ctx, athcon_address *addr, athcon_bytes32 *key);
 enum athcon_storage_status setStorage(void *ctx, athcon_address *addr, athcon_bytes32 *key, athcon_bytes32 *val);
-athcon_uint256be getBalance(void *ctx, athcon_address *addr);
+uint64_t getBalance(void *ctx, athcon_address *addr);
 struct athcon_tx_context getTxContext(void *ctx);
 athcon_bytes32 getBlockHash(void *ctx, long long int number);
 struct athcon_result call(void *ctx, struct athcon_message *msg);
@@ -68,7 +68,7 @@ func goByteSlice(data *C.uint8_t, size C.size_t) []byte {
 
 // TxContext contains information about current transaction and block.
 type TxContext struct {
-	GasPrice    Bytes32
+	GasPrice    uint64
 	Origin      Address
 	Coinbase    Address
 	BlockHeight int64
@@ -81,10 +81,10 @@ type HostContext interface {
 	AccountExists(addr Address) bool
 	GetStorage(addr Address, key Bytes32) Bytes32
 	SetStorage(addr Address, key Bytes32, value Bytes32) StorageStatus
-	GetBalance(addr Address) Bytes32
+	GetBalance(addr Address) uint64
 	GetTxContext() TxContext
 	GetBlockHash(number int64) Bytes32
-	Call(kind CallKind, recipient Address, sender Address, value Bytes32, input []byte, method []byte, gas int64, depth int) (
+	Call(kind CallKind, recipient Address, sender Address, value uint64, input []byte, method []byte, gas int64, depth int) (
 		output []byte, gasLeft int64, createAddr Address, err error)
 	Spawn(blob []byte) Address
 	Deploy(code []byte) Address
@@ -109,9 +109,9 @@ func setStorage(pCtx unsafe.Pointer, pAddr *C.athcon_address, pKey *C.athcon_byt
 }
 
 //export getBalance
-func getBalance(pCtx unsafe.Pointer, pAddr *C.athcon_address) C.athcon_uint256be {
+func getBalance(pCtx unsafe.Pointer, pAddr *C.athcon_address) C.uint64_t {
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
-	return *athconBytes32(ctx.GetBalance(goAddress(*pAddr)))
+	return C.uint64_t(ctx.GetBalance(goAddress(*pAddr)))
 }
 
 //export getTxContext
@@ -120,7 +120,7 @@ func getTxContext(pCtx unsafe.Pointer) C.struct_athcon_tx_context {
 	txContext := ctx.GetTxContext()
 
 	return C.struct_athcon_tx_context{
-		*athconBytes32(txContext.GasPrice),
+		C.uint64_t(txContext.GasPrice),
 		*athconAddress(txContext.Origin),
 		C.int64_t(txContext.BlockHeight),
 		C.int64_t(txContext.Timestamp),
@@ -140,7 +140,7 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 
 	kind := CallKind(msg.kind)
-	output, gasLeft, createAddr, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), goHash(msg.value),
+	output, gasLeft, createAddr, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), uint64(msg.value),
 		goByteSlice(msg.input_data, msg.input_size), goByteSlice(msg.method_name, msg.method_name_size), int64(msg.gas), int(msg.depth))
 
 	statusCode := C.enum_athcon_status_code(0)
