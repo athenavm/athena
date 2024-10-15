@@ -218,6 +218,7 @@ dependencies = [
 name = "athena-interface"
 version = "0.4.1"
 dependencies = [
+ "bincode",
  "blake3",
  "bytemuck",
  "serde",

@@ -7,7 +7,6 @@ use athena_interface::StorageStatus;
 ///
 /// `address` is the callee address, `input_ptr` is a bytearray to be passed to the
 /// callee function, and `input_len` is the number of bytes to read from the input bytearray.
-/// the first four bytes of the input bytearray are the method selector.
 /// `amount` is the number of coins to transfer to the callee.
 /// For now there is no return value and no return status code. The caller can assume
 /// that, if this function returns, the call was successful.

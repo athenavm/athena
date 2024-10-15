@@ -8,7 +8,7 @@ pub use context::*;
 use blake3::{hash, Hasher};
 use serde::{Deserialize, Serialize};
 
-use std::{cmp::Ordering, collections::BTreeMap, convert::TryFrom, error::Error, fmt};
+use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -18,53 +18,24 @@ pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 pub type MethodSelectorBytes = [u8; METHOD_SELECTOR_LENGTH];
-pub const METHOD_SELECTOR_DEFAULT: MethodSelector = MethodSelector {
-  bytes: [0u8; METHOD_SELECTOR_LENGTH],
-};
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
-pub struct MethodSelector {
-  bytes: MethodSelectorBytes,
-}
-
-impl MethodSelector {
-  pub fn bytes(&self) -> MethodSelectorBytes {
-    self.bytes
-  }
-}
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, PartialOrd, Ord, Serialize)]
+pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
   fn from(value: &str) -> Self {
-    let h = hash(value.as_bytes());
-    let vbytes = h.as_bytes();
-    MethodSelector {
-      bytes: vbytes[vbytes.len() - METHOD_SELECTOR_LENGTH..]
+    MethodSelector(
+      hash(value.as_bytes()).as_bytes()[..METHOD_SELECTOR_LENGTH]
         .try_into()
         .unwrap(),
-    }
+    )
   }
 }
 
-impl From<&[u8]> for MethodSelector {
-  fn from(value: &[u8]) -> Self {
-    MethodSelector {
-      bytes: value.try_into().unwrap(),
-    }
-  }
-}
-
-impl From<MethodSelector> for MethodSelectorBytes {
-  fn from(value: MethodSelector) -> MethodSelectorBytes {
-    value.bytes
-  }
-}
-
-impl Ord for MethodSelector {
-  fn cmp(&self, other: &Self) -> Ordering {
-    // Implement comparison logic here
-    // For example, if MethodSelector has a single field `value` of type String:
-    self.bytes.cmp(&other.bytes)
-  }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ExecutionPayload {
+  pub selector: Option<MethodSelector>,
+  pub input: Vec<u8>,
 }
 
 pub struct AddressWrapper(Address);
@@ -73,7 +44,6 @@ impl From<Vec<u32>> for AddressWrapper {
   fn from(value: Vec<u32>) -> Self {
     assert!(value.len() == ADDRESS_LENGTH / 4, "Invalid address length");
     let mut bytes = [0u8; ADDRESS_LENGTH];
-    // let mut value_bytes = [0u8; 4];
     for (i, word) in value.iter().enumerate() {
       let value_bytes = word.to_le_bytes();
       bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
@@ -744,6 +714,7 @@ pub trait VmInterface<T: HostInterface> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use bincode;
 
   #[test]
   fn test_get_storage() {
@@ -884,5 +855,31 @@ mod tests {
     // deploying again should fail
     let address = host.deploy(blob.clone());
     assert!(address.is_err());
+  }
+
+  #[test]
+  fn test_method_selector() {
+    let selector = MethodSelector::from("test");
+    assert_eq!(selector.0, [0x15, 0x32, 0x60, 0x50]);
+
+    let selector = MethodSelector::from("test2");
+    assert_eq!(selector.0, [0x7A, 0xCA, 0xAC, 0xF0]);
+  }
+
+  #[test]
+  fn test_execution_payload() {
+    let selector = MethodSelector::from("test");
+    let input_bytes = vec![0u8, 1, 2, 3];
+    let payload = ExecutionPayload {
+      selector: Some(selector.clone()),
+      input: input_bytes.clone(),
+    };
+    let mut encoded_bytes = selector.0.to_vec();
+    encoded_bytes.extend(&input_bytes);
+    assert_eq!(
+      bincode::serialize(&payload).unwrap(),
+      vec![0x94, 0x04, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04]
+    );
+    assert_eq!(bincode::serialize(&payload).unwrap(), encoded_bytes);
   }
 }

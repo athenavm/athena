@@ -5,7 +5,7 @@
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{ExecutionError, Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
-use athena_interface::{AthenaContext, HostInterface, MethodSelector, METHOD_SELECTOR_DEFAULT};
+use athena_interface::{AthenaContext, HostInterface, MethodSelector};
 
 /// A client for interacting with Athena.
 pub struct ExecutionClient;
@@ -89,12 +89,7 @@ impl ExecutionClient {
     };
     let mut runtime = Runtime::new(program, host, opts, context);
     runtime.write_vecs(&stdin.buffer);
-    let execute_fn = if selector == &METHOD_SELECTOR_DEFAULT {
-      runtime.execute()
-    } else {
-      runtime.execute_selector(selector)
-    };
-    execute_fn.map(|gas_left| {
+    runtime.execute_selector(selector).map(|gas_left| {
       (
         AthenaPublicValues::from(&runtime.state.public_values_stream),
         gas_left,

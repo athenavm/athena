@@ -45,7 +45,7 @@ impl Program {
         tracing::info!(
           "adding selector table entry for symbol {}: 0x{}",
           symbol,
-          hex::encode(selector.bytes()),
+          selector,
         );
         selector_table.insert(selector, *address);
       }
