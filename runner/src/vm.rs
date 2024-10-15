@@ -57,14 +57,13 @@ where
         tracing::info!("Method selector missing from input");
         return ExecutionResult::new(StatusCode::Failure, 0, None, None);
       }
-      let method_selector: MethodSelector =
-        input_data[..METHOD_SELECTOR_LENGTH].try_into().unwrap();
+      let method_selector = MethodSelector::from(&input_data[..METHOD_SELECTOR_LENGTH]);
 
       // write the remainder to stdin
       stdin.write_vec(input_data[METHOD_SELECTOR_LENGTH..].to_vec());
       tracing::info!(
         "Executing method selector 0x{} with input length {}",
-        hex::encode(method_selector),
+        hex::encode(method_selector.bytes()),
         input_data.len() - METHOD_SELECTOR_LENGTH
       );
       self.client.execute_function(
@@ -108,8 +107,8 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MethodSelector,
-    MethodSelectorAsString, MockHost, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MethodSelector, MockHost,
+    ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -171,8 +170,8 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
-    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_test1"));
-    let mut combined_input = selector.to_vec();
+    let selector = MethodSelector::from("athexp_test1");
+    let mut combined_input = selector.bytes().to_vec();
     combined_input.extend_from_slice(&input);
     let result = AthenaVm::new().execute(
       &mut host,
@@ -193,7 +192,7 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_test2"));
+    let selector = MethodSelector::from("athexp_test2");
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -203,7 +202,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(selector.to_vec()),
+        Some(selector.bytes().to_vec()),
         Balance::default(),
         vec![],
       ),
@@ -213,7 +212,7 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_test3"));
+    let selector = MethodSelector::from("athexp_test3");
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -223,7 +222,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(selector.to_vec()),
+        Some(selector.bytes().to_vec()),
         Balance::default(),
         vec![],
       ),

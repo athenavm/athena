@@ -67,7 +67,7 @@ pub trait WalletProgram {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use athena_interface::{MethodSelector, MethodSelectorAsString, METHOD_SELECTOR_DEFAULT};
+  use athena_interface::{MethodSelector, METHOD_SELECTOR_DEFAULT};
 
   #[test]
   fn convert_empty_slice() {
@@ -95,15 +95,15 @@ mod tests {
 
   #[test]
   fn convert_method_selector() {
-    let selector = MethodSelector::from(MethodSelectorAsString::new("test"));
-    let result = bytes_to_u32_vec(selector);
+    let selector = MethodSelector::from("test");
+    let result = bytes_to_u32_vec(selector.bytes());
     assert_eq!(result, vec![0x15_32_60_50]);
 
-    let selector = MethodSelector::from(MethodSelectorAsString::new("test2"));
-    let result = bytes_to_u32_vec(selector);
+    let selector = MethodSelector::from("test2");
+    let result = bytes_to_u32_vec(selector.bytes());
     assert_eq!(result, vec![0x7A_CA_AC_F0]);
 
-    let result = bytes_to_u32_vec(METHOD_SELECTOR_DEFAULT);
+    let result = bytes_to_u32_vec(METHOD_SELECTOR_DEFAULT.bytes());
     assert_eq!(result, vec![0x0]);
   }
 }

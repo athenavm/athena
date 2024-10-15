@@ -6,8 +6,9 @@ mod context;
 pub use context::*;
 
 use blake3::{hash, Hasher};
+use serde::{Deserialize, Serialize};
 
-use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
+use std::{cmp::Ordering, collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -16,26 +17,53 @@ pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
-pub type MethodSelector = [u8; METHOD_SELECTOR_LENGTH];
-pub const METHOD_SELECTOR_DEFAULT: MethodSelector = [0u8; METHOD_SELECTOR_LENGTH];
+pub type MethodSelectorBytes = [u8; METHOD_SELECTOR_LENGTH];
+pub const METHOD_SELECTOR_DEFAULT: MethodSelector = MethodSelector {
+  bytes: [0u8; METHOD_SELECTOR_LENGTH],
+};
 
-pub struct MethodSelectorAsString(MethodSelector);
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
+pub struct MethodSelector {
+  bytes: MethodSelectorBytes,
+}
 
-impl MethodSelectorAsString {
-  pub fn new(value: &str) -> Self {
-    let h = hash(value.as_bytes());
-    let vbytes = h.as_bytes();
-    MethodSelectorAsString(
-      vbytes[vbytes.len() - METHOD_SELECTOR_LENGTH..]
-        .try_into()
-        .unwrap(),
-    )
+impl MethodSelector {
+  pub fn bytes(&self) -> MethodSelectorBytes {
+    self.bytes
   }
 }
 
-impl From<MethodSelectorAsString> for MethodSelector {
-  fn from(value: MethodSelectorAsString) -> Self {
-    value.0
+impl From<&str> for MethodSelector {
+  fn from(value: &str) -> Self {
+    let h = hash(value.as_bytes());
+    let vbytes = h.as_bytes();
+    MethodSelector {
+      bytes: vbytes[vbytes.len() - METHOD_SELECTOR_LENGTH..]
+        .try_into()
+        .unwrap(),
+    }
+  }
+}
+
+impl From<&[u8]> for MethodSelector {
+  fn from(value: &[u8]) -> Self {
+    MethodSelector {
+      bytes: value.try_into().unwrap(),
+    }
+  }
+}
+
+impl From<MethodSelector> for MethodSelectorBytes {
+  fn from(value: MethodSelector) -> MethodSelectorBytes {
+    value.bytes
+  }
+}
+
+impl Ord for MethodSelector {
+  fn cmp(&self, other: &Self) -> Ordering {
+    // Implement comparison logic here
+    // For example, if MethodSelector has a single field `value` of type String:
+    self.bytes.cmp(&other.bytes)
   }
 }
 

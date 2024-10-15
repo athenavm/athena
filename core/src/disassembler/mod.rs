@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, fs::File, io::Read};
 
 use crate::runtime::{Instruction, Program};
 
-use athena_interface::{MethodSelector, MethodSelectorAsString};
+use athena_interface::MethodSelector;
 
 impl Program {
   /// Create a new program.
@@ -41,11 +41,11 @@ impl Program {
       // Construct the selector table from the symbol table.
       let mut selector_table = BTreeMap::new();
       for (symbol, address) in &elf.symbol_table {
-        let selector = MethodSelector::from(MethodSelectorAsString::new(symbol));
+        let selector = MethodSelector::from(symbol.as_str());
         tracing::info!(
           "adding selector table entry for symbol {}: 0x{}",
           symbol,
-          hex::encode(selector),
+          hex::encode(selector.bytes()),
         );
         selector_table.insert(selector, *address);
       }

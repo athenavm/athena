@@ -9,7 +9,7 @@ use std::error::Error;
 
 use athena_interface::{
   Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MethodSelector,
-  MethodSelectorAsString, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+  MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{Pubkey, SendArguments};
@@ -44,7 +44,7 @@ fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> 
   stdin.write(&owner.0);
 
   // calculate method selector
-  let method_selector = MethodSelector::from(MethodSelectorAsString::new("athexp_spawn"));
+  let method_selector = MethodSelector::from("athexp_spawn");
 
   let client = ExecutionClient::new();
   let (mut result, _) =
@@ -95,7 +95,7 @@ fn main() {
     hex::encode(args.recipient),
   );
   // calculate method selector
-  let method_selector = MethodSelector::from(MethodSelectorAsString::new("athexp_send"));
+  let method_selector = MethodSelector::from("athexp_send");
   let (_, gas_cost) = ExecutionClient::new()
     .execute_function(
       ELF,
@@ -123,7 +123,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
   use athena_interface::{
-    Address, HostDynamicContext, HostStaticContext, MethodSelector, MethodSelectorAsString,
+    Address, HostDynamicContext, HostStaticContext, MethodSelector,
     MockHost, ADDRESS_ALICE,
   };
   use athena_sdk::{AthenaStdin, ExecutionClient};
@@ -150,7 +150,7 @@ mod tests {
     stdin.write_slice(wallet_state);
     stdin.write_vec(code.encode());
 
-    let selector = MethodSelector::from(MethodSelectorAsString::new("athexp_deploy"));
+    let selector = MethodSelector::from("athexp_deploy");
     let result = ExecutionClient::new().execute_function(
       super::ELF,
       selector,
