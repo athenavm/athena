@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
+	"github.com/spacemeshos/go-scale"
 )
 
 // Address represents the 24 bytes address of an Athena account.
@@ -29,6 +30,73 @@ type Address [24]byte
 // hash). It occasionally is used to represent 256-bit unsigned integer values
 // stored in big-endian byte order.
 type Bytes32 [32]byte
+
+// MethodSelector is used to identify the method to be called.
+type MethodSelector [4]byte
+
+func (t *MethodSelector) EncodeScale(enc *scale.Encoder) (total int, err error) {
+	{
+		n, err := scale.EncodeByteSliceWithLimit(enc, t[:], 4)
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	return total, nil
+}
+
+func (t *MethodSelector) DecodeScale(dec *scale.Decoder) (total int, err error) {
+	{
+		n, err := scale.DecodeByteArray(dec, t[:])
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	return total, nil
+}
+
+// ExecutionPayload is used to pass the method selector and the arguments to the VM.
+type ExecutionPayload struct {
+	Selector *MethodSelector
+	Args     []byte
+}
+
+func (t *ExecutionPayload) EncodeScale(enc *scale.Encoder) (total int, err error) {
+	{
+		n, err := scale.EncodeOption(enc, t.Selector)
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	{
+		n, err := scale.EncodeByteArray(enc, t.Args[:])
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	return total, nil
+}
+
+func (t *ExecutionPayload) DecodeScale(dec *scale.Decoder) (total int, err error) {
+	{
+		n, err := t.Selector.DecodeScale(dec)
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	{
+		n, err := scale.DecodeByteArray(dec, t.Args[:])
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	return total, nil
+}
 
 // Static asserts.
 const (

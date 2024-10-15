@@ -18,7 +18,6 @@ pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
-pub type MethodSelectorBytes = [u8; METHOD_SELECTOR_LENGTH];
 
 #[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
