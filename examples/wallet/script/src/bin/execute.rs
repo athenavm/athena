@@ -123,8 +123,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
   use athena_interface::{
-    Address, HostDynamicContext, HostStaticContext, MethodSelector,
-    MockHost, ADDRESS_ALICE,
+    Address, HostDynamicContext, HostStaticContext, MethodSelector, MockHost, ADDRESS_ALICE,
   };
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
@@ -153,7 +152,7 @@ mod tests {
     let selector = MethodSelector::from("athexp_deploy");
     let result = ExecutionClient::new().execute_function(
       super::ELF,
-      selector,
+      &selector,
       stdin.clone(),
       Some(&mut host),
       Some(25000000),
