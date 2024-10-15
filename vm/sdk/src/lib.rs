@@ -96,14 +96,14 @@ mod tests {
   #[test]
   fn convert_method_selector() {
     let selector = MethodSelector::from(MethodSelectorAsString::new("test"));
-    let result = bytes_to_u32_vec(&selector);
+    let result = bytes_to_u32_vec(selector);
     assert_eq!(result, vec![0x15_32_60_50]);
 
     let selector = MethodSelector::from(MethodSelectorAsString::new("test2"));
-    let result = bytes_to_u32_vec(&selector);
+    let result = bytes_to_u32_vec(selector);
     assert_eq!(result, vec![0x7A_CA_AC_F0]);
 
-    let result = bytes_to_u32_vec(&METHOD_SELECTOR_DEFAULT);
+    let result = bytes_to_u32_vec(METHOD_SELECTOR_DEFAULT);
     assert_eq!(result, vec![0x0]);
   }
 }

@@ -56,8 +56,8 @@ fn test_athcon_create() {
     assert_eq!(
       vm.set_option.unwrap()(
         vm_ptr,
-        "foo\0".as_ptr() as *const std::os::raw::c_char,
-        "bar\0".as_ptr() as *const std::os::raw::c_char
+        c"foo".as_ptr() as *const std::os::raw::c_char,
+        c"bar".as_ptr() as *const std::os::raw::c_char
       ),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
