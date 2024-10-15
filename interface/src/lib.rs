@@ -520,7 +520,7 @@ pub const STORAGE_VALUE: Bytes32 = [
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-impl<'a> Default for MockHost<'a> {
+impl Default for MockHost<'_> {
   fn default() -> Self {
     // init
     let mut storage = BTreeMap::new();
@@ -546,7 +546,7 @@ impl<'a> Default for MockHost<'a> {
   }
 }
 
-impl<'a> HostInterface for MockHost<'a> {
+impl HostInterface for MockHost<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     self
       .storage

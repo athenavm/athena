@@ -379,7 +379,7 @@ impl<'a> WrappedHostInterface<'a> {
   }
 }
 
-impl<'a> HostInterface for WrappedHostInterface<'a> {
+impl HostInterface for WrappedHostInterface<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     let value_wrapper: Bytes32Wrapper = self
       .context

@@ -5,9 +5,10 @@ use athcon_sys as ffi;
 use std::ffi::CStr;
 
 /// Athena VM wrapper
-/// It owns the VM handle and provides a high-level interface to interact with the VM
-/// It also provides a host interface to the VM
-/// The VM is automatically destroyed when the wrapper is dropped
+///
+/// It owns the VM handle and provides a high-level interface to interact with the VM.
+/// It also provides a host interface to the VM.
+/// The VM is automatically destroyed when the wrapper is dropped.
 pub struct AthconVm {
   handle: *mut ffi::athcon_vm,
   host_interface: ffi::athcon_host_interface,
