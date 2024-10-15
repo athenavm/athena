@@ -6,7 +6,6 @@ mod context;
 pub use context::*;
 
 use blake3::{hash, Hasher};
-use hex;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
