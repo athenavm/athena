@@ -89,12 +89,14 @@ impl ExecutionClient {
     };
     let mut runtime = Runtime::new(program, host, opts, context);
     runtime.write_vecs(&stdin.buffer);
-    runtime.execute_selector(selector).map(|gas_left| {
-      (
-        AthenaPublicValues::from(&runtime.state.public_values_stream),
-        gas_left,
-      )
-    })
+    runtime
+      .execute_function_by_selector(selector)
+      .map(|gas_left| {
+        (
+          AthenaPublicValues::from(&runtime.state.public_values_stream),
+          gas_left,
+        )
+      })
   }
 }
 

@@ -57,7 +57,7 @@ impl Syscall for SyscallHostWrite {
 /// SyscallHostCall performs a host call, calling other programs.
 /// Inputs:
 ///  - a0 (arg1): address to call
-///  - a1 (arg2): pointer to input (bytes) to pass to the called program (first four bytes are method selector)
+///  - a1 (arg2): pointer to payload containing method selector and input to the called program
 ///  - a2 (x12): length of input (bytes)
 ///  - a3 (x13): address to read the amount from (2 words, 8 bytes)
 pub(crate) struct SyscallHostCall;
@@ -97,9 +97,9 @@ impl Syscall for SyscallHostCall {
       let input_bytes = input_words
         .into_iter()
         .flat_map(|word| word.to_le_bytes())
+        .take(len) // this removes any extra padding from the input
         .collect::<Vec<u8>>();
-      // this removes any extra padding from the input
-      Some(input_bytes[..len].to_vec())
+      Some(input_bytes)
     } else {
       None
     };

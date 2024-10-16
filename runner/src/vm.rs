@@ -1,7 +1,7 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
-  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionPayload,
-  ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
+  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, Decode,
+  ExecutionPayload, ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -50,7 +50,7 @@ where
     let execution_payload = match msg
       .input_data
       .map_or(Ok(ExecutionPayload::default()), |data| {
-        ExecutionPayload::from_scale(&data)
+        ExecutionPayload::decode(&mut data.as_slice())
       }) {
       Ok(p) => p,
       Err(e) => {
@@ -112,8 +112,8 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, ExecutionPayload, MessageKind, MethodSelector,
-    MockHost, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, Encode, ExecutionPayload, MessageKind,
+    MethodSelector, MockHost, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -188,7 +188,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(payload.to_scale()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -211,7 +211,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(payload.to_scale()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -234,7 +234,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(payload.to_scale()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -330,7 +330,7 @@ mod tests {
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      Some(payload.to_scale()),
+      Some(payload.encode()),
       0,
       vec![],
     );

@@ -6,7 +6,7 @@ mod context;
 pub use context::*;
 
 use blake3::{hash, Hasher};
-use parity_scale_codec::{Decode, Encode};
+pub use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
@@ -42,18 +42,6 @@ impl std::fmt::Display for MethodSelector {
 pub struct ExecutionPayload {
   pub selector: Option<MethodSelector>,
   pub input: Vec<u8>,
-}
-
-impl ExecutionPayload {
-  // Encode the struct to a byte vector using SCALE
-  pub fn to_scale(&self) -> Vec<u8> {
-    self.encode()
-  }
-
-  // Decode the struct from a byte slice using SCALE
-  pub fn from_scale(bytes: &[u8]) -> Result<Self, parity_scale_codec::Error> {
-    Self::decode(&mut &*bytes)
-  }
 }
 
 pub struct AddressWrapper(Address);
@@ -881,51 +869,5 @@ mod tests {
 
     let selector = MethodSelector::from("test2");
     assert_eq!(selector.0, [116, 112, 75, 76]);
-  }
-
-  #[test]
-  fn test_execution_payload() {
-    let payload = ExecutionPayload {
-      selector: None,
-      input: vec![],
-    };
-    let encoded = payload.to_scale();
-    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
-    assert_eq!(decoded, payload);
-
-    let selector = MethodSelector::from("test");
-    let payload = ExecutionPayload {
-      selector: Some(selector.clone()),
-      input: vec![],
-    };
-    let encoded = payload.to_scale();
-    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
-    assert_eq!(decoded, payload);
-
-    let selector = MethodSelector::from("test");
-    let payload = ExecutionPayload {
-      selector: Some(selector.clone()),
-      input: vec![0u8],
-    };
-    let encoded = payload.to_scale();
-    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
-    assert_eq!(decoded, payload);
-
-    let selector = MethodSelector::from("test");
-    let payload = ExecutionPayload {
-      selector: Some(selector.clone()),
-      input: vec![0u8, 1, 2, 3],
-    };
-    let encoded = payload.to_scale();
-    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
-    assert_eq!(decoded, payload);
-
-    let payload = ExecutionPayload {
-      selector: None,
-      input: vec![0u8, 1, 2, 3],
-    };
-    let encoded = payload.to_scale();
-    let decoded = ExecutionPayload::from_scale(&encoded).unwrap();
-    assert_eq!(decoded, payload);
   }
 }

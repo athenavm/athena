@@ -134,7 +134,7 @@ impl Drop for HostContext {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use athena_interface::ExecutionPayload;
+  use athena_interface::{Encode, ExecutionPayload};
 
   /// Test the Rust host interface to athcon
   /// We don't use this in production since Athena provides only the VM, not the Host, but
@@ -158,7 +158,7 @@ mod tests {
       50000000,
       &ADDRESS_ALICE,
       &[128u8; ADDRESS_LENGTH],
-      payload.to_scale().as_slice(),
+      payload.encode().as_slice(),
       0,
       CONTRACT_CODE,
     );

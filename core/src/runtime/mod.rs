@@ -703,8 +703,11 @@ impl<'host> Runtime<'host> {
     tracing::info!("starting execution");
   }
 
-  /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+  /// Execute an exported function by name. Does the same work as execute().
+  pub fn execute_function_by_name(
+    &mut self,
+    symbol_name: &str,
+  ) -> Result<Option<u32>, ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
       Some(offset) => *offset,
@@ -717,7 +720,7 @@ impl<'host> Runtime<'host> {
   }
 
   /// Execute an exported function using method selector. Does the same work as execute().
-  pub fn execute_selector(
+  pub fn execute_function_by_selector(
     &mut self,
     selector: &MethodSelector,
   ) -> Result<Option<u32>, ExecutionError> {
@@ -924,7 +927,7 @@ pub mod tests {
 
     // now attempt to execute each function in turn
     // first, the spawn
-    runtime.execute_function("athexp_spawn").unwrap();
+    runtime.execute_function_by_name("athexp_spawn").unwrap();
     drop(runtime);
 
     // get newly-created wallet address
@@ -956,7 +959,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
-    let res = runtime.execute_function("athexp_send");
+    let res = runtime.execute_function_by_name("athexp_send");
     match res {
       Ok(_) => panic!("expected execution error"),
       Err(e) => match e {
@@ -987,7 +990,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // do the send again
-    runtime.execute_function("athexp_send").unwrap();
+    runtime.execute_function_by_name("athexp_send").unwrap();
 
     // final balance check: some of alice's coins were sent to Charlie
     assert_eq!(
