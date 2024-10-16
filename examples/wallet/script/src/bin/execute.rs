@@ -125,13 +125,20 @@ mod tests {
   };
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
+  use ed25519_dalek::ed25519::signature::Signer;
+  use ed25519_dalek::SigningKey;
+  use rand::rngs::OsRng;
+
+  fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
+  }
 
   #[test]
   fn deploy_template() {
-    tracing_subscriber::fmt()
-      .with_test_writer()
-      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-      .init();
+    setup_logger();
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
@@ -161,5 +168,62 @@ mod tests {
     let address: Address = result.read();
     let template = host.template(&address);
     assert_eq!(template, Some(&code));
+  }
+
+  #[test]
+  fn verifying_tx() {
+    setup_logger();
+
+    let mut host = MockHost::new_with_context(
+      HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    );
+
+    let signing_key = SigningKey::generate(&mut OsRng);
+    let owner = Pubkey(signing_key.verifying_key().to_bytes());
+    let address = super::spawn(&mut host, &owner).unwrap();
+    let wallet_state = host.get_program(&address).unwrap().clone();
+
+    let tx = b"some really bad tx";
+
+    // First try with invalid signature
+    {
+      let mut stdin = AthenaStdin::new();
+      stdin.write_vec(wallet_state.clone());
+      stdin.write_vec(tx.as_slice().encode());
+      stdin.write_vec([0; 64].encode());
+
+      let result = ExecutionClient::new().execute_function(
+        super::ELF,
+        &MethodSelector::from("athexp_verify"),
+        stdin.clone(),
+        Some(&mut host),
+        Some(25000000),
+        None,
+      );
+      let (mut result, _) = result.unwrap();
+      let valid = result.read::<bool>();
+      assert!(!valid);
+    }
+
+    // Now with valid signature
+    let signature = signing_key.sign(tx);
+
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(tx.as_slice().encode());
+    stdin.write_vec(signature.to_bytes().encode());
+
+    let result = ExecutionClient::new().execute_function(
+      super::ELF,
+      &MethodSelector::from("athexp_verify"),
+      stdin.clone(),
+      Some(&mut host),
+      Some(25000000),
+      None,
+    );
+    let (mut result, _) = result.unwrap();
+    let valid = result.read::<bool>();
+    assert!(valid);
   }
 }

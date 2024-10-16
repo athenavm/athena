@@ -2,6 +2,7 @@ package athcon
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/rand"
 	_ "embed"
 	"encoding/binary"
@@ -200,4 +201,68 @@ func TestSpend(t *testing.T) {
 	// Step 3: Check balance
 	require.Equal(t, host.balances[recipient], uint64(100))
 	require.Equal(t, host.balances[principal], uint64(900))
+}
+
+func TestVerify(t *testing.T) {
+	vm, _ := Load(modulePath)
+	defer vm.Destroy()
+
+	host := newHost()
+	// Step 1: Spawn wallet
+	principal := randomAddress()
+	pubkey, privkey, err := ed25519.GenerateKey(nil)
+	var walletAddress Address
+	{
+		pubkey := Bytes32(pubkey)
+		executionPayload := EncodedExecutionPayload(nil, vm.Lib.EncodeTxSpawn(pubkey))
+
+		result, err := vm.Execute(host, Frontier, Call, 1, 10000000, principal, principal, executionPayload, 0, WALLET_TEST)
+		require.NoError(t, err)
+		require.Len(t, result.Output, 24)
+
+		walletAddress = Address(result.Output)
+	}
+	// Step 2: Try verify TX with invalid signature
+	tx := make([]byte, 100)
+	_, err = rand.Read(tx)
+	require.NoError(t, err)
+	txEncoded, err := scale.Marshal(tx)
+	require.NoError(t, err)
+
+	var signature [64]byte
+	signatureEncoded, err := scale.Marshal(signature)
+	require.NoError(t, err)
+
+	selector, err := FromString("athexp_verify")
+	require.NoError(t, err)
+	payload := Payload{
+		Selector: &selector,
+		Input:    append(txEncoded, signatureEncoded...),
+	}
+	payloadEncoded, err := scale.Marshal(payload)
+	require.NoError(t, err)
+
+	executionPayload := EncodedExecutionPayload(host.programs[walletAddress], payloadEncoded)
+
+	result, err := vm.Execute(host, Frontier, Call, 1, 1000000000, principal, principal, executionPayload, 0, WALLET_TEST)
+	require.NoError(t, err)
+	require.Zero(t, result.Output[0])
+
+	// Step 3: Try verify TX with valid signature
+	copy(signature[:], ed25519.Sign(privkey, tx))
+	signatureEncoded, err = scale.Marshal(signature)
+	require.NoError(t, err)
+
+	payload = Payload{
+		Selector: &selector,
+		Input:    append(txEncoded, signatureEncoded...),
+	}
+	payloadEncoded, err = scale.Marshal(payload)
+	require.NoError(t, err)
+
+	executionPayload = EncodedExecutionPayload(host.programs[walletAddress], payloadEncoded)
+
+	result, err = vm.Execute(host, Frontier, Call, 1, 1000000000, principal, principal, executionPayload, 0, WALLET_TEST)
+	require.NoError(t, err)
+	require.Equal(t, uint8(1), result.Output[0])
 }
