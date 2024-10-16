@@ -85,7 +85,7 @@ pub enum MemoryAccessPosition {
   A = 3,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ExecutionError {
   #[error("execution failed with exit code {0}")]
   HaltWithNonZeroExitCode(u32),
@@ -799,7 +799,9 @@ impl<'host> Runtime<'host> {
 pub mod tests {
 
   use crate::{
-    io::AthenaStdin, runtime::ExecutionError, runtime::MemoryAccessPosition, utils::with_max_gas,
+    io::AthenaStdin,
+    runtime::{ExecutionError, MemoryAccessPosition},
+    utils::with_max_gas,
   };
   use athena_interface::{
     calculate_address, Address, AthenaContext, HostDynamicContext, HostInterface,
@@ -1263,6 +1265,34 @@ pub mod tests {
       u64::from(value_high) << 32 | u64::from(value_low),
       SOME_COINS
     );
+  }
+
+  #[test]
+  fn test_syscall_fail() {
+    let instructions = vec![
+      Instruction::new(
+        Opcode::ADD,
+        Register::X5 as u32,
+        0,
+        SyscallCode::WRITE as u32,
+        false,
+        true,
+      ),
+      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+    ];
+    let program = Program::new(instructions, 0, 0);
+    let mut runtime = Runtime::new(program, None, Default::default(), None);
+
+    let mut syscall = super::MockSyscall::new();
+    syscall
+      .expect_execute()
+      .returning(|_, _, _| Err(StatusCode::Rejected));
+    runtime
+      .syscall_map
+      .insert(SyscallCode::WRITE, std::sync::Arc::new(syscall));
+
+    let err = runtime.execute().unwrap_err();
+    assert_eq!(err, ExecutionError::SyscallFailed(StatusCode::Rejected));
   }
 
   #[test]

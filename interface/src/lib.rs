@@ -324,6 +324,7 @@ impl ExecutionResult {
   }
 }
 
+#[mockall::automock]
 pub trait HostInterface {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;

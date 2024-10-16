@@ -14,3 +14,4 @@ hex = "0.4.3"
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
 serde = { version = "1.0.204", features = ["derive"] }
 tracing = "0.1.40"
+mockall = "0.13.0"

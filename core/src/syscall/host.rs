@@ -234,6 +234,13 @@ fn vec_u32_to_bytes(vec: Vec<u32>, length: usize) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+  use athena_interface::{Address, AthenaContext, ExecutionResult, MockHostInterface};
+
+  use crate::{
+    runtime::{self, Program},
+    utils::{with_max_gas, AthenaCoreOpts},
+  };
+
   use super::*;
 
   #[test]
@@ -273,5 +280,25 @@ mod tests {
       4, 0, 0, 0, // 4
     ];
     assert_eq!(vec_u32_to_bytes(vec_u32, length), expected);
+  }
+
+  #[test]
+  fn call_increments_depth() {
+    let mut host = MockHostInterface::new();
+    host
+      .expect_call()
+      .withf(|m| m.depth == 1)
+      .returning(|_| ExecutionResult::new(StatusCode::Success, 0, None, None));
+
+    let context = AthenaContext::new(Address::default(), Address::default(), 0);
+    let mut runtime = runtime::Runtime::new(
+      Program::new(vec![], 0, 0),
+      Some(&mut host),
+      AthenaCoreOpts::default().with_options(vec![with_max_gas(10)]),
+      Some(context),
+    );
+
+    let result = SyscallHostCall {}.execute(&mut SyscallContext { rt: &mut runtime }, 0, 0);
+    result.unwrap();
   }
 }
