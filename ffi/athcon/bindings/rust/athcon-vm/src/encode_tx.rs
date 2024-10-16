@@ -54,31 +54,6 @@ unsafe extern "C" fn athcon_encode_tx_spend(
   Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
 }
 
-// /// Encode Athena Verify() payload.
-// ///
-// /// # Arguments
-// /// - `state`: Account state.
-// /// - `tx`: The raw transaction bytes.
-// /// - `signature`: The 64B signature of the transaction.
-// ///
-// /// # Safety
-// /// The caller is responsible for freeing the returned bytes
-// /// via the `athcon_free_bytes` function.
-// #[no_mangle]
-// unsafe extern "C" fn athcon_encode_verify_tx(
-//   state: ffi::athcon_bytes,
-//   tx: ffi::athcon_bytes,
-//   signature: *const u8,
-// ) -> *mut ffi::athcon_bytes {
-//   let signature: &[u8; 64] = slice::from_raw_parts(signature, 64).try_into().unwrap();
-//   let args = encode_verify(state.as_slice(), tx.as_slice(), signature);
-
-//   let payload = Payload::new(Some(MethodSelector::from("athexp_verify")), args);
-
-//   let (ptr, size) = crate::allocate_output_data(payload.encode());
-//   Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
-// }
-
 #[cfg(test)]
 mod tests {
   use athcon_sys as ffi;
