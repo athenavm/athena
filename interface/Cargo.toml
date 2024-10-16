@@ -11,3 +11,4 @@ edition.workspace = true
 blake3 = "1.5.3"
 bytemuck = "1.16.0"
 tracing = "0.1.40"
+mockall = "0.13.0"
