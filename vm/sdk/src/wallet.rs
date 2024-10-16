@@ -16,6 +16,7 @@ pub trait WalletProgram {
   fn spend(&self, args: SpendArguments);
   fn proxy(&self, destination: Address, args: &[u8]);
   fn deploy(&self, code: Vec<u8>) -> Address;
+  fn maxspend(&self, args: SpendArguments) -> u64;
 }
 
 pub fn encode_spend(state: Vec<u8>, args: SpendArguments) -> Vec<u8> {
