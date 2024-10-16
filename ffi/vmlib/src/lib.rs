@@ -8,8 +8,8 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, Bytes32AsU64, ExecutionResult,
-  HostInterface, MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
+  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, ExecutionResult, HostInterface,
+  MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
 };
 use athena_runner::AthenaVm;
 
@@ -135,12 +135,6 @@ impl From<Bytes32Wrapper> for Bytes32 {
   }
 }
 
-impl From<Bytes32Wrapper> for u64 {
-  fn from(bytes: Bytes32Wrapper) -> Self {
-    Bytes32AsU64::new(bytes.0).into()
-  }
-}
-
 impl From<ffi::athcon_bytes32> for Bytes32Wrapper {
   fn from(bytes: ffi::athcon_bytes32) -> Self {
     Bytes32Wrapper(bytes.bytes)
@@ -168,13 +162,6 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       None
     };
 
-    // Convert method pointer and size to Vec<u8>
-    let method = if !item.method_name.is_null() && item.method_name_size > 0 {
-      Some(unsafe { std::slice::from_raw_parts(item.method_name, item.method_name_size) }.to_vec())
-    } else {
-      None
-    };
-
     // Convert code pointer and size to Vec<u8>
     let code = if !item.code.is_null() && item.code_size > 0 {
       unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
@@ -183,7 +170,6 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
     };
 
     let kind: MessageKindWrapper = item.kind.into();
-    let byteswrapper: Bytes32Wrapper = item.value.into();
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: u32::try_from(item.depth).expect("Depth value out of range"),
@@ -191,54 +177,17 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       recipient: AddressWrapper::from(item.recipient).into(),
       sender: AddressWrapper::from(item.sender).into(),
       input_data,
-      method,
-      value: Bytes32AsU64::new(byteswrapper.0).into(),
+      value: item.value,
       code,
     })
   }
 }
-
-// probably not needed, but keeping it here for reference for now
-// note: this code is memory safe, but would require manually freeing the input_data and code pointers.
-// impl From<AthenaMessageWrapper> for ffi::athcon_message {
-//   fn from(item: AthenaMessageWrapper) -> Self {
-//     let (input_data, input_size) = if let Some(data) = item.0.input_data {
-//       // need to transfer ownership of the data to the FFI
-//       let boxed_data = data.into_boxed_slice();
-//       let data_len = boxed_data.len();
-//       let data_ptr = Box::into_raw(boxed_data) as *const u8;
-//       (data_ptr, data_len)
-//     } else {
-//       (std::ptr::null(), 0)
-//     };
-//     let boxed_code = item.0.code.into_boxed_slice();
-//     let code_size = boxed_code.len();
-//     let code_ptr = Box::into_raw(boxed_code) as *const u8;
-//     let kind = match item.0.kind {
-//       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
-//     };
-//     let value: Bytes32AsU64 = item.0.value.into();
-//     ffi::athcon_message {
-//       kind,
-//       depth: item.0.depth as i32,
-//       gas: item.0.gas as i64,
-//       recipient: AddressWrapper(item.0.recipient).into(),
-//       sender: AddressWrapper(item.0.sender).into(),
-//       input_data,
-//       input_size,
-//       value: Bytes32Wrapper(value.into()).into(),
-//       code: code_ptr,
-//       code_size,
-//     }
-//   }
-// }
 
 impl From<AthenaMessageWrapper> for AthconExecutionMessage {
   fn from(item: AthenaMessageWrapper) -> Self {
     let kind = match item.0.kind {
       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
     };
-    let value: Bytes32AsU64 = item.0.value.into();
     let code = if !item.0.code.is_empty() {
       Some(item.0.code.as_slice())
     } else {
@@ -251,8 +200,7 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       AddressWrapper(item.0.recipient).into(),
       AddressWrapper(item.0.sender).into(),
       item.0.input_data.as_deref(),
-      item.0.method.as_deref(),
-      Bytes32Wrapper(value.into()).into(),
+      item.0.value,
       code,
     )
   }
@@ -261,17 +209,15 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
 impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
   fn from(item: &AthconExecutionMessage) -> Self {
     let kind: MessageKindWrapper = item.kind().into();
-    let byteswrapper = Bytes32Wrapper::from(*item.value());
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
       depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
-      recipient: AddressWrapper::from(*item.recipient()).into(),
-      sender: AddressWrapper::from(*item.sender()).into(),
+      recipient: item.recipient().bytes,
+      sender: item.sender().bytes,
       input_data: item.input().cloned(),
-      method: item.method().cloned(),
-      value: Bytes32AsU64::new(byteswrapper.0).into(),
-      code: item.code().map_or(Vec::new(), |c| c.to_vec()),
+      value: item.value(),
+      code: item.code().cloned().unwrap_or_default(),
     })
   }
 }
@@ -411,40 +357,6 @@ impl From<ExecutionResultWrapper> for AthconExecutionResult {
   }
 }
 
-// probably not needed, but keeping it here for reference for now
-// note: this code is NOT MEMORY SAFE. it assumes that output lives at least as long as the result.
-// otherwise, output_data will be a dangling pointer.
-// impl From<ExecutionResultWrapper> for ffi::athcon_result {
-//   fn from(value: ExecutionResultWrapper) -> Self {
-//     let output = value.0.output.unwrap_or_else(Vec::new);
-//     let output_size = output.len();
-
-//     // in order to ensure that a slice can be reconstructed from empty output,
-//     // we need some trickery here. see std::slice::from_raw_parts for more details.
-//     let output_data = if output_size > 0 {
-//       output.as_ptr()
-//     } else {
-//       core::ptr::NonNull::<u8>::dangling().as_ptr()
-//     };
-
-//     let gas_left = value.0.gas_left as i64;
-//     let create_address = value.0.create_address.map_or_else(
-//       || ffi::athcon_address::default(),
-//       |address| AddressWrapper(address).into(),
-//     );
-//     let status_code = StatusCodeWrapper(value.0.status_code).into();
-//     let release = None;
-//     ffi::athcon_result {
-//       output_data,
-//       output_size,
-//       gas_left,
-//       create_address,
-//       status_code,
-//       release,
-//     }
-//   }
-// }
-
 fn convert_storage_status(status: ffi::athcon_storage_status) -> StorageStatus {
   match status {
     ffi::athcon_storage_status::ATHCON_STORAGE_ASSIGNED => StorageStatus::StorageAssigned,
@@ -470,7 +382,7 @@ impl From<TransactionContextWrapper> for TransactionContext {
   fn from(context: TransactionContextWrapper) -> Self {
     let tx_context = context.0;
     TransactionContext {
-      gas_price: Bytes32Wrapper::from(tx_context.tx_gas_price).into(),
+      gas_price: tx_context.tx_gas_price,
       origin: AddressWrapper::from(tx_context.tx_origin).into(),
       block_height: tx_context.block_height,
       block_timestamp: tx_context.block_timestamp,
@@ -490,7 +402,7 @@ impl<'a> WrappedHostInterface<'a> {
   }
 }
 
-impl<'a> HostInterface for WrappedHostInterface<'a> {
+impl HostInterface for WrappedHostInterface<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     let value_wrapper: Bytes32Wrapper = self
       .context
@@ -508,8 +420,7 @@ impl<'a> HostInterface for WrappedHostInterface<'a> {
   }
 
   fn get_balance(&self, addr: &Address) -> Balance {
-    let balance = self.context.get_balance(&AddressWrapper(*addr).into());
-    Bytes32AsU64::new(Bytes32Wrapper::from(balance).into()).into()
+    self.context.get_balance(&AddressWrapper(*addr).into())
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {

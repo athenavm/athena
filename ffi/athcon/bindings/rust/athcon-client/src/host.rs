@@ -11,8 +11,8 @@ pub trait HostContext {
   fn account_exists(&self, addr: &Address) -> bool;
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-  fn get_balance(&self, addr: &Address) -> Bytes32;
-  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32);
+  fn get_balance(&self, addr: &Address) -> u64;
+  fn get_tx_context(&self) -> (u64, Address, i64, i64, i64, Bytes32);
   fn get_block_hash(&self, number: i64) -> Bytes32;
   fn spawn(&mut self, blob: &[u8]) -> Address;
   fn deploy(&mut self, blob: &[u8]) -> Address;
@@ -22,9 +22,8 @@ pub trait HostContext {
     kind: MessageKind,
     recipient: &Address,
     sender: &Address,
-    value: &Bytes32,
+    value: u64,
     input: &Bytes,
-    method: &Bytes,
     gas: i64,
     depth: i32,
   ) -> (Vec<u8>, i64, Address, StatusCode);
@@ -81,12 +80,10 @@ unsafe extern "C" fn set_storage(
 unsafe extern "C" fn get_balance(
   context: *mut ffi::athcon_host_context,
   address: *const ffi::athcon_address,
-) -> ffi::athcon_uint256be {
-  ffi::athcon_uint256be {
-    bytes: (*(context as *mut ExtendedContext))
-      .hctx
-      .get_balance(&(*address).bytes),
-  }
+) -> u64 {
+  (*(context as *mut ExtendedContext))
+    .hctx
+    .get_balance(&(*address).bytes)
 }
 
 unsafe extern "C" fn get_tx_context(
@@ -95,7 +92,7 @@ unsafe extern "C" fn get_tx_context(
   let (gas_price, origin, height, timestamp, gas_limit, chain_id) =
     (*(context as *mut ExtendedContext)).hctx.get_tx_context();
   ffi::athcon_tx_context {
-    tx_gas_price: athcon_sys::athcon_bytes32 { bytes: gas_price },
+    tx_gas_price: gas_price,
     tx_origin: athcon_sys::athcon_address { bytes: origin },
     block_height: height,
     block_timestamp: timestamp,
@@ -161,14 +158,9 @@ pub unsafe extern "C" fn call(
       msg.kind,
       &msg.recipient.bytes,
       &msg.sender.bytes,
-      &msg.value.bytes,
+      msg.value,
       if !msg.input_data.is_null() && msg.input_size > 0 {
         std::slice::from_raw_parts(msg.input_data, msg.input_size)
-      } else {
-        &[]
-      },
-      if !msg.method_name.is_null() && msg.method_name_size > 0 {
-        std::slice::from_raw_parts(msg.method_name, msg.method_name_size)
       } else {
         &[]
       },

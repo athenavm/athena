@@ -5,46 +5,43 @@
 mod context;
 pub use context::*;
 
-use blake3::Hasher;
+use blake3::{hash, Hasher};
+pub use parity_scale_codec::{Decode, Encode};
+use serde::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
+pub const METHOD_SELECTOR_LENGTH: usize = 4;
 pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 
-pub struct Bytes32AsU64(Bytes32);
+#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
-impl Bytes32AsU64 {
-  pub fn new(bytes: Bytes32) -> Self {
-    Bytes32AsU64(bytes)
+impl From<&str> for MethodSelector {
+  fn from(value: &str) -> Self {
+    MethodSelector(
+      hash(value.as_bytes()).as_bytes()[..METHOD_SELECTOR_LENGTH]
+        .try_into()
+        .unwrap(),
+    )
   }
 }
 
-impl From<Bytes32AsU64> for u64 {
-  fn from(bytes: Bytes32AsU64) -> Self {
-    // take most significant 8 bytes, assume little-endian
-    let slice = &bytes.0[..8];
-    u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
+impl std::fmt::Display for MethodSelector {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", hex::encode(self.0))
   }
 }
 
-impl From<Bytes32AsU64> for Bytes32 {
-  fn from(bytes: Bytes32AsU64) -> Self {
-    bytes.0
-  }
-}
-
-impl From<u64> for Bytes32AsU64 {
-  fn from(value: u64) -> Self {
-    let mut bytes = [0u8; 32];
-    let value_bytes = value.to_le_bytes();
-    bytes[..8].copy_from_slice(&value_bytes);
-    Bytes32AsU64(bytes)
-  }
+#[derive(Clone, Debug, Decode, Default, Encode, PartialEq)]
+pub struct ExecutionPayload {
+  pub selector: Option<MethodSelector>,
+  pub input: Vec<u8>,
 }
 
 pub struct AddressWrapper(Address);
@@ -53,7 +50,6 @@ impl From<Vec<u32>> for AddressWrapper {
   fn from(value: Vec<u32>) -> Self {
     assert!(value.len() == ADDRESS_LENGTH / 4, "Invalid address length");
     let mut bytes = [0u8; ADDRESS_LENGTH];
-    // let mut value_bytes = [0u8; 4];
     for (i, word) in value.iter().enumerate() {
       let value_bytes = word.to_le_bytes();
       bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
@@ -181,7 +177,6 @@ pub struct AthenaMessage {
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
-  pub method: Option<Vec<u8>>,
   pub value: Balance,
   // code is currently unused, and it seems redundant.
   // it's not in the yellow paper.
@@ -198,7 +193,6 @@ impl AthenaMessage {
     recipient: Address,
     sender: Address,
     input_data: Option<Vec<u8>>,
-    method: Option<Vec<u8>>,
     value: Balance,
     code: Vec<u8>,
   ) -> Self {
@@ -209,7 +203,6 @@ impl AthenaMessage {
       recipient,
       sender,
       input_data,
-      method,
       value,
       code,
     }
@@ -331,6 +324,7 @@ impl ExecutionResult {
   }
 }
 
+#[mockall::automock]
 pub trait HostInterface {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
@@ -531,7 +525,7 @@ pub const STORAGE_VALUE: Bytes32 = [
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-impl<'a> Default for MockHost<'a> {
+impl Default for MockHost<'_> {
   fn default() -> Self {
     // init
     let mut storage = BTreeMap::new();
@@ -557,7 +551,7 @@ impl<'a> Default for MockHost<'a> {
   }
 }
 
-impl<'a> HostInterface for MockHost<'a> {
+impl HostInterface for MockHost<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     self
       .storage
@@ -792,7 +786,6 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      None,
       0,
       vec![],
     );
@@ -808,7 +801,6 @@ mod tests {
       1000,
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
-      None,
       None,
       100,
       vec![],
@@ -826,7 +818,6 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      None,
       SOME_COINS,
       vec![],
     );
@@ -842,7 +833,6 @@ mod tests {
       1000,
       ADDRESS_BOB,
       ADDRESS_ALICE,
-      None,
       None,
       100,
       vec![],
@@ -871,5 +861,14 @@ mod tests {
     // deploying again should fail
     let address = host.deploy(blob.clone());
     assert!(address.is_err());
+  }
+
+  #[test]
+  fn test_method_selector() {
+    let selector = MethodSelector::from("test");
+    assert_eq!(selector.0, [72, 120, 202, 4]);
+
+    let selector = MethodSelector::from("test2");
+    assert_eq!(selector.0, [116, 112, 75, 76]);
   }
 }
