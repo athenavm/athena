@@ -5,6 +5,5 @@ members = [
   "io/script",
   "wallet/script",
 ]
-resolver = "2"
 
 exclude = ["wallet/program"]

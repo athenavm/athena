@@ -3,7 +3,7 @@
 //! A library with no external dependencies that includes core types and traits.
 
 mod context;
-pub mod transaction;
+pub mod payload;
 pub use context::*;
 
 use blake3::Hasher;

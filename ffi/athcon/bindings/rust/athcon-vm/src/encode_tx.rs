@@ -1,7 +1,7 @@
 //! Implements athcon_encode_tx
 use athcon_sys as ffi;
 use athena_interface::{
-  transaction::{Encode, Payload},
+  payload::{Encode, Payload},
   MethodSelector,
 };
 use athena_vm_sdk::{Pubkey, SpendArguments};
@@ -53,7 +53,7 @@ unsafe extern "C" fn athcon_encode_tx_spend(
 mod tests {
   use athcon_sys as ffi;
   use athena_interface::{
-    transaction::{Decode, Payload},
+    payload::{Decode, Payload},
     MethodSelector,
   };
   use athena_vm_sdk::{Pubkey, SpendArguments};

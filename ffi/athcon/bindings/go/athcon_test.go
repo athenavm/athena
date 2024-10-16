@@ -98,10 +98,10 @@ func TestLibraryEncodeTx(t *testing.T) {
 		require.NotEqual(t, tx, tx2)
 	})
 	t.Run("spend", func(t *testing.T) {
-		tx := lib.EncodeTxSend(Address{1, 2, 3, 4}, 191239)
+		tx := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 191239)
 		require.NotEmpty(t, tx)
 
-		tx2 := lib.EncodeTxSend(Address{1, 2, 3, 4}, 80972)
+		tx2 := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 80972)
 		require.NotEqual(t, tx, tx2)
 	})
 }
