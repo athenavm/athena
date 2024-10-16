@@ -11,3 +11,6 @@ edition.workspace = true
 athcon-sys = { path = "../athcon-sys" }
 athena-interface = { path = "../../../../../interface" }
 athena-vm-sdk = { path = "../../../../../vm/sdk" }
+
+[dev-dependencies]
+parity-scale-codec = "3.6.12"

@@ -12,9 +12,8 @@ use athena_interface::{
   ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use athena_vm_sdk::{Pubkey, SpendArguments};
+use athena_vm_sdk::{encode_spawn, encode_spend, Pubkey, SpendArguments};
 use clap::Parser;
-use parity_scale_codec::Encode;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
 ///
@@ -41,7 +40,7 @@ fn parse_owner(data: &str) -> Result<Pubkey, hex::FromHexError> {
 
 fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> {
   let mut stdin = AthenaStdin::new();
-  stdin.write(&owner.0);
+  stdin.write_vec(encode_spawn(owner));
 
   let client = ExecutionClient::new();
   let (mut result, _) =
@@ -72,16 +71,14 @@ fn main() {
   let mut stdin = AthenaStdin::new();
   let wallet = host
     .get_program(&address)
-    .expect("getting wallet program instance")
-    .clone();
-
-  stdin.write_vec(wallet);
+    .expect("getting wallet program instance");
 
   let args = SpendArguments {
     recipient: ADDRESS_CHARLIE,
-    amount: 10,
+    amount: 120,
   };
-  stdin.write_slice(&args.encode());
+
+  stdin.write_vec(encode_spend(wallet.clone(), args));
 
   let alice_balance = host.get_balance(&ADDRESS_ALICE);
   assert!(alice_balance >= 10);
@@ -111,16 +108,15 @@ fn main() {
     charlie_balance
   );
   assert!(gas_cost.is_some());
-  assert_eq!(charlie_balance, 10);
-  assert_eq!(new_alice_balance, alice_balance - 10);
+  assert_eq!(charlie_balance, 120);
+  assert_eq!(new_alice_balance, alice_balance - 120);
 }
 
 #[cfg(test)]
 mod tests {
   use athena_interface::{Address, HostDynamicContext, HostStaticContext, MockHost, ADDRESS_ALICE};
   use athena_sdk::{AthenaStdin, ExecutionClient};
-  use athena_vm_sdk::Pubkey;
-  use parity_scale_codec::Encode;
+  use athena_vm_sdk::{encode_deploy, Pubkey};
 
   #[test]
   fn deploy_template() {
@@ -139,8 +135,7 @@ mod tests {
     let code = b"some really bad code".to_vec();
     let mut stdin = AthenaStdin::new();
     let wallet_state = host.get_program(&address).unwrap();
-    stdin.write_slice(wallet_state);
-    stdin.write_vec(code.encode());
+    stdin.write_vec(encode_deploy(wallet_state.clone(), code.clone()));
 
     let result = ExecutionClient::new().execute_function(
       super::ELF,

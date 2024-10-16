@@ -1,7 +1,10 @@
-use athena_interface::{Address, Bytes32};
+use athena_interface::Bytes32;
 use cfg_if::cfg_if;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
+
+pub mod wallet;
+pub use wallet::*;
 
 cfg_if! {
   if #[cfg(target_os = "zkvm")] {
@@ -45,23 +48,8 @@ pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
   result
 }
 
-// These traits define the reference wallet interface.
-
 pub trait VerifiableTemplate {
   fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
-}
-
-#[derive(Clone, Copy, Debug, Default, Encode, Decode)]
-pub struct SpendArguments {
-  pub recipient: Address,
-  pub amount: u64,
-}
-
-pub trait WalletProgram {
-  fn spawn(owner: Pubkey) -> Address;
-  fn spend(&self, args: SpendArguments);
-  fn proxy(&self, destination: Address, args: &[u8]);
-  fn deploy(&self, code: Vec<u8>) -> Address;
 }
 
 #[cfg(test)]
