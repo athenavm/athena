@@ -49,11 +49,20 @@ pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
 }
 
 pub trait VerifiableTemplate {
-  fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
+  fn verify(&self, tx: Vec<u8>, signature: [u8; 64]) -> bool;
+}
+
+pub fn encode_verify(state: Vec<u8>, tx: &[u8], signature: &[u8; 64]) -> Vec<u8> {
+  let mut args = state;
+  args.extend(tx.encode());
+  args.extend(signature.encode());
+  args
 }
 
 #[cfg(test)]
 mod tests {
+  use parity_scale_codec::IoReader;
+
   use super::*;
 
   #[test]
@@ -78,5 +87,26 @@ mod tests {
   fn convert_single_byte() {
     let result = bytes_to_u32_vec([1]);
     assert_eq!(result, vec![0x00_00_00_01]);
+  }
+
+  #[test]
+  fn encode_decode_verify() {
+    let wallet = Vec::<i32>::from([1, 2, 3, 4]);
+    let wallet_state = wallet.encode();
+    let tx = b"some tx".to_vec();
+    let signature = [0x01; 64];
+    let encoded = encode_verify(wallet_state, &tx, &signature);
+
+    let mut input_reader = IoReader(encoded.as_slice());
+    let decoded_wallet = Vec::<i32>::decode(&mut input_reader).unwrap();
+    assert_eq!(decoded_wallet, wallet);
+
+    let decoded_tx = Vec::<u8>::decode(&mut input_reader).unwrap();
+    assert_eq!(decoded_tx, tx);
+
+    let decoded_sig = <[u8; 64]>::decode(&mut input_reader).unwrap();
+    assert_eq!(decoded_sig, signature);
+
+    assert!(input_reader.0.is_empty());
   }
 }
