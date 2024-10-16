@@ -226,4 +226,39 @@ mod tests {
     let valid = result.read::<bool>();
     assert!(valid);
   }
+
+  #[test]
+  fn maxspend() {
+    setup_logger();
+
+    let mut host = MockHost::new_with_context(
+      HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    );
+
+    let address = super::spawn(&mut host, Pubkey::default()).unwrap();
+
+    let wallet = host.get_program(&address).unwrap();
+    let args = athena_vm_sdk::SpendArguments {
+      recipient: Address::default(),
+      amount: 100,
+    };
+
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(athena_vm_sdk::encode_spend(wallet.clone(), args));
+
+    let result = ExecutionClient::new().execute_function(
+      super::ELF,
+      "athexp_maxspend",
+      stdin,
+      Some(&mut host),
+      Some(25000),
+      None,
+    );
+    let (mut result, gas_cost) = result.unwrap();
+    assert!(gas_cost.is_some());
+
+    let max_spend: u64 = result.read();
+    assert_eq!(max_spend, args.amount);
+  }
 }
