@@ -19,7 +19,6 @@ jobs:
           - ubuntu-latest
           - [runs-on, runner=8cpu-linux-arm64, "run-id=${{ github.run_id }}"]
           - macos-latest
-          - macos-13
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     env:
