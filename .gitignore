@@ -19,3 +19,4 @@ target/
 
 # Still not sure why cargo creates this in the root directory
 /elf
+**/elf/*
