@@ -1,6 +1,7 @@
-use athena_helper::build_program;
-
+#[cfg(feature = "unittest")]
 fn build_programs_for_tests() {
+  use athena_helper::build_program;
+
   build_program("../examples/fibonacci/program");
   build_program("../examples/hello_world/program");
   build_program("../examples/io/program");
