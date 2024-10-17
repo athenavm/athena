@@ -97,6 +97,19 @@ impl ExecutionClient {
     })
   }
 
+  /// Execute the program under GDB.
+  ///
+  /// The GDB will halt the program on the first instruction and
+  /// await connection from the GDB client.
+  ///
+  /// ### Examples
+  /// ```no_run
+  /// let elf = b"program elf with debug symbols";
+  /// let stdin = athena_core::io::AthenaStdin::new();
+  /// let client = athena_sdk::ExecutionClient::new();
+  /// client.execute_with_gdb(elf, stdin, None, None, None, 9001);
+  /// ```
+  /// Now, connect with GDB: `target remote localhost:9001` and debug.
   pub fn execute_with_gdb(
     &self,
     elf: &[u8],
@@ -125,6 +138,19 @@ impl ExecutionClient {
     })
   }
 
+  /// Execute the program function under GDB.
+  ///
+  /// The GDB will halt the program on the first instruction and
+  /// await connection from the GDB client.
+  ///
+  /// ### Examples
+  /// ```no_run
+  /// let elf = b"program elf with debug symbols";
+  /// let stdin = athena_core::io::AthenaStdin::new();
+  /// let client = athena_sdk::ExecutionClient::new();
+  /// client.execute_function_with_gdb(elf, "athexp_deploy", stdin, None, None, None, 9001);
+  /// ```
+  /// Now, connect with GDB: `target remote localhost:9001` and debug.
   #[allow(clippy::too_many_arguments)]
   pub fn execute_function_with_gdb(
     &self,
