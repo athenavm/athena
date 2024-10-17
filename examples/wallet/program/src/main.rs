@@ -5,7 +5,7 @@ extern crate alloc;
 
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
-use athena_vm_sdk::{call, spawn, Pubkey, SendArguments, VerifiableTemplate, WalletProgram};
+use athena_vm_sdk::{call, spawn, Pubkey, SpendArguments, VerifiableTemplate, WalletProgram};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use parity_scale_codec::{Decode, Encode};
 #[derive(Debug, Encode, Decode)]
@@ -39,7 +39,7 @@ impl WalletProgram for Wallet {
   }
 
   #[callable]
-  fn send(&self, send_arguments: SendArguments) {
+  fn spend(&self, send_arguments: SpendArguments) {
     // Send coins
     // Note: error checking happens inside the host
     call(send_arguments.recipient, None, None, send_arguments.amount);
@@ -78,10 +78,10 @@ mod test {
     let wallet = Wallet::new(owner);
 
     Wallet::spawn(owner);
-    let send_arguments = SendArguments {
+    let send_arguments = SpendArguments {
       recipient: [0u8; 24],
       amount: 0,
     };
-    wallet.send(send_arguments);
+    wallet.spend(send_arguments);
   }
 }

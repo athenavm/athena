@@ -3,9 +3,11 @@
 //! A library with no external dependencies that includes core types and traits.
 
 mod context;
+pub mod payload;
 pub use context::*;
 
 use blake3::Hasher;
+use parity_scale_codec::{Decode, Encode};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -15,6 +17,16 @@ pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Encode, Decode)]
+pub struct MethodSelector([u8; 4]);
+
+impl From<&str> for MethodSelector {
+  fn from(value: &str) -> Self {
+    let h = blake3::hash(value.as_bytes());
+    Self(h.as_bytes()[..4].try_into().unwrap())
+  }
+}
 
 pub struct AddressWrapper(Address);
 
