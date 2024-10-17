@@ -831,6 +831,8 @@ extern "C"
   athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
   athcon_bytes* athcon_encode_tx_spend(const athcon_bytes* state, const athcon_address* recipient, uint64_t amount);
 
+  athcon_bytes* athcon_encode_verify_tx(const athcon_bytes* state, const athcon_bytes* tx, uint8_t (*signature)[64]);
+
 #ifdef __cplusplus
 }
 #endif

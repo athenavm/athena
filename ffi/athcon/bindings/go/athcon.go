@@ -68,8 +68,9 @@ type Library struct {
 
 	create func() *C.struct_athcon_vm
 
-	encodeTxSpawn func(*C.athcon_bytes32) *C.athcon_bytes
-	encodeTxSpend func(*C.athcon_bytes, *C.athcon_address, C.uint64_t) *C.athcon_bytes
+	encodeTxSpawn  func(*C.athcon_bytes32) *C.athcon_bytes
+	encodeTxSpend  func(*C.athcon_bytes, *C.athcon_address, C.uint64_t) *C.athcon_bytes
+	encodeVerifyTx func(*C.athcon_bytes, *C.athcon_bytes, *[64]C.uint8_t) *C.athcon_bytes
 
 	freeBytes func(*C.athcon_bytes)
 }
@@ -90,6 +91,8 @@ func LoadLibrary(path string) (*Library, error) {
 	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create_"+vmName)
 	purego.RegisterLibFunc(&lib.encodeTxSpawn, libHandle, "athcon_encode_tx_spawn")
 	purego.RegisterLibFunc(&lib.encodeTxSpend, libHandle, "athcon_encode_tx_spend")
+	purego.RegisterLibFunc(&lib.encodeVerifyTx, libHandle, "athcon_encode_verify_tx")
+
 	purego.RegisterLibFunc(&lib.freeBytes, libHandle, "athcon_free_bytes")
 	return lib, nil
 }
@@ -292,4 +295,31 @@ func (l *Library) EncodeTxSpend(walletState []byte, recipient Address, nonce uin
 	defer l.freeBytes(encoded)
 	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
 	return tx
+}
+
+func (l *Library) EncodeVerifyTx(walletState []byte, tx []byte, signature [64]byte) []byte {
+	cState := C.CBytes(walletState)
+	defer C.free(cState)
+	cTx := C.CBytes(tx)
+	defer C.free(cTx)
+
+	var cSig [64]C.uint8_t
+	for i := 0; i < len(signature); i++ {
+		cSig[i] = C.uint8_t(signature[i])
+	}
+
+	cEncoded := l.encodeVerifyTx(
+		&C.athcon_bytes{
+			ptr:  (*C.uchar)(cState),
+			size: C.size_t(len(walletState)),
+		},
+		&C.athcon_bytes{
+			ptr:  (*C.uchar)(cState),
+			size: C.size_t(len(walletState)),
+		},
+		&cSig,
+	)
+	defer l.freeBytes(cEncoded)
+	encoded := C.GoBytes(unsafe.Pointer(cEncoded.ptr), C.int(cEncoded.size))
+	return encoded
 }

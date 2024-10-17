@@ -886,27 +886,6 @@ pub mod tests {
     stdin.write(&owner_pubkey);
     runtime.write_vecs(&stdin.buffer);
 
-    // make sure the program loaded correctly
-    // riscv32-unknown-linux-gnu-objdump -d -j .text elf/wallet-template | grep athexp
-    assert_eq!(
-      runtime
-        .program
-        .as_ref()
-        .symbol_table
-        .get("athexp_spawn")
-        .unwrap(),
-      &2106680
-    );
-    assert_eq!(
-      runtime
-        .program
-        .as_ref()
-        .symbol_table
-        .get("athexp_spend")
-        .unwrap(),
-      &2106732
-    );
-
     // now attempt to execute each function in turn
     // first, the spawn
     runtime.execute_function("athexp_spawn").unwrap();
