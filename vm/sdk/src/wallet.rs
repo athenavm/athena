@@ -40,9 +40,16 @@ mod tests {
 
   use super::SpendArguments;
 
+  #[derive(Debug, Clone, Encode, Decode, PartialEq, Eq)]
+  struct Wallet {
+    pub owner: super::Pubkey,
+  }
+
   #[test]
   fn encode_decode_spend() {
-    let wallet = Vec::<i32>::from([1, 2, 3, 4]);
+    let wallet = Wallet {
+      owner: super::Pubkey([11u8; 32]),
+    };
     let wallet_state = wallet.encode();
     let args = SpendArguments {
       recipient: [22u8; 24],
@@ -51,7 +58,7 @@ mod tests {
     let encoded = super::encode_spend(wallet_state, args);
 
     let mut input_reader = IoReader(encoded.as_slice());
-    let decoded_wallet = Vec::<i32>::decode(&mut input_reader).unwrap();
+    let decoded_wallet = Wallet::decode(&mut input_reader).unwrap();
     assert_eq!(decoded_wallet, wallet);
 
     let decoded_args = SpendArguments::decode(&mut input_reader).unwrap();
