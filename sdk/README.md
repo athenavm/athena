@@ -7,7 +7,7 @@ It allows to attach with GDB and debug a guest program running in the VM.
 
 💡 The GDB support is experimental and some things might not work.
 
-### Rquired instrumentation
+### Required instrumentation
 The host program (which executes the guest program) must be instrumented to enable GDB debugging.
 See the documentation of `ExecutionClient` for details.
 
@@ -19,6 +19,8 @@ debug=true
 ```
 
 ### Connecting with GDB
+
+Note that you'll need a version of `gdb` with RISC-V support. The version of `gdb` included with most Linux distributions doesn't support RISC-V out of the box. You can obtain it as part of the [riscv-gnu-toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain).
 
 Once the instrumented program is executed, the GDBstub will halt it on the first instruction and await connection from a GDB client. Assuming, it listens on port 9001, execute the following:
 
