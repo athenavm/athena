@@ -17,4 +17,11 @@ athena-sdk = { path = "../sdk" }
 tracing = "0.1.40"
 
 [dev-dependencies]
+athena-runner = { path = ".", features = ["unittest"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+[build-dependencies]
+athena-helper = { path = "../helper" }
+
+[features]
+unittest = []
