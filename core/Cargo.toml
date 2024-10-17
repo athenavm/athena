@@ -21,6 +21,7 @@ tracing = "0.1.40"
 strum_macros = "0.26"
 strum = "0.26"
 thiserror = "1.0.60"
+mockall = "0.13.0"
 gdbstub = "0.7.2"
 
 [dev-dependencies]
