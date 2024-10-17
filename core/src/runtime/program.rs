@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use super::Instruction;
@@ -6,7 +5,7 @@ use super::Instruction;
 use athena_interface::MethodSelector;
 
 /// A program that can be executed by the VM.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Program {
   /// The instructions of the program.
   pub instructions: Vec<Instruction>,

@@ -7,7 +7,6 @@ pub use context::*;
 
 use blake3::{hash, Hasher};
 pub use parity_scale_codec::{Decode, Encode};
-use serde::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -19,7 +18,7 @@ pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 
-#[derive(Clone, Debug, Decode, Deserialize, Encode, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Decode, Encode, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
