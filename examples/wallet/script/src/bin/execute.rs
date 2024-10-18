@@ -175,29 +175,26 @@ mod tests {
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
       HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
     );
-    let address = super::spawn(&mut host, Pubkey::default()).unwrap();
-
-    let wallet = host.get_program(&address).unwrap();
-    let args = athena_vm_sdk::SpendArguments {
-      recipient: Address::default(),
-      amount: 100,
-    };
+    let address = super::spawn(&mut host, &Pubkey::default()).unwrap();
+    let wallet_state = host.get_program(&address).unwrap();
+    let recipient = Address::default();
+    let amount = 100;
 
     let mut stdin = AthenaStdin::new();
-    stdin.write_vec(athena_vm_sdk::encode_spend(wallet.clone(), args));
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(athena_vm_sdk::encode_spend_inner(&recipient, amount));
 
+    let selector = MethodSelector::from("athexp_maxspend");
     let result = ExecutionClient::new().execute_function(
       super::ELF,
-      "athexp_maxspend",
+      &selector,
       stdin,
       Some(&mut host),
-      Some(25000),
+      Some(25000000),
       None,
     );
     let (mut result, gas_cost) = result.unwrap();
     assert!(gas_cost.is_some());
-
-    let max_spend: u64 = result.read();
-    assert_eq!(max_spend, args.amount);
+    assert_eq!(result.read::<u64>(), amount);
   }
 }
