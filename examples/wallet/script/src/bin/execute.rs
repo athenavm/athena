@@ -126,12 +126,16 @@ mod tests {
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
 
-  #[test]
-  fn deploy_template() {
-    tracing_subscriber::fmt()
+  fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
       .with_test_writer()
       .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-      .init();
+      .try_init();
+  }
+
+  #[test]
+  fn deploy_template() {
+    setup_logger();
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
@@ -161,5 +165,36 @@ mod tests {
     let address: Address = result.read();
     let template = host.template(&address);
     assert_eq!(template, Some(&code));
+  }
+
+  #[test]
+  fn maxspend() {
+    setup_logger();
+
+    let mut host = MockHost::new_with_context(
+      HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    );
+    let address = super::spawn(&mut host, &Pubkey::default()).unwrap();
+    let wallet_state = host.get_program(&address).unwrap();
+    let recipient = Address::default();
+    let amount = 100;
+
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(athena_vm_sdk::encode_spend_inner(&recipient, amount));
+
+    let selector = MethodSelector::from("athexp_maxspend");
+    let result = ExecutionClient::new().execute_function(
+      super::ELF,
+      &selector,
+      stdin,
+      Some(&mut host),
+      Some(25000000),
+      None,
+    );
+    let (mut result, gas_cost) = result.unwrap();
+    assert!(gas_cost.is_some());
+    assert_eq!(result.read::<u64>(), amount);
   }
 }

@@ -39,10 +39,10 @@ impl WalletProgram for Wallet {
   }
 
   #[callable]
-  fn spend(&self, send_arguments: SpendArguments) {
+  fn spend(&self, args: SpendArguments) {
     // Send coins
     // Note: error checking happens inside the host
-    call(send_arguments.recipient, None, None, send_arguments.amount);
+    call(args.recipient, None, None, args.amount);
   }
 
   fn proxy(&self, _destination: Address, _args: &[u8]) {
@@ -52,6 +52,11 @@ impl WalletProgram for Wallet {
   #[callable]
   fn deploy(&self, code: alloc::vec::Vec<u8>) -> Address {
     athena_vm_sdk::deploy(code)
+  }
+
+  #[callable]
+  fn maxspend(&self, args: SpendArguments) -> u64 {
+    args.amount
   }
 }
 
