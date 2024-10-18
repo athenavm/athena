@@ -725,7 +725,10 @@ impl<'host> Runtime<'host> {
   }
 
   /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function_by_name(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+  pub fn execute_function_by_name(
+    &mut self,
+    symbol_name: &str,
+  ) -> Result<Option<u32>, ExecutionError> {
     self.jump_to_symbol(symbol_name)?;
     // Hand over to execute
     self.execute()
