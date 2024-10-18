@@ -3,7 +3,7 @@ package athcon
 import (
 	"encoding/hex"
 
-	"golang.org/x/crypto/blake2b"
+	"github.com/zeebo/blake3"
 )
 
 // Address represents the 24 bytes address of an Athena account.
@@ -20,14 +20,11 @@ type MethodSelector [MethodSelectorLength]byte
 
 // FromString converts a string to a MethodSelector, similar to the Rust From<&str> implementation.
 func FromString(value string) (MethodSelector, error) {
-	hash, err := blake2b.New256(nil)
-	if err != nil {
-		return MethodSelector{}, err
-	}
-	hash.Write([]byte(value))
-	hashBytes := hash.Sum(nil)
 	var selector MethodSelector
-	copy(selector[:], hashBytes[:MethodSelectorLength])
+	hasher := blake3.New()
+	hasher.Write([]byte(value))
+	hasher.Digest().Read(selector[:])
+
 	return selector, nil
 }
 

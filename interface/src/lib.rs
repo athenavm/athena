@@ -6,7 +6,7 @@ mod context;
 pub mod payload;
 pub use context::*;
 
-use blake3::{hash, Hasher};
+use blake3::Hasher;
 pub use parity_scale_codec::{Decode, Encode};
 use payload::ExecutionPayload;
 
@@ -25,8 +25,9 @@ pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
   fn from(value: &str) -> Self {
+    let hash = blake3::hash(value.as_bytes());
     MethodSelector(
-      hash(value.as_bytes()).as_bytes()[..METHOD_SELECTOR_LENGTH]
+      hash.as_bytes()[..METHOD_SELECTOR_LENGTH]
         .try_into()
         .unwrap(),
     )

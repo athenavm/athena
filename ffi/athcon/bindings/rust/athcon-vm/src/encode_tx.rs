@@ -72,6 +72,7 @@ mod tests {
     assert_eq!(tx.selector, Some(MethodSelector::from("athexp_spawn")));
     assert_eq!(Pubkey::decode(&mut tx.input.as_slice()).unwrap(), pubkey);
   }
+
   #[test]
   fn encoding_spend_tx() {
     let address = [0x1C; 24];

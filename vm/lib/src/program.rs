@@ -110,6 +110,30 @@ where
   }
 }
 
+/// Implement Method for methods taking 2 arguments:
+/// # Example:
+/// ```ignore
+/// impl Foo {
+///   fn foo(&self, arg1: impl IntoArgument<T1, IO>, arg2: impl IntoArgument<T2, IO>) -> impl IntoResult<IO>
+/// }
+/// ```
+impl<F, IO, S, T1, T2, R> Method<(&S, T1, T2), R, IO> for F
+where
+  IO: Read + Write,
+  F: Fn(&S, T1, T2) -> R,
+  S: IntoArgument<S, IO>,
+  T1: IntoArgument<T1, IO>,
+  T2: IntoArgument<T2, IO>,
+  R: IntoResult<IO>,
+{
+  fn call_method(self, io: &mut IO) {
+    let instance = S::into_argument(io);
+    let arg1 = T1::into_argument(io);
+    let arg2 = T2::into_argument(io);
+    self(&instance, arg1, arg2).into_result(io);
+  }
+}
+
 /// Implement Function for functions taking 2 arguments:
 /// # Example:
 /// ```ignore
