@@ -73,6 +73,10 @@ fn main() {
   let context = AthenaContext::new(ADDRESS_ALICE, ADDRESS_BOB, 0);
 
   let mut stdin = AthenaStdin::new();
+
+  // write some random data to stdin first
+  stdin.write(&[0u8; 8]);
+
   let wallet = host
     .get_program(&address)
     .expect("getting wallet program instance")
@@ -102,7 +106,7 @@ fn main() {
       &method_selector,
       stdin,
       Some(&mut host),
-      Some(25000),
+      Some(25000000),
       Some(context.clone()),
     )
     .expect("sending coins");

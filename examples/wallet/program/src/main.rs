@@ -1,6 +1,5 @@
 //! The Spacemesh standard wallet template.
 #![no_main]
-#![no_std]
 extern crate alloc;
 
 use athena_interface::Address;
@@ -42,6 +41,10 @@ impl WalletProgram for Wallet {
   fn send(&self, send_arguments: SendArguments) {
     // Send coins
     // Note: error checking happens inside the host
+    println!(
+      "Sending {} coins to {:?}",
+      send_arguments.amount, send_arguments.recipient
+    );
     call(send_arguments.recipient, None, None, send_arguments.amount);
   }
 
