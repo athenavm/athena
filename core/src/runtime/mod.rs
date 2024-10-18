@@ -8,6 +8,7 @@ mod syscall;
 #[macro_use]
 mod utils;
 
+use athena_interface::MethodSelector;
 pub use instruction::*;
 pub use opcode::*;
 pub use program::*;
@@ -702,10 +703,29 @@ impl<'host> Runtime<'host> {
     tracing::info!("starting execution");
   }
 
-  /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+  /// Execute an exported function by name. Does the same work as execute().
+  pub fn execute_function_by_name(
+    &mut self,
+    symbol_name: &str,
+  ) -> Result<Option<u32>, ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
+      Some(offset) => *offset,
+      None => return Err(ExecutionError::UnknownSymbol()),
+    };
+    self.state.pc = offset;
+
+    // Hand over to execute
+    self.execute()
+  }
+
+  /// Execute an exported function using method selector. Does the same work as execute().
+  pub fn execute_function_by_selector(
+    &mut self,
+    selector: &MethodSelector,
+  ) -> Result<Option<u32>, ExecutionError> {
+    // Make sure the selector exists, and set the program counter
+    let offset = match self.program.selector_table.get(selector) {
       Some(offset) => *offset,
       None => return Err(ExecutionError::UnknownSymbol()),
     };
@@ -888,7 +908,7 @@ pub mod tests {
 
     // now attempt to execute each function in turn
     // first, the spawn
-    runtime.execute_function("athexp_spawn").unwrap();
+    runtime.execute_function_by_name("athexp_spawn").unwrap();
     drop(runtime);
 
     // get newly-created wallet address
@@ -920,7 +940,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
-    let res = runtime.execute_function("athexp_spend");
+    let res = runtime.execute_function_by_name("athexp_spend");
     match res {
       Ok(_) => panic!("expected execution error"),
       Err(e) => match e {
@@ -951,7 +971,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // do the send again
-    runtime.execute_function("athexp_spend").unwrap();
+    runtime.execute_function_by_name("athexp_spend").unwrap();
 
     // final balance check: some of alice's coins were sent to Charlie
     assert_eq!(
@@ -1100,18 +1120,8 @@ pub mod tests {
       Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
     );
     instructions.push(
-      // X13 is arg4 (ptr to method name)
-      // zero pointer
-      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X14 is arg5 (method name len)
-      // no input
-      Instruction::new(Opcode::ADD, Register::X14 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X15 is arg6 (value ptr)
-      Instruction::new(Opcode::ADD, Register::X15 as u32, 0, memloc2, false, true),
+      // X13 is arg4 (value ptr)
+      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, memloc2, false, true),
     );
     instructions.push(
       // X5 is syscall ID

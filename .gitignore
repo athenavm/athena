@@ -11,7 +11,7 @@ target/
 /build
 /cmake-build-*
 /.idea
-/.vscode
+.vscode/
 .DS_Store
 
 # Ignore the book build directory

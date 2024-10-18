@@ -113,21 +113,6 @@ extern "C"
     size_t input_size;
 
     /**
-     * The destination program method to call.
-     *
-     * The arbitrary length byte array of the method name of the call.
-     * This MAY be NULL.
-     */
-    const uint8_t *method_name;
-
-    /**
-     * The size of the method name data.
-     *
-     * If method_name is NULL this MUST be 0.
-     */
-    size_t method_name_size;
-
-    /**
      * The number of coins transferred with the message.
      *
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.
@@ -202,7 +187,7 @@ extern "C"
    */
   typedef athcon_address (*athcon_spawn_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
 
-    /**
+  /**
    * Deploy program callback function.
    *
    * This callback function is used by a VM to deploy a new program template
@@ -829,7 +814,7 @@ extern "C"
   void athcon_free_bytes(athcon_bytes* v);
 
   athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
-  athcon_bytes* athcon_encode_tx_spend(const athcon_bytes* state, const athcon_address* recipient, uint64_t amount);
+  athcon_bytes* athcon_encode_tx_spend(const athcon_address* recipient, uint64_t amount);
 
   athcon_bytes* athcon_encode_verify_tx(const athcon_bytes* state, const athcon_bytes* tx, uint8_t (*signature)[64]);
 

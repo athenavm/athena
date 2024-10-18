@@ -20,14 +20,6 @@ import (
 	"github.com/ebitengine/purego"
 )
 
-// Address represents the 24 bytes address of an Athena account.
-type Address [24]byte
-
-// Bytes32 represents the 32 bytes of arbitrary data (e.g. the result of Keccak256
-// hash). It occasionally is used to represent 256-bit unsigned integer values
-// stored in big-endian byte order.
-type Bytes32 [32]byte
-
 // Static asserts.
 const (
 	// The size of athcon_bytes32 equals the size of Bytes32.
@@ -69,7 +61,7 @@ type Library struct {
 	create func() *C.struct_athcon_vm
 
 	encodeTxSpawn  func(*C.athcon_bytes32) *C.athcon_bytes
-	encodeTxSpend  func(*C.athcon_bytes, *C.athcon_address, C.uint64_t) *C.athcon_bytes
+	encodeTxSpend  func(*C.athcon_address, C.uint64_t) *C.athcon_bytes
 	encodeVerifyTx func(*C.athcon_bytes, *C.athcon_bytes, *[64]C.uint8_t) *C.athcon_bytes
 
 	freeBytes func(*C.athcon_bytes)
@@ -198,7 +190,6 @@ func (vm *VM) Execute(
 	gas int64,
 	recipient, sender Address,
 	input []byte,
-	method []byte,
 	value uint64,
 	code []byte,
 ) (res Result, err error) {
@@ -222,13 +213,6 @@ func (vm *VM) Execute(
 		defer C.free(cInputData)
 		msg.input_data = (*C.uchar)(cInputData)
 		msg.input_size = C.size_t(len(input))
-	}
-	if len(method) > 0 {
-		// Allocate memory for method name in C.
-		cMethodName := C.CBytes(method)
-		defer C.free(cMethodName)
-		msg.method_name = (*C.uchar)(cMethodName)
-		msg.method_name_size = C.size_t(len(method))
 	}
 
 	ctxHandle := cgo.NewHandle(ctx)
@@ -281,14 +265,8 @@ func (l *Library) EncodeTxSpawn(pubkey Bytes32) []byte {
 	return tx
 }
 
-func (l *Library) EncodeTxSpend(walletState []byte, recipient Address, nonce uint64) []byte {
-	cState := C.CBytes(walletState)
-	defer C.free(cState)
+func (l *Library) EncodeTxSpend(recipient Address, nonce uint64) []byte {
 	encoded := l.encodeTxSpend(
-		&C.athcon_bytes{
-			ptr:  (*C.uchar)(cState),
-			size: C.size_t(len(walletState)),
-		},
 		athconAddress(recipient),
 		C.uint64_t(nonce),
 	)

@@ -7,22 +7,13 @@ use athena_interface::StorageStatus;
 ///
 /// `address` is the callee address, `input_ptr` is a bytearray to be passed to the
 /// callee function, and `input_len` is the number of bytes to read from the input bytearray.
-/// `method_ptr` is the name of the function to call, and `method_len` is the length of
-/// the method name in bytes.
 /// `amount` is the number of coins to transfer to the callee.
 /// For now there is no return value and no return status code. The caller can assume
 /// that, if this function returns, the call was successful.
 ///
 /// See https://github.com/athenavm/athena/issues/5 for more information.
 #[allow(unused_variables)]
-pub fn call(
-  address: *const u32,
-  input_ptr: *const u32,
-  input_len: usize,
-  method_ptr: *const u32,
-  method_len: usize,
-  amount: *const u32,
-) {
+pub fn call(address: *const u32, input_ptr: *const u32, input_len: usize, amount: *const u32) {
   #[cfg(target_os = "zkvm")]
   unsafe {
     asm!(
@@ -31,9 +22,7 @@ pub fn call(
         in("a0") address,
         in("a1") input_ptr,
         in("a2") input_len,
-        in("a3") method_ptr,
-        in("a4") method_len,
-        in("a5") amount,
+        in("a3") amount,
     )
   }
 

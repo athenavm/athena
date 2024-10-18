@@ -84,7 +84,7 @@ type HostContext interface {
 	GetBalance(addr Address) uint64
 	GetTxContext() TxContext
 	GetBlockHash(number int64) Bytes32
-	Call(kind CallKind, recipient Address, sender Address, value uint64, input []byte, method []byte, gas int64, depth int) (
+	Call(kind CallKind, recipient Address, sender Address, value uint64, input []byte, gas int64, depth int) (
 		output []byte, gasLeft int64, createAddr Address, err error)
 	Spawn(blob []byte) Address
 	Deploy(code []byte) Address
@@ -141,7 +141,7 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 
 	kind := CallKind(msg.kind)
 	output, gasLeft, createAddr, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), uint64(msg.value),
-		goByteSlice(msg.input_data, msg.input_size), goByteSlice(msg.method_name, msg.method_name_size), int64(msg.gas), int(msg.depth))
+		goByteSlice(msg.input_data, msg.input_size), int64(msg.gas), int(msg.depth))
 
 	statusCode := C.enum_athcon_status_code(0)
 	if err != nil {
@@ -160,14 +160,14 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 
 //export spawn
 func spawn(pCtx unsafe.Pointer, pBlob *C.uint8_t, blobSize C.size_t) C.athcon_address {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	blob := goByteSlice(pBlob, blobSize)
 	return *athconAddress(ctx.Spawn(blob))
 }
 
 //export deploy
 func deploy(pCtx unsafe.Pointer, pCode *C.uint8_t, codeSize C.size_t) C.athcon_address {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	code := goByteSlice(pCode, codeSize)
 	return *athconAddress(ctx.Deploy(code))
 }
