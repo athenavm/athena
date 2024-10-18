@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 
 use nohash_hasher::BuildNoHashHasher;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 
 /// Holds data describing the current state of a program's execution.
-#[serde_as]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct ExecutionState {
   /// The global clock keeps track of how many instrutions have been executed.
   pub global_clk: u64,

@@ -54,11 +54,7 @@ fn test_athcon_create() {
 
     // Test the FFI functions
     assert_eq!(
-      vm.set_option.unwrap()(
-        vm_ptr,
-        "foo\0".as_ptr() as *const std::os::raw::c_char,
-        "bar\0".as_ptr() as *const std::os::raw::c_char
-      ),
+      vm.set_option.unwrap()(vm_ptr, c"foo".as_ptr(), c"bar".as_ptr()),
       ffi::athcon_set_option_result::ATHCON_SET_OPTION_INVALID_NAME
     );
     assert_eq!(
@@ -78,8 +74,6 @@ fn test_athcon_create() {
       sender: ::athcon_sys::athcon_address::default(),
       input_data: std::ptr::null(),
       input_size: 0,
-      method_name: std::ptr::null(),
-      method_name_size: 0,
       value: 0,
       code: code.as_ptr(),
       code_size: code.len(),

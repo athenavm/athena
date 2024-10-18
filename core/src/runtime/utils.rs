@@ -7,7 +7,7 @@ pub const fn align(addr: u32) -> u32 {
   addr - addr % 4
 }
 
-impl<'h> Runtime<'h> {
+impl Runtime<'_> {
   #[inline]
   pub fn log(&mut self, instruction: &Instruction) {
     // Write the current program counter to the trace buffer for the cycle tracer.

@@ -5,14 +5,14 @@ use serde::Serialize;
 
 use super::Runtime;
 
-impl<'host> Read for Runtime<'host> {
+impl Read for Runtime<'_> {
   fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
     self.read_public_values_slice(buf);
     Ok(buf.len())
   }
 }
 
-impl<'host> Runtime<'host> {
+impl Runtime<'_> {
   pub fn write_stdin<U: Serialize>(&mut self, input: &U) {
     let mut buf = Vec::new();
     bincode::serialize_into(&mut buf, input).expect("serialization failed");
