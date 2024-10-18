@@ -1,7 +1,7 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
-  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, SetOptionError, StatusCode, VmInterface,
+  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, Decode,
+  ExecutionPayload, ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -47,37 +47,43 @@ where
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
     let mut stdin = AthenaStdin::new();
-
-    // input data is optional
-    if let Some(input_data) = msg.input_data {
-      stdin.write_vec(input_data);
+    let execution_payload = match msg
+      .input_data
+      .map_or(Ok(ExecutionPayload::default()), |data| {
+        ExecutionPayload::decode(&mut data.as_slice())
+      }) {
+      Ok(p) => p,
+      Err(e) => {
+        tracing::info!("Failed to deserialize execution payload: {e:?}");
+        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+      }
+    };
+    let input_len = execution_payload.input.len();
+    if input_len > 0 {
+      stdin.write_vec(execution_payload.input);
     }
-
-    // method name is also optional
-    let execution_result = if let Some(method_name) = msg.method {
-      // TODO: use a fixed-length method selector here rather than a string
-      // https://github.com/athenavm/athena/issues/113
-      let method_name_str = match std::str::from_utf8(&method_name) {
-        Ok(name) => name,
-        Err(err) => {
-          tracing::info!("malformed utf-8 method name: {err:?}");
-          return ExecutionResult::new(StatusCode::Failure, 0, None, None);
-        }
-      };
-      tracing::info!("Executing method {method_name_str} with input data");
-      self.client.execute_function(
-        code,
-        method_name_str,
-        stdin,
-        Some(host),
-        Some(msg.gas),
-        Some(context),
-      )
-    } else {
-      tracing::info!("Executing default method with input data");
-      self
-        .client
-        .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+    let execution_result = match execution_payload.selector {
+      Some(method) => {
+        tracing::info!(
+          "Executing method 0x{} with input length {}",
+          method,
+          input_len,
+        );
+        self.client.execute_function(
+          code,
+          &method,
+          stdin,
+          Some(host),
+          Some(msg.gas),
+          Some(context),
+        )
+      }
+      None => {
+        tracing::info!("Executing default method with input length {}", input_len,);
+        self
+          .client
+          .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+      }
     };
 
     match execution_result {
@@ -106,8 +112,9 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, MockHostInterface,
-    ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, Encode, ExecutionPayload, MessageKind,
+    MethodSelector, MockHost, MockHostInterface, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY,
+    STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -131,7 +138,6 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
-        None,
         Balance::default(),
         vec![],
       ),
@@ -141,6 +147,7 @@ mod tests {
 
   #[test]
   fn test_method_selector() {
+    setup_logger();
     let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
 
     // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
@@ -160,7 +167,6 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
-        None,
         Balance::default(),
         vec![],
       ),
@@ -170,6 +176,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
+    let payload = ExecutionPayload {
+      selector: Some(MethodSelector::from("athexp_test1")),
+      input: input.clone(),
+    };
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -179,8 +189,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(input),
-        Some("athexp_test1".as_bytes().to_vec()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -190,6 +199,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
+    let payload = ExecutionPayload {
+      selector: Some(MethodSelector::from("athexp_test2")),
+      input: input.clone(),
+    };
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -199,8 +212,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        None,
-        Some("athexp_test2".as_bytes().to_vec()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -210,6 +222,10 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
+    let payload = ExecutionPayload {
+      selector: Some(MethodSelector::from("athexp_test3")),
+      input,
+    };
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -219,8 +235,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        None,
-        Some("athexp_test3".as_bytes().to_vec()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -306,14 +321,17 @@ mod tests {
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
+    let payload = ExecutionPayload {
+      selector: None,
+      input: vec![8, 0, 0, 0],
+    };
     let msg = AthenaMessage::new(
       MessageKind::Call,
       0,
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      Some(vec![8u8, 0, 0, 0]),
-      None,
+      Some(payload.encode()),
       0,
       vec![],
     );

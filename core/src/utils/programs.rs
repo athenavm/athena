@@ -1,7 +1,6 @@
 #[cfg(test)]
 pub mod tests {
   /// Demos.
-
   pub const FIBONACCI_ELF: &[u8] =
     include_bytes!("../../../examples/fibonacci/program/elf/fibonacci-program");
 
@@ -14,7 +13,6 @@ pub mod tests {
     include_bytes!("../../../examples/wallet/program/elf/wallet-template");
 
   /// Tests.
-
   pub const TEST_FIBONACCI_ELF: &[u8] =
     include_bytes!("../../../tests/fibonacci/elf/fibonacci-test");
 

@@ -8,8 +8,8 @@
 use std::error::Error;
 
 use athena_interface::{
-  Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost,
-  ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+  Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MethodSelector,
+  MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{encode_spawn, encode_spend, Pubkey, SpendArguments};
@@ -42,9 +42,12 @@ fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> 
   let mut stdin = AthenaStdin::new();
   stdin.write_vec(encode_spawn(owner));
 
+  // calculate method selector
+  let method_selector = MethodSelector::from("athexp_spawn");
+
   let client = ExecutionClient::new();
   let (mut result, _) =
-    client.execute_function(ELF, "athexp_spawn", stdin, Some(host), None, None)?;
+    client.execute_function(ELF, &method_selector, stdin, Some(host), None, None)?;
 
   Ok(result.read())
 }
@@ -88,10 +91,12 @@ fn main() {
     hex::encode(context.address()),
     hex::encode(args.recipient),
   );
+  // calculate method selector
+  let method_selector = MethodSelector::from("athexp_spend");
   let (_, gas_cost) = ExecutionClient::new()
     .execute_function(
       ELF,
-      "athexp_spend",
+      &method_selector,
       stdin,
       Some(&mut host),
       Some(25000),
@@ -114,7 +119,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{Address, HostDynamicContext, HostStaticContext, MockHost, ADDRESS_ALICE};
+  use athena_interface::{
+    Address, HostDynamicContext, HostStaticContext, MethodSelector, MockHost, ADDRESS_ALICE,
+  };
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::{encode_deploy, Pubkey};
 
@@ -137,9 +144,10 @@ mod tests {
     let wallet_state = host.get_program(&address).unwrap();
     stdin.write_vec(encode_deploy(wallet_state.clone(), code.clone()));
 
+    let selector = MethodSelector::from("athexp_deploy");
     let result = ExecutionClient::new().execute_function(
       super::ELF,
-      "athexp_deploy",
+      &selector,
       stdin.clone(),
       Some(&mut host),
       Some(25000000),
