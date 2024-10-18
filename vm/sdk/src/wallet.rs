@@ -34,11 +34,6 @@ pub fn encode_spawn(pubkey: &Pubkey) -> Vec<u8> {
   payload.encode()
 }
 
-pub fn encode_deploy(code: Vec<u8>) -> Vec<u8> {
-  let payload = Payload::new(Some(MethodSelector::from("athexp_spawn")), code.encode());
-  payload.encode()
-}
-
 #[cfg(test)]
 mod tests {
   use athena_interface::{payload::Payload, MethodSelector};
