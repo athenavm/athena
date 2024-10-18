@@ -99,7 +99,7 @@ func accountExists(pCtx unsafe.Pointer, pAddr *C.athcon_address) C.bool {
 //export getStorage
 func getStorage(pCtx unsafe.Pointer, pAddr *C.athcon_address, pKey *C.athcon_bytes32) C.athcon_bytes32 {
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
-	return athconBytes32(ctx.GetStorage(goAddress(*pAddr), goHash(*pKey)))
+	return *athconBytes32(ctx.GetStorage(goAddress(*pAddr), goHash(*pKey)))
 }
 
 //export setStorage
@@ -121,18 +121,18 @@ func getTxContext(pCtx unsafe.Pointer) C.struct_athcon_tx_context {
 
 	return C.struct_athcon_tx_context{
 		C.uint64_t(txContext.GasPrice),
-		athconAddress(txContext.Origin),
+		*athconAddress(txContext.Origin),
 		C.int64_t(txContext.BlockHeight),
 		C.int64_t(txContext.Timestamp),
 		C.int64_t(txContext.GasLimit),
-		athconBytes32(txContext.ChainID),
+		*athconBytes32(txContext.ChainID),
 	}
 }
 
 //export getBlockHash
 func getBlockHash(pCtx unsafe.Pointer, number int64) C.athcon_bytes32 {
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
-	return athconBytes32(ctx.GetBlockHash(number))
+	return *athconBytes32(ctx.GetBlockHash(number))
 }
 
 //export call
@@ -154,22 +154,22 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 	}
 
 	result := C.athcon_make_result(statusCode, C.int64_t(gasLeft), outputData, C.size_t(len(output)))
-	result.create_address = athconAddress(createAddr)
+	result.create_address = *athconAddress(createAddr)
 	return result
 }
 
 //export spawn
 func spawn(pCtx unsafe.Pointer, pBlob *C.uint8_t, blobSize C.size_t) C.athcon_address {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	blob := goByteSlice(pBlob, blobSize)
-	return athconAddress(ctx.Spawn(blob))
+	return *athconAddress(ctx.Spawn(blob))
 }
 
 //export deploy
 func deploy(pCtx unsafe.Pointer, pCode *C.uint8_t, codeSize C.size_t) C.athcon_address {
-	ctx := cgo.Handle(pCtx).Value().(HostContext)
+	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 	code := goByteSlice(pCode, codeSize)
-	return athconAddress(ctx.Deploy(code))
+	return *athconAddress(ctx.Deploy(code))
 }
 
 func newHostInterface() *C.struct_athcon_host_interface {

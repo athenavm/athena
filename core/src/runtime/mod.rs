@@ -824,7 +824,7 @@ pub mod tests {
     ADDRESS_LENGTH, SOME_COINS,
   };
   use athena_vm::helpers::address_to_32bit_words;
-  use athena_vm_sdk::SendArguments;
+  use athena_vm_sdk::SpendArguments;
   use parity_scale_codec::Encode;
 
   use crate::{
@@ -908,7 +908,7 @@ pub mod tests {
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
     // set up send arguments
-    let send_args = SendArguments {
+    let send_args = SpendArguments {
       amount: amount_to_send,
       recipient: ADDRESS_CHARLIE,
     };
@@ -920,27 +920,6 @@ pub mod tests {
     let mut stdin = AthenaStdin::new();
     stdin.write(&owner_pubkey);
     runtime.write_vecs(&stdin.buffer);
-
-    // make sure the program loaded correctly
-    // riscv32-unknown-linux-gnu-objdump -d -j .text elf/wallet-template | grep athexp
-    assert_eq!(
-      runtime
-        .program
-        .as_ref()
-        .symbol_table
-        .get("athexp_spawn")
-        .unwrap(),
-      &2106660
-    );
-    assert_eq!(
-      runtime
-        .program
-        .as_ref()
-        .symbol_table
-        .get("athexp_send")
-        .unwrap(),
-      &2106712
-    );
 
     // now attempt to execute each function in turn
     // first, the spawn
@@ -976,7 +955,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // now attempt the send
-    let res = runtime.execute_function_by_name("athexp_send");
+    let res = runtime.execute_function_by_name("athexp_spend");
     match res {
       Ok(_) => panic!("expected execution error"),
       Err(e) => match e {
@@ -1007,7 +986,7 @@ pub mod tests {
     runtime.write_vecs(&stdin.buffer);
 
     // do the send again
-    runtime.execute_function_by_name("athexp_send").unwrap();
+    runtime.execute_function_by_name("athexp_spend").unwrap();
 
     // final balance check: some of alice's coins were sent to Charlie
     assert_eq!(

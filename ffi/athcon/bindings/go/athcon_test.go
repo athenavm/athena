@@ -86,3 +86,22 @@ func TestErrorMessage(t *testing.T) {
 	check(Error(-1), "internal error")
 	check(Error(1000), "<unknown>")
 }
+
+func TestLibraryEncodeTx(t *testing.T) {
+	lib, err := LoadLibrary(modulePath)
+	require.NoError(t, err)
+	t.Run("spawn", func(t *testing.T) {
+		tx := lib.EncodeTxSpawn(Bytes32{9, 8, 7, 6})
+		require.NotEmpty(t, tx)
+
+		tx2 := lib.EncodeTxSpawn(Bytes32{1, 2, 3, 4})
+		require.NotEqual(t, tx, tx2)
+	})
+	t.Run("spend", func(t *testing.T) {
+		tx := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 191239)
+		require.NotEmpty(t, tx)
+
+		tx2 := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 80972)
+		require.NotEqual(t, tx, tx2)
+	})
+}

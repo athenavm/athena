@@ -3,9 +3,10 @@ package athcon
 import (
 	"encoding/hex"
 	"fmt"
+	"testing"
+
 	"github.com/ChainSafe/gossamer/pkg/scale"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestEncoding(t *testing.T) {
@@ -14,7 +15,7 @@ func TestEncoding(t *testing.T) {
 	fmt.Printf("Selector: %s\n", selector)
 	require.NoError(t, err)
 
-	payload := ExecutionPayload{
+	payload := Payload{
 		Selector: &selector,
 		Input:    []byte("example_input_data"),
 	}
@@ -24,7 +25,7 @@ func TestEncoding(t *testing.T) {
 
 	fmt.Println("Encoded Payload:", hex.EncodeToString(encoded))
 
-	var unmarshaled ExecutionPayload
+	var unmarshaled Payload
 	err = scale.Unmarshal(encoded, &unmarshaled)
 	require.NoError(t, err)
 

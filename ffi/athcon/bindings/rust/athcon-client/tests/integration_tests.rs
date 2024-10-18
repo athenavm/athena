@@ -7,6 +7,7 @@ use athcon_client::{
   AthconVm,
 };
 use athcon_vm::{MessageKind, Revision, StatusCode, StorageStatus};
+use athena_interface::payload::ExecutionPayload;
 use athena_interface::ADDRESS_ALICE;
 
 const CONTRACT_CODE: &[u8] =
@@ -98,6 +99,15 @@ impl HostInterface for HostContext {
       );
     }
 
+    // The input must be enriched with optional account state
+    // and then passed to the VM.
+    let execution_payload = ExecutionPayload {
+      // TODO: figure out when to provide a state here
+      state: vec![],
+      payload: input.to_vec(),
+    };
+    let input: Vec<u8> = execution_payload.into();
+
     let res = self.vm.clone().execute(
       self,
       Revision::ATHCON_FRONTIER,
@@ -106,7 +116,7 @@ impl HostInterface for HostContext {
       gas,
       destination,
       sender,
-      input,
+      &input,
       value,
       CONTRACT_CODE,
     );
@@ -134,21 +144,28 @@ impl Drop for HostContext {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use athena_interface::{Encode, ExecutionPayload};
+  use athena_interface::{
+    payload::{ExecutionPayloadBuilder, Payload},
+    Encode,
+  };
 
   /// Test the Rust host interface to athcon
   /// We don't use this in production since Athena provides only the VM, not the Host, but
   /// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
   #[test]
   fn test_rust_host() {
+    tracing_subscriber::fmt::init();
+
     let vm = AthconVm::new();
     println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
 
     let mut host = HostContext::new(vm);
-    let payload = ExecutionPayload {
-      selector: None,
-      input: vec![3u8, 0, 0, 0],
-    };
+    let payload = ExecutionPayloadBuilder::new()
+      .with_payload(Payload {
+        selector: None,
+        input: vec![3u8, 0, 0, 0],
+      })
+      .build();
 
     let (output, gas_left, status_code) = host.vm.clone().execute(
       &mut host,

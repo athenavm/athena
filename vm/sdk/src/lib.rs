@@ -1,14 +1,18 @@
-use athena_interface::{Address, Bytes32};
+use athena_interface::Bytes32;
 use cfg_if::cfg_if;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
+
+pub mod wallet;
+pub use wallet::*;
+
+mod call;
+pub use call::call;
 
 cfg_if! {
   if #[cfg(target_os = "zkvm")] {
     mod spawn;
     pub use spawn::spawn;
-    mod call;
-    pub use call::call;
     mod deploy;
     pub use deploy::deploy;
     mod io;
@@ -17,7 +21,7 @@ cfg_if! {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Pubkey(pub Bytes32);
 
 #[allow(dead_code)] // Used by RISC-V targets and tests
@@ -45,23 +49,8 @@ pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
   result
 }
 
-// These traits define the reference wallet interface.
-
 pub trait VerifiableTemplate {
   fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
-}
-
-#[derive(Clone, Copy, Debug, Default, Encode, Decode)]
-pub struct SendArguments {
-  pub recipient: Address,
-  pub amount: u64,
-}
-
-pub trait WalletProgram {
-  fn spawn(owner: Pubkey) -> Address;
-  fn send(&self, args: SendArguments);
-  fn proxy(&self, destination: Address, args: &[u8]);
-  fn deploy(&self, code: Vec<u8>) -> Address;
 }
 
 #[cfg(test)]

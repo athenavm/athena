@@ -2,6 +2,7 @@ package athcon
 
 import (
 	"encoding/hex"
+
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -36,6 +37,11 @@ func (ms MethodSelector) String() string {
 }
 
 type ExecutionPayload struct {
+	State   []byte
+	Payload []byte
+}
+
+type Payload struct {
 	Selector *MethodSelector
 	Input    []byte
 }
