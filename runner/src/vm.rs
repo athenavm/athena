@@ -1,8 +1,10 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
+  payload::{ExecutionPayload, Payload},
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, Decode,
-  ExecutionPayload, ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
+  ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
 };
+
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
@@ -58,11 +60,28 @@ where
         return ExecutionResult::new(StatusCode::Failure, 0, None, None);
       }
     };
-    let input_len = execution_payload.input.len();
-    if input_len > 0 {
-      stdin.write_vec(execution_payload.input);
+    if !execution_payload.state.is_empty() {
+      stdin.write_vec(execution_payload.state);
     }
-    let execution_result = match execution_payload.selector {
+
+    let payload = if execution_payload.payload.is_empty() {
+      Ok(Payload::default())
+    } else {
+      Payload::decode(&mut execution_payload.payload.as_slice())
+    };
+    let Payload { selector, input } = match payload {
+      Ok(p) => p,
+      Err(e) => {
+        tracing::info!("Failed to deserialize payload: {e:?}");
+        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+      }
+    };
+
+    let input_len = input.len();
+    if input_len > 0 {
+      stdin.write_vec(input);
+    }
+    let execution_result = match selector {
       Some(method) => {
         tracing::info!(
           "Executing method 0x{} with input length {}",
@@ -112,9 +131,9 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, Encode, ExecutionPayload, MessageKind,
-    MethodSelector, MockHost, MockHostInterface, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY,
-    STORAGE_VALUE,
+    payload::{ExecutionPayloadBuilder, Payload},
+    Address, AthenaMessage, AthenaRevision, Balance, Encode, MessageKind, MethodSelector, MockHost,
+    MockHostInterface, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -176,10 +195,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: Some(MethodSelector::from("athexp_test1")),
       input: input.clone(),
     };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -199,10 +219,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: Some(MethodSelector::from("athexp_test2")),
       input: input.clone(),
     };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -222,10 +243,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: Some(MethodSelector::from("athexp_test3")),
-      input,
+      input: input.clone(),
     };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -321,17 +343,18 @@ mod tests {
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: None,
       input: vec![8, 0, 0, 0],
     };
+
     let msg = AthenaMessage::new(
       MessageKind::Call,
       0,
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      Some(payload.encode()),
+      Some(payload.into()),
       0,
       vec![],
     );

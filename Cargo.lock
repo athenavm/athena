@@ -105,6 +105,7 @@ dependencies = [
  "athena-interface",
  "athena-vmlib",
  "hex",
+ "tracing-subscriber",
 ]
 
 [[package]]

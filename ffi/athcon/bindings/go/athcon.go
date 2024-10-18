@@ -61,7 +61,7 @@ type Library struct {
 	create func() *C.struct_athcon_vm
 
 	encodeTxSpawn func(*C.athcon_bytes32) *C.athcon_bytes
-	encodeTxSpend func(*C.athcon_bytes, *C.athcon_address, C.uint64_t) *C.athcon_bytes
+	encodeTxSpend func(*C.athcon_address, C.uint64_t) *C.athcon_bytes
 
 	freeBytes func(*C.athcon_bytes)
 }
@@ -262,14 +262,8 @@ func (l *Library) EncodeTxSpawn(pubkey Bytes32) []byte {
 	return tx
 }
 
-func (l *Library) EncodeTxSpend(walletState []byte, recipient Address, nonce uint64) []byte {
-	cState := C.CBytes(walletState)
-	defer C.free(cState)
+func (l *Library) EncodeTxSpend(recipient Address, nonce uint64) []byte {
 	encoded := l.encodeTxSpend(
-		&C.athcon_bytes{
-			ptr:  (*C.uchar)(cState),
-			size: C.size_t(len(walletState)),
-		},
 		athconAddress(recipient),
 		C.uint64_t(nonce),
 	)

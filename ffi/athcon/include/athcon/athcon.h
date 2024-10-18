@@ -814,7 +814,7 @@ extern "C"
   void athcon_free_bytes(athcon_bytes* v);
 
   athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
-  athcon_bytes* athcon_encode_tx_spend(const athcon_bytes* state, const athcon_address* recipient, uint64_t amount);
+  athcon_bytes* athcon_encode_tx_spend(const athcon_address* recipient, uint64_t amount);
 
 #ifdef __cplusplus
 }

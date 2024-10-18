@@ -1,6 +1,6 @@
 //! Definitions of the reference wallet interface.
 
-use athena_interface::Address;
+use athena_interface::{payload::Payload, Address, MethodSelector};
 use parity_scale_codec::{Decode, Encode};
 
 use crate::Pubkey;
@@ -18,50 +18,46 @@ pub trait WalletProgram {
   fn deploy(&self, code: Vec<u8>) -> Address;
 }
 
-pub fn encode_spend(state: Vec<u8>, args: SpendArguments) -> Vec<u8> {
-  let mut encoded = state;
-  encoded.extend(args.encode());
-  encoded
+pub fn encode_spend(recipient: &Address, amount: u64) -> Vec<u8> {
+  let args = SpendArguments {
+    recipient: *recipient,
+    amount,
+  };
+  let input = args.encode();
+  let payload = Payload::new(Some(MethodSelector::from("athexp_spend")), input);
+
+  payload.encode()
 }
 
-pub fn encode_spawn(pubkey: Pubkey) -> Vec<u8> {
-  pubkey.encode()
+pub fn encode_spawn(pubkey: &Pubkey) -> Vec<u8> {
+  let payload = Payload::new(Some(MethodSelector::from("athexp_spawn")), pubkey.encode());
+  payload.encode()
 }
 
-pub fn encode_deploy(state: Vec<u8>, code: Vec<u8>) -> Vec<u8> {
-  let mut encoded = state;
-  encoded.extend(code.encode());
-  encoded
+pub fn encode_deploy(code: Vec<u8>) -> Vec<u8> {
+  let payload = Payload::new(Some(MethodSelector::from("athexp_spawn")), code.encode());
+  payload.encode()
 }
 
 #[cfg(test)]
 mod tests {
-  use parity_scale_codec::{Decode, Encode, IoReader};
+  use athena_interface::{payload::Payload, MethodSelector};
+  use parity_scale_codec::{Decode, IoReader};
 
   use super::SpendArguments;
 
-  #[derive(Debug, Clone, Encode, Decode, PartialEq, Eq)]
-  struct Wallet {
-    pub owner: super::Pubkey,
-  }
-
   #[test]
   fn encode_decode_spend() {
-    let wallet = Wallet {
-      owner: super::Pubkey([11u8; 32]),
-    };
-    let wallet_state = wallet.encode();
     let args = SpendArguments {
       recipient: [22u8; 24],
-      amount: 0,
+      amount: 800,
     };
-    let encoded = super::encode_spend(wallet_state, args);
+    let encoded = super::encode_spend(&args.recipient, args.amount);
 
     let mut input_reader = IoReader(encoded.as_slice());
-    let decoded_wallet = Wallet::decode(&mut input_reader).unwrap();
-    assert_eq!(decoded_wallet, wallet);
-
-    let decoded_args = SpendArguments::decode(&mut input_reader).unwrap();
+    let payload = Payload::decode(&mut input_reader).unwrap();
+    assert_eq!(payload.selector, Some(MethodSelector::from("athexp_spend")));
+    let decoded_args = SpendArguments::decode(&mut payload.input.as_slice()).unwrap();
     assert_eq!(decoded_args, args);
     assert!(input_reader.0.is_empty());
   }

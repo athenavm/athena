@@ -6,12 +6,13 @@ use serde::{Deserialize, Serialize};
 pub mod wallet;
 pub use wallet::*;
 
+mod call;
+pub use call::call;
+
 cfg_if! {
   if #[cfg(target_os = "zkvm")] {
     mod spawn;
     pub use spawn::spawn;
-    mod call;
-    pub use call::call;
     mod deploy;
     pub use deploy::deploy;
     mod io;
