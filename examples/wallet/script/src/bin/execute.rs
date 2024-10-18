@@ -8,11 +8,11 @@
 use std::error::Error;
 
 use athena_interface::{
-  payload::ExecutionPayload, Address, AthenaContext, Encode, HostDynamicContext, HostInterface,
-  HostStaticContext, MethodSelector, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+  Address, AthenaContext, Encode, HostDynamicContext, HostInterface, HostStaticContext,
+  MethodSelector, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use athena_vm_sdk::{encode_spawn, Pubkey, SpendArguments};
+use athena_vm_sdk::{Pubkey, SpendArguments};
 use clap::Parser;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
@@ -40,15 +40,8 @@ fn parse_owner(data: &str) -> Result<Pubkey, hex::FromHexError> {
 
 fn spawn(host: &mut MockHost, owner: &Pubkey) -> Result<Address, Box<dyn Error>> {
   let mut stdin = AthenaStdin::new();
+  stdin.write_vec(owner.encode());
 
-  let execution_payload = ExecutionPayload {
-    payload: encode_spawn(owner),
-    ..Default::default()
-  };
-
-  stdin.write_vec(execution_payload.into());
-
-  // calculate method selector
   let method_selector = MethodSelector::from("athexp_spawn");
 
   let client = ExecutionClient::new();
