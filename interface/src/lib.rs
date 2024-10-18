@@ -878,8 +878,6 @@ mod tests {
 
   #[test]
   fn test_method_selector() {
-    let selector = MethodSelector::from("athexp_verify");
-    dbg!(format!("{selector}"));
     let selector = MethodSelector::from("test");
     assert_eq!(selector.0, [72, 120, 202, 4]);
 
