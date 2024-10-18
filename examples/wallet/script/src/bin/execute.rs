@@ -124,7 +124,7 @@ mod tests {
     Address, Encode, HostDynamicContext, HostStaticContext, MethodSelector, MockHost, ADDRESS_ALICE,
   };
   use athena_sdk::{AthenaStdin, ExecutionClient};
-  use athena_vm_sdk::{encode_deploy, encode_verify, Pubkey};
+  use athena_vm_sdk::Pubkey;
   use ed25519_dalek::ed25519::signature::Signer;
   use ed25519_dalek::SigningKey;
   use rand::rngs::OsRng;
@@ -181,7 +181,7 @@ mod tests {
 
     let signing_key = SigningKey::generate(&mut OsRng);
     let owner = Pubkey(signing_key.verifying_key().to_bytes());
-    let address = super::spawn(&mut host, owner).unwrap();
+    let address = super::spawn(&mut host, &owner).unwrap();
     let wallet_state = host.get_program(&address).unwrap().clone();
 
     let tx = b"some really bad tx";
@@ -189,11 +189,13 @@ mod tests {
     // First try with invalid signature
     {
       let mut stdin = AthenaStdin::new();
-      stdin.write_vec(encode_verify(wallet_state.clone(), tx, &[0; 64]));
+      stdin.write_vec(wallet_state.clone());
+      stdin.write_vec(tx.as_slice().encode());
+      stdin.write_vec([0; 64].encode());
 
       let result = ExecutionClient::new().execute_function(
         super::ELF,
-        "athexp_verify",
+        &MethodSelector::from("athexp_verify"),
         stdin.clone(),
         Some(&mut host),
         Some(25000000),
@@ -205,13 +207,16 @@ mod tests {
     }
 
     // Now with valid signature
-    let mut stdin = AthenaStdin::new();
     let signature = signing_key.sign(tx);
-    stdin.write_vec(encode_verify(wallet_state, tx, &signature.to_bytes()));
+
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(tx.as_slice().encode());
+    stdin.write_vec(signature.to_bytes().encode());
 
     let result = ExecutionClient::new().execute_function(
       super::ELF,
-      "athexp_verify",
+      &MethodSelector::from("athexp_verify"),
       stdin.clone(),
       Some(&mut host),
       Some(25000000),
