@@ -42,8 +42,28 @@ func (err Error) Error() string {
 }
 
 const (
-	Failure = Error(C.ATHCON_FAILURE)
-	Revert  = Error(C.ATHCON_REVERT)
+	Failure                   = Error(C.ATHCON_FAILURE)
+	Revert                    = Error(C.ATHCON_REVERT)
+	OutOfGas                  = Error(C.ATHCON_OUT_OF_GAS)
+	InvalidInstruction        = Error(C.ATHCON_INVALID_INSTRUCTION)
+	UndefinedInstruction      = Error(C.ATHCON_UNDEFINED_INSTRUCTION)
+	StackOverflow             = Error(C.ATHCON_STACK_OVERFLOW)
+	StackUnderflow            = Error(C.ATHCON_STACK_UNDERFLOW)
+	BadJumpDestination        = Error(C.ATHCON_BAD_JUMP_DESTINATION)
+	InvalidMemoryAccess       = Error(C.ATHCON_INVALID_MEMORY_ACCESS)
+	CallDepthExceeded         = Error(C.ATHCON_CALL_DEPTH_EXCEEDED)
+	StaticModeViolation       = Error(C.ATHCON_STATIC_MODE_VIOLATION)
+	PrecompileFailure         = Error(C.ATHCON_PRECOMPILE_FAILURE)
+	ContractValidationFailure = Error(C.ATHCON_CONTRACT_VALIDATION_FAILURE)
+	ArgumentOutOfRange        = Error(C.ATHCON_ARGUMENT_OUT_OF_RANGE)
+	UnreachableInstruction    = Error(C.ATHCON_UNREACHABLE_INSTRUCTION)
+	Trap                      = Error(C.ATHCON_TRAP)
+	InsufficientBalance       = Error(C.ATHCON_INSUFFICIENT_BALANCE)
+	InsufficientInput         = Error(C.ATHCON_INSUFFICIENT_INPUT)
+	InvalidSyscallArgument    = Error(C.ATHCON_INVALID_SYSCALL_ARGUMENT)
+	InternalError             = Error(C.ATHCON_INTERNAL_ERROR)
+	Rejected                  = Error(C.ATHCON_REJECTED)
+	OutOfMemory               = Error(C.ATHCON_OUT_OF_MEMORY)
 )
 
 type Revision int32
