@@ -24,6 +24,7 @@ mockall = "0.13.0"
 gdbstub = "0.7.2"
 
 [dev-dependencies]
+athena-core = { path = ".", features = ["unittest"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 athena-vm = { path = "../vm/entrypoint" }
 athena-vm-sdk = { path = "../vm/sdk" }
@@ -31,3 +32,7 @@ parity-scale-codec = "3.6.12"
 
 [features]
 debug = []
+unittest = []
+
+[build-dependencies]
+athena-helper = {path = "../helper"}

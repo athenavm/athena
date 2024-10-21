@@ -172,6 +172,8 @@ dependencies = [
 name = "athena-core"
 version = "0.4.1"
 dependencies = [
+ "athena-core",
+ "athena-helper",
  "athena-interface",
  "athena-vm",
  "athena-vm-sdk",
@@ -229,7 +231,9 @@ dependencies = [
  "athcon-sys",
  "athcon-vm",
  "athena-core",
+ "athena-helper",
  "athena-interface",
+ "athena-runner",
  "athena-sdk",
  "bincode",
  "hex",
