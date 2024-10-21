@@ -28,20 +28,14 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets --all-features
+        run: cargo check --all-targets --all-features
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release
+        run: cargo test --release
         env:
           RUSTFLAGS: -Copt-level=3 -Cdebug-assertions -Coverflow-checks=y -Cdebuginfo=0 -C target-cpu=native
           RUST_BACKTRACE: 1
@@ -53,8 +47,11 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ffi/athcon/bindings/go/go.mod
+          cache-dependency-path: "**/go.sum"
 
       - name: Run go test
         run: |
@@ -71,24 +68,16 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-        env:
-          CARGO_INCREMENTAL: 1
+        run: cargo fmt --all -- --check
 
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-features --all-targets -- -D warnings -A incomplete-features
-        env:
-          CARGO_INCREMENTAL: 1
+        run: cargo clippy --all-features --all-targets -- -D warnings -A incomplete-features
 
   examples:
     name: Examples
@@ -100,8 +89,8 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
         run: |
@@ -112,8 +101,7 @@ jobs:
 
       - name: Install Athena CLI
         run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli
           cargo athena install-toolchain
 
       - name: Run cargo check
@@ -135,8 +123,8 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
         run: |
@@ -147,8 +135,7 @@ jobs:
 
       - name: Install Athena CLI
         run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli 
           cargo athena install-toolchain
 
       - name: Run cargo athena new
@@ -157,8 +144,7 @@ jobs:
 
       - name: Build program and run script
         run: |
-          cd fibonacci
-          cd program
+          cd fibonacci/program
           cargo add athena-vm --path $GITHUB_WORKSPACE/vm/entrypoint
           cargo athena build
           cd ../script
