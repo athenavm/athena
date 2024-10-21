@@ -12,6 +12,7 @@ package athcon
 import "C"
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime/cgo"
 	"strings"
@@ -221,6 +222,7 @@ func (vm *VM) Execute(
 	code []byte,
 ) (res Result, err error) {
 	if len(code) == 0 {
+		fmt.Fprintf(os.Stderr, "athcon: no input code")
 		return res, Failure
 	}
 	msg := C.struct_athcon_message{
