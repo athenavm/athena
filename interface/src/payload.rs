@@ -4,16 +4,37 @@ use crate::MethodSelector;
 
 /// Execution payload is passed as input to VM to execute a metod.
 /// The optional state contains a serialized wallet state. It should be
-/// None if the call doesn't require any state.
+/// empty if the call doesn't require any state.
 #[derive(Clone, Debug, Decode, Default, Encode, PartialEq, Eq)]
 pub struct ExecutionPayload {
   pub state: Vec<u8>,
-  pub payload: Vec<u8>,
+  pub payload: Payload,
 }
 
 impl From<ExecutionPayload> for Vec<u8> {
   fn from(value: ExecutionPayload) -> Self {
     value.encode()
+  }
+}
+
+impl ExecutionPayload {
+  /// Manually encode using an already encoded payload.
+  /// Effectively: encode(state) | payload
+  pub fn encode_with_encoded_payload<S, P>(state: S, payload: P) -> Vec<u8>
+  where
+    S: Into<Vec<u8>>,
+    P: AsRef<[u8]>,
+  {
+    // create a dummy instance to get a compilation error when `ExecutionPayload` is changed
+    // and to remember to update this method.
+    ExecutionPayload {
+      state: vec![],
+      payload: Payload::default(),
+    };
+
+    let mut encoded = state.into().encode();
+    encoded.extend_from_slice(payload.as_ref());
+    encoded
   }
 }
 
@@ -32,8 +53,8 @@ impl ExecutionPayloadBuilder {
     self
   }
 
-  pub fn with_payload<P: Into<Vec<u8>>>(mut self, payload: P) -> Self {
-    self.payload.payload = payload.into();
+  pub fn with_payload(mut self, payload: Payload) -> Self {
+    self.payload.payload = payload;
     self
   }
 
@@ -74,9 +95,20 @@ mod tests {
   use super::*;
 
   #[test]
-  fn encode_decode_payload() {
-    let payload = ExecutionPayload::default();
-    let encoded = payload.encode();
-    dbg!(encoded);
+  fn test_manual_encoding() {
+    let exe_payload = ExecutionPayload {
+      state: vec![1, 2, 3, 4, 5, 6, 7, 8],
+      payload: Payload {
+        selector: Some(MethodSelector::from("abcd")),
+        input: vec![9, 8, 7, 6],
+      },
+    };
+
+    let manually_encoded = ExecutionPayload::encode_with_encoded_payload(
+      exe_payload.state.clone(),
+      exe_payload.payload.encode(),
+    );
+
+    assert_eq!(manually_encoded, exe_payload.encode());
   }
 }

@@ -101,12 +101,9 @@ impl HostInterface for HostContext {
 
     // The input must be enriched with optional account state
     // and then passed to the VM.
-    let execution_payload = ExecutionPayload {
-      // TODO: figure out when to provide a state here
-      state: vec![],
-      payload: input.to_vec(),
-    };
-    let input: Vec<u8> = execution_payload.into();
+    // TODO: figure out when to provide a state here
+    let state = vec![];
+    let execution_payload = ExecutionPayload::encode_with_encoded_payload(state, input);
 
     let res = self.vm.clone().execute(
       self,
@@ -116,7 +113,7 @@ impl HostInterface for HostContext {
       gas,
       destination,
       sender,
-      &input,
+      &execution_payload,
       value,
       CONTRACT_CODE,
     );

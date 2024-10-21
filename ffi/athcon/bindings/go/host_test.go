@@ -133,8 +133,7 @@ func TestCall(t *testing.T) {
 
 	host := newHost()
 	addr := Address{}
-	payload, err := scale.Marshal(Payload{Input: []byte{2, 0, 0, 0}})
-	require.NoError(t, err)
+	payload := Payload{Input: []byte{2, 0, 0, 0}}
 	executionPayload := ExecutionPayload{Payload: payload}
 
 	encoded, err := scale.Marshal(executionPayload)
@@ -159,11 +158,9 @@ func TestSpawn(t *testing.T) {
 	pubkey := Bytes32([32]byte{1, 1, 2, 2, 3, 3, 4, 4})
 
 	payload := vm.Lib.EncodeTxSpawn(pubkey)
-	executionPayload := ExecutionPayload{Payload: payload}
+	executionPayload := EncodedExecutionPayload(nil, payload)
 
-	encoded, err := scale.Marshal(executionPayload)
-	require.NoError(t, err)
-	result, err := vm.Execute(host, Frontier, Call, 1, 1000000, principal, principal, encoded, 0, WALLET_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 1000000, principal, principal, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 	require.Len(t, result.Output, 24)
 
@@ -180,11 +177,9 @@ func TestSpend(t *testing.T) {
 	var walletAddress Address
 	{
 		pubkey := Bytes32([32]byte{1, 1, 2, 2, 3, 3, 4, 4})
-		executionPayload := ExecutionPayload{Payload: vm.Lib.EncodeTxSpawn(pubkey)}
+		executionPayload := EncodedExecutionPayload(nil, vm.Lib.EncodeTxSpawn(pubkey))
 
-		encoded, err := scale.Marshal(executionPayload)
-		require.NoError(t, err)
-		result, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, encoded, 0, WALLET_TEST)
+		result, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, executionPayload, 0, WALLET_TEST)
 		require.NoError(t, err)
 		require.Len(t, result.Output, 24)
 
@@ -195,14 +190,11 @@ func TestSpend(t *testing.T) {
 	host.balances[principal] = 1000
 	recipient := randomAddress()
 
-	executionPayload := ExecutionPayload{
-		State:   host.programs[walletAddress],
-		Payload: vm.Lib.EncodeTxSpend(recipient, 100),
-	}
-
-	encoded, err := scale.Marshal(executionPayload)
-	require.NoError(t, err)
-	_, err = vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, encoded, 0, WALLET_TEST)
+	executionPayload := EncodedExecutionPayload(
+		host.programs[walletAddress],
+		vm.Lib.EncodeTxSpend(recipient, 100),
+	)
+	_, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 
 	// Step 3: Check balance

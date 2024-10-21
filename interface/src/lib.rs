@@ -613,13 +613,10 @@ impl HostInterface for MockHost<'_> {
       // and then passed to the VM.
       let msg = match msg.input_data {
         Some(data) => {
-          let execution_payload = ExecutionPayload {
-            // TODO: figure out when to provide a state here
-            state: vec![],
-            payload: data,
-          };
+          // TODO: figure out when to provide a state here
+          let state = vec![];
           AthenaMessage {
-            input_data: Some(execution_payload.into()),
+            input_data: Some(ExecutionPayload::encode_with_encoded_payload(state, data)),
             ..msg
           }
         }

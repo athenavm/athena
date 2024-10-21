@@ -64,18 +64,7 @@ where
       stdin.write_vec(execution_payload.state);
     }
 
-    let payload = if execution_payload.payload.is_empty() {
-      Ok(Payload::default())
-    } else {
-      Payload::decode(&mut execution_payload.payload.as_slice())
-    };
-    let Payload { selector, input } = match payload {
-      Ok(p) => p,
-      Err(e) => {
-        tracing::info!("Failed to deserialize payload: {e:?}");
-        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
-      }
-    };
+    let Payload { selector, input } = execution_payload.payload;
 
     let input_len = input.len();
     if input_len > 0 {
