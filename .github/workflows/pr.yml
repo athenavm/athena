@@ -19,17 +19,17 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
       - name: Install Athena toolchain
         run: |
           curl -L https://install.athenavm.org | bash
           $ATHENA_DIR/bin/athup --path $GITHUB_WORKSPACE
-          $ATHENA_DIR/bin/cargo-athena athena --version
           echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
-
-      - name: Install Athena CLI
-        run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli
+          cargo athena --version
           cargo athena install-toolchain
 
       - name: Build binaries
@@ -74,8 +74,7 @@ jobs:
 
       - name: Install Athena CLI
         run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli
           cargo athena install-toolchain
 
       - name: Run cargo check
@@ -108,13 +107,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: program-binaries
-      - name: list
-        run: |
-          ls
-          echo "ls tests:"
-          ls tests/
-          echo "ts tests/recursive_call/elf"
-          ls tests/recursive_call/elf/
+
       - name: Run go test
         run: |
           cd ffi/athcon/bindings/go
@@ -178,8 +171,7 @@ jobs:
 
       - name: Install Athena CLI
         run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli
           cargo athena install-toolchain
 
       - name: Run cargo check
