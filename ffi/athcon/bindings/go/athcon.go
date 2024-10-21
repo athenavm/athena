@@ -31,39 +31,48 @@ const (
 	_ = uint(C.sizeof_athcon_address - len(Address{}))
 )
 
-type Error int32
+type Error struct {
+	// athcon-compatible error code
+	Code int32
+	// underlying Go error for additional context
+	Err error
+}
 
 func (err Error) IsInternalError() bool {
-	return err < 0
+	return err.Code < 0
 }
 
+// Implement the Error method to return a string representation
 func (err Error) Error() string {
-	return C.GoString(C.athcon_status_code_to_string(C.enum_athcon_status_code(err)))
+	if err.Err != nil {
+		return fmt.Sprintf("%s: %v", C.GoString(C.athcon_status_code_to_string(C.enum_athcon_status_code(err.Code))), err.Err)
+	}
+	return C.GoString(C.athcon_status_code_to_string(C.enum_athcon_status_code(err.Code)))
 }
 
-const (
-	Failure                   = Error(C.ATHCON_FAILURE)
-	Revert                    = Error(C.ATHCON_REVERT)
-	OutOfGas                  = Error(C.ATHCON_OUT_OF_GAS)
-	InvalidInstruction        = Error(C.ATHCON_INVALID_INSTRUCTION)
-	UndefinedInstruction      = Error(C.ATHCON_UNDEFINED_INSTRUCTION)
-	StackOverflow             = Error(C.ATHCON_STACK_OVERFLOW)
-	StackUnderflow            = Error(C.ATHCON_STACK_UNDERFLOW)
-	BadJumpDestination        = Error(C.ATHCON_BAD_JUMP_DESTINATION)
-	InvalidMemoryAccess       = Error(C.ATHCON_INVALID_MEMORY_ACCESS)
-	CallDepthExceeded         = Error(C.ATHCON_CALL_DEPTH_EXCEEDED)
-	StaticModeViolation       = Error(C.ATHCON_STATIC_MODE_VIOLATION)
-	PrecompileFailure         = Error(C.ATHCON_PRECOMPILE_FAILURE)
-	ContractValidationFailure = Error(C.ATHCON_CONTRACT_VALIDATION_FAILURE)
-	ArgumentOutOfRange        = Error(C.ATHCON_ARGUMENT_OUT_OF_RANGE)
-	UnreachableInstruction    = Error(C.ATHCON_UNREACHABLE_INSTRUCTION)
-	Trap                      = Error(C.ATHCON_TRAP)
-	InsufficientBalance       = Error(C.ATHCON_INSUFFICIENT_BALANCE)
-	InsufficientInput         = Error(C.ATHCON_INSUFFICIENT_INPUT)
-	InvalidSyscallArgument    = Error(C.ATHCON_INVALID_SYSCALL_ARGUMENT)
-	InternalError             = Error(C.ATHCON_INTERNAL_ERROR)
-	Rejected                  = Error(C.ATHCON_REJECTED)
-	OutOfMemory               = Error(C.ATHCON_OUT_OF_MEMORY)
+var (
+	Failure                   = Error{Code: C.ATHCON_FAILURE}
+	Revert                    = Error{Code: C.ATHCON_REVERT}
+	OutOfGas                  = Error{Code: C.ATHCON_OUT_OF_GAS}
+	InvalidInstruction        = Error{Code: C.ATHCON_INVALID_INSTRUCTION}
+	UndefinedInstruction      = Error{Code: C.ATHCON_UNDEFINED_INSTRUCTION}
+	StackOverflow             = Error{Code: C.ATHCON_STACK_OVERFLOW}
+	StackUnderflow            = Error{Code: C.ATHCON_STACK_UNDERFLOW}
+	BadJumpDestination        = Error{Code: C.ATHCON_BAD_JUMP_DESTINATION}
+	InvalidMemoryAccess       = Error{Code: C.ATHCON_INVALID_MEMORY_ACCESS}
+	CallDepthExceeded         = Error{Code: C.ATHCON_CALL_DEPTH_EXCEEDED}
+	StaticModeViolation       = Error{Code: C.ATHCON_STATIC_MODE_VIOLATION}
+	PrecompileFailure         = Error{Code: C.ATHCON_PRECOMPILE_FAILURE}
+	ContractValidationFailure = Error{Code: C.ATHCON_CONTRACT_VALIDATION_FAILURE}
+	ArgumentOutOfRange        = Error{Code: C.ATHCON_ARGUMENT_OUT_OF_RANGE}
+	UnreachableInstruction    = Error{Code: C.ATHCON_UNREACHABLE_INSTRUCTION}
+	Trap                      = Error{Code: C.ATHCON_TRAP}
+	InsufficientBalance       = Error{Code: C.ATHCON_INSUFFICIENT_BALANCE}
+	InsufficientInput         = Error{Code: C.ATHCON_INSUFFICIENT_INPUT}
+	InvalidSyscallArgument    = Error{Code: C.ATHCON_INVALID_SYSCALL_ARGUMENT}
+	InternalError             = Error{Code: C.ATHCON_INTERNAL_ERROR}
+	Rejected                  = Error{Code: C.ATHCON_REJECTED}
+	OutOfMemory               = Error{Code: C.ATHCON_OUT_OF_MEMORY}
 )
 
 type Revision int32
@@ -212,7 +221,7 @@ func (vm *VM) Execute(
 	code []byte,
 ) (res Result, err error) {
 	if len(code) == 0 {
-		return res, fmt.Errorf("code is empty")
+		return res, Failure
 	}
 	msg := C.struct_athcon_message{
 		kind:      C.enum_athcon_call_kind(kind),
@@ -250,7 +259,7 @@ func (vm *VM) Execute(
 	res.Output = C.GoBytes(unsafe.Pointer(result.output_data), C.int(result.output_size))
 	res.GasLeft = int64(result.gas_left)
 	if result.status_code != C.ATHCON_SUCCESS {
-		err = Error(result.status_code)
+		err = Error{Code: result.status_code}
 	}
 
 	if result.release != nil {
