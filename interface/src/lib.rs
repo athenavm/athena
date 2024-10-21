@@ -573,7 +573,7 @@ impl HostInterface for MockHost<'_> {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
 
-      // The optional msg.input_data  must be enriched with optional account state
+      // The optional msg.input_data must be enriched with optional account state
       // and then passed to the VM.
       let msg = match msg.input_data {
         Some(data) => {
