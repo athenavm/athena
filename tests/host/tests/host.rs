@@ -1,5 +1,5 @@
 use athena_interface::{
-  Address, AthenaContext, HostInterface, MockHost, ADDRESS_LENGTH, STORAGE_KEY, STORAGE_VALUE,
+  Address, AthenaContext, HostInterface, MockHost, ADDRESS_CHARLIE, STORAGE_KEY, STORAGE_VALUE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -7,7 +7,7 @@ use athena_sdk::{AthenaStdin, ExecutionClient};
 fn test() {
   tracing_subscriber::fmt::init();
 
-  let caller = [0xCA; ADDRESS_LENGTH];
+  let caller = ADDRESS_CHARLIE;
   // host-test binary is precompiled and kept in git
   let elf = include_bytes!("../elf/host-test");
   let stdin = AthenaStdin::new();

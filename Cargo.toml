@@ -15,7 +15,6 @@ members = [
   "tests/host",
   "vm/declare",
   "vm/entrypoint",
-  "vm/hostfunctions",
   "vm/lib",
   "vm/sdk",
 ]
