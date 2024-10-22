@@ -3,10 +3,12 @@
 //! A library with no external dependencies that includes core types and traits.
 
 mod context;
+pub mod payload;
 pub use context::*;
 
 use blake3::{hash, Hasher};
 pub use parity_scale_codec::{Decode, Encode};
+use payload::ExecutionPayload;
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -35,12 +37,6 @@ impl std::fmt::Display for MethodSelector {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", hex::encode(self.0))
   }
-}
-
-#[derive(Clone, Debug, Decode, Default, Encode, PartialEq)]
-pub struct ExecutionPayload {
-  pub selector: Option<MethodSelector>,
-  pub input: Vec<u8>,
 }
 
 pub struct AddressWrapper(Address);
@@ -612,6 +608,20 @@ impl HostInterface for MockHost<'_> {
     let res = if let Some(code) = self.templates.get(&msg.recipient).cloned() {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
+
+      // The optional msg.input_data  must be enriched with optional account state
+      // and then passed to the VM.
+      let msg = match msg.input_data {
+        Some(data) => {
+          // TODO: figure out when to provide a state here
+          let state = vec![];
+          AthenaMessage {
+            input_data: Some(ExecutionPayload::encode_with_encoded_payload(state, data)),
+            ..msg
+          }
+        }
+        None => msg,
+      };
 
       vm.expect("missing VM instance")
         .execute(self, AthenaRevision::AthenaFrontier, msg, &code)

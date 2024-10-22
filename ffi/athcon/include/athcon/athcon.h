@@ -805,6 +805,17 @@ extern "C"
   struct athcon_vm *athcon_create_example_vm(void);
 #endif
 
+  typedef struct athcon_bytes_t
+  {
+    const uint8_t* ptr;
+    size_t size;
+  } athcon_bytes;
+
+  void athcon_free_bytes(athcon_bytes* v);
+
+  athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
+  athcon_bytes* athcon_encode_tx_spend(const athcon_address* recipient, uint64_t amount);
+
 #ifdef __cplusplus
 }
 #endif

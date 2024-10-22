@@ -2,6 +2,9 @@ package athcon
 
 import (
 	"encoding/hex"
+	"fmt"
+
+	"github.com/ChainSafe/gossamer/pkg/scale"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -36,6 +39,22 @@ func (ms MethodSelector) String() string {
 }
 
 type ExecutionPayload struct {
+	State   []byte
+	Payload Payload
+}
+
+type Payload struct {
 	Selector *MethodSelector
 	Input    []byte
+}
+
+// EncodedExecutionPayload combines the program state and an already encoded payload into a single byte array
+// which is equivalent to a scale-encoded `ExecutionPayload` with the same data.
+func EncodedExecutionPayload(state []byte, encodedPayload []byte) []byte {
+	encodedState, err := scale.Marshal(state)
+	if err != nil {
+		panic(fmt.Errorf("unable to encode state: %w", err))
+	}
+
+	return append(encodedState, encodedPayload...)
 }

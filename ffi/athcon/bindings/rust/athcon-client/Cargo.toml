@@ -15,3 +15,4 @@ athcon-vm = { path = "../athcon-vm" }
 [dev-dependencies]
 hex = "0.4.3"
 athena-interface = { path = "../../../../../interface" }
+tracing-subscriber = "0.3.16"
