@@ -50,7 +50,7 @@ pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
 }
 
 pub trait VerifiableTemplate {
-  fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
+  fn verify(&self, tx: Vec<u8>, signature: [u8; 64]) -> bool;
 }
 
 #[cfg(test)]

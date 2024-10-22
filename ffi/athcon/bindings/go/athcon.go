@@ -82,6 +82,7 @@ func LoadLibrary(path string) (*Library, error) {
 	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create_"+vmName)
 	purego.RegisterLibFunc(&lib.encodeTxSpawn, libHandle, "athcon_encode_tx_spawn")
 	purego.RegisterLibFunc(&lib.encodeTxSpend, libHandle, "athcon_encode_tx_spend")
+
 	purego.RegisterLibFunc(&lib.freeBytes, libHandle, "athcon_free_bytes")
 	return lib, nil
 }
