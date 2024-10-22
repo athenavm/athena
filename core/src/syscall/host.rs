@@ -288,7 +288,7 @@ mod tests {
     host
       .expect_call()
       .withf(|m| m.depth == 1)
-      .returning(|_| ExecutionResult::new(StatusCode::Success, 0, None, None));
+      .returning(|_| ExecutionResult::new(StatusCode::Success, 0, None));
 
     let context = AthenaContext::new(Address::default(), Address::default(), 0);
     let mut runtime = runtime::Runtime::new(
