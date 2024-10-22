@@ -429,9 +429,6 @@ pub struct MockHost<'a> {
   // context information
   static_context: Option<HostStaticContext>,
   dynamic_context: Option<HostDynamicContext>,
-
-  // the result of the most recent spawn operation
-  spawn_result: Option<SpawnResult>,
 }
 
 impl<'a> MockHost<'a> {
@@ -474,18 +471,7 @@ impl<'a> MockHost<'a> {
     tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
 
     self.programs.insert(address, blob.clone());
-    self.spawn_result = Some(SpawnResult {
-      address,
-      blob,
-      template: *template,
-      principal: *principal,
-      nonce,
-    });
     address
-  }
-
-  pub fn get_spawn_result(&self) -> Option<&SpawnResult> {
-    self.spawn_result.as_ref()
   }
 
   pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
