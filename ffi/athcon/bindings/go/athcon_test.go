@@ -57,8 +57,7 @@ func TestExecuteEmptyCode(t *testing.T) {
 	defer vm.Destroy()
 
 	addr := Address{}
-	h := Bytes32{}
-	result, err := vm.Execute(nil, Frontier, Call, 1, 999, addr, addr, nil, nil, h, nil)
+	result, err := vm.Execute(nil, Frontier, Call, 1, 999, addr, addr, nil, 0, nil)
 
 	require.Error(t, err)
 	require.Empty(t, result.Output)
@@ -86,4 +85,23 @@ func TestErrorMessage(t *testing.T) {
 	check(Error(3), "out of gas")
 	check(Error(-1), "internal error")
 	check(Error(1000), "<unknown>")
+}
+
+func TestLibraryEncodeTx(t *testing.T) {
+	lib, err := LoadLibrary(modulePath)
+	require.NoError(t, err)
+	t.Run("spawn", func(t *testing.T) {
+		tx := lib.EncodeTxSpawn(Bytes32{9, 8, 7, 6})
+		require.NotEmpty(t, tx)
+
+		tx2 := lib.EncodeTxSpawn(Bytes32{1, 2, 3, 4})
+		require.NotEqual(t, tx, tx2)
+	})
+	t.Run("spend", func(t *testing.T) {
+		tx := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 191239)
+		require.NotEmpty(t, tx)
+
+		tx2 := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 80972)
+		require.NotEqual(t, tx, tx2)
+	})
 }

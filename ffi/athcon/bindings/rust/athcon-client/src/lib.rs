@@ -5,9 +5,10 @@ use athcon_sys as ffi;
 use std::ffi::CStr;
 
 /// Athena VM wrapper
-/// It owns the VM handle and provides a high-level interface to interact with the VM
-/// It also provides a host interface to the VM
-/// The VM is automatically destroyed when the wrapper is dropped
+///
+/// It owns the VM handle and provides a high-level interface to interact with the VM.
+/// It also provides a host interface to the VM.
+/// The VM is automatically destroyed when the wrapper is dropped.
 pub struct AthconVm {
   handle: *mut ffi::athcon_vm,
   host_interface: ffi::athcon_host_interface,
@@ -53,8 +54,7 @@ impl AthconVm {
     destination: &Address,
     sender: &Address,
     input: &[u8],
-    method: &[u8],
-    value: &[u8; 32],
+    value: u64,
     code: &[u8],
   ) -> (Vec<u8>, i64, StatusCode) {
     let ext_ctx = host::ExtendedContext { hctx: ctx };
@@ -68,9 +68,7 @@ impl AthconVm {
       sender: ffi::athcon_address { bytes: *sender },
       input_data: input.as_ptr(),
       input_size: input.len(),
-      method_name: method.as_ptr(),
-      method_name_size: method.len(),
-      value: ffi::athcon_uint256be { bytes: *value },
+      value,
       code: code.as_ptr(),
       code_size: code.len(),
     };
@@ -80,7 +78,6 @@ impl AthconVm {
       let result = execute_func(
         self.handle,
         &self.host_interface,
-        // ext_ctx as *mut ffi::athcon_host_context,
         std::mem::transmute::<&host::ExtendedContext, *mut ffi::athcon_host_context>(&ext_ctx),
         rev,
         &athcon_message,

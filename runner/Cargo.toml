@@ -14,7 +14,8 @@ athcon-vm = { path = "../ffi/athcon/bindings/rust/athcon-vm" }
 athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
-log = "0.4.21"
+hex = "0.4.3"
+tracing = "0.1.40"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

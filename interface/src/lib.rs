@@ -3,47 +3,40 @@
 //! A library with no external dependencies that includes core types and traits.
 
 mod context;
+pub mod payload;
 pub use context::*;
 
 use blake3::Hasher;
+pub use parity_scale_codec::{Decode, Encode};
+use payload::ExecutionPayload;
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
+pub const METHOD_SELECTOR_LENGTH: usize = 4;
 pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 
-pub struct Bytes32AsU64(Bytes32);
+#[derive(Clone, Debug, Decode, Encode, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
 
-impl Bytes32AsU64 {
-  pub fn new(bytes: Bytes32) -> Self {
-    Bytes32AsU64(bytes)
+impl From<&str> for MethodSelector {
+  fn from(value: &str) -> Self {
+    let hash = blake3::hash(value.as_bytes());
+    MethodSelector(
+      hash.as_bytes()[..METHOD_SELECTOR_LENGTH]
+        .try_into()
+        .unwrap(),
+    )
   }
 }
 
-impl From<Bytes32AsU64> for u64 {
-  fn from(bytes: Bytes32AsU64) -> Self {
-    // take most significant 8 bytes, assume little-endian
-    let slice = &bytes.0[..8];
-    u64::from_le_bytes(slice.try_into().expect("slice with incorrect length"))
-  }
-}
-
-impl From<Bytes32AsU64> for Bytes32 {
-  fn from(bytes: Bytes32AsU64) -> Self {
-    bytes.0
-  }
-}
-
-impl From<u64> for Bytes32AsU64 {
-  fn from(value: u64) -> Self {
-    let mut bytes = [0u8; 32];
-    let value_bytes = value.to_le_bytes();
-    bytes[..8].copy_from_slice(&value_bytes);
-    Bytes32AsU64(bytes)
+impl std::fmt::Display for MethodSelector {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", hex::encode(self.0))
   }
 }
 
@@ -53,7 +46,6 @@ impl From<Vec<u32>> for AddressWrapper {
   fn from(value: Vec<u32>) -> Self {
     assert!(value.len() == ADDRESS_LENGTH / 4, "Invalid address length");
     let mut bytes = [0u8; ADDRESS_LENGTH];
-    // let mut value_bytes = [0u8; 4];
     for (i, word) in value.iter().enumerate() {
       let value_bytes = word.to_le_bytes();
       bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
@@ -124,6 +116,24 @@ pub enum StorageStatus {
   StorageModifiedRestored,
 }
 
+impl TryFrom<u32> for StorageStatus {
+  type Error = &'static str;
+  fn try_from(value: u32) -> Result<Self, Self::Error> {
+    match value {
+      0 => Ok(StorageStatus::StorageAssigned),
+      1 => Ok(StorageStatus::StorageAdded),
+      2 => Ok(StorageStatus::StorageDeleted),
+      3 => Ok(StorageStatus::StorageModified),
+      4 => Ok(StorageStatus::StorageDeletedAdded),
+      5 => Ok(StorageStatus::StorageModifiedDeleted),
+      6 => Ok(StorageStatus::StorageDeletedRestored),
+      7 => Ok(StorageStatus::StorageAddedDeleted),
+      8 => Ok(StorageStatus::StorageModifiedRestored),
+      _ => Err("Invalid storage status"),
+    }
+  }
+}
+
 impl fmt::Display for StorageStatus {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
@@ -163,7 +173,6 @@ pub struct AthenaMessage {
   pub recipient: Address,
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
-  pub method: Option<Vec<u8>>,
   pub value: Balance,
   // code is currently unused, and it seems redundant.
   // it's not in the yellow paper.
@@ -180,7 +189,6 @@ impl AthenaMessage {
     recipient: Address,
     sender: Address,
     input_data: Option<Vec<u8>>,
-    method: Option<Vec<u8>>,
     value: Balance,
     code: Vec<u8>,
   ) -> Self {
@@ -191,7 +199,6 @@ impl AthenaMessage {
       recipient,
       sender,
       input_data,
-      method,
       value,
       code,
     }
@@ -464,7 +471,7 @@ impl<'a> MockHost<'a> {
     nonce: u64,
   ) -> Address {
     let address = calculate_address(template, &blob, principal, nonce);
-    log::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
+    tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
 
     self.programs.insert(address, blob.clone());
     self.spawn_result = Some(SpawnResult {
@@ -524,7 +531,7 @@ pub const STORAGE_VALUE: Bytes32 = [
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-impl<'a> HostInterface for MockHost<'a> {
+impl HostInterface for MockHost<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     self
       .storage
@@ -545,9 +552,9 @@ impl<'a> HostInterface for MockHost<'a> {
     self.balance.get(addr).copied().unwrap_or(0)
   }
 
+  #[tracing::instrument(skip(self), fields(id = self as *const Self as usize, depth = msg.depth))]
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
-    let depth = msg.depth;
-    log::info!("MockHost::call:depth {} :: {:?}", msg.depth, msg);
+    tracing::info!(msg = ?msg);
 
     // don't go too deep!
     if msg.depth > 10 {
@@ -557,10 +564,8 @@ impl<'a> HostInterface for MockHost<'a> {
     // take snapshots of the state in case we need to roll back
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
-    log::info!(
-      "MockHost::call:id {:?} depth {} before backup storage item is :: {:?}",
-      self as *const Self as usize,
-      depth,
+    tracing::debug!(
+      "before backup storage item is {:?}",
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
     let backup_storage = self.storage.clone();
@@ -589,6 +594,20 @@ impl<'a> HostInterface for MockHost<'a> {
       // create an owned copy of VM before taking the host from self
       let vm = self.vm;
 
+      // The optional msg.input_data  must be enriched with optional account state
+      // and then passed to the VM.
+      let msg = match msg.input_data {
+        Some(data) => {
+          // TODO: figure out when to provide a state here
+          let state = vec![];
+          AthenaMessage {
+            input_data: Some(ExecutionPayload::encode_with_encoded_payload(state, data)),
+            ..msg
+          }
+        }
+        None => msg,
+      };
+
       vm.expect("missing VM instance")
         .execute(self, AthenaRevision::AthenaFrontier, msg, &code)
     } else {
@@ -607,10 +626,8 @@ impl<'a> HostInterface for MockHost<'a> {
 
     self.dynamic_context = old_dynamic_context;
 
-    log::info!(
-      "MockHost::call:id {:?} depth {} finished with storage item :: {:?}",
-      self as *const Self as usize,
-      depth,
+    tracing::debug!(
+      "finished with storage item {:?}",
       self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
     );
     if res.status_code != StatusCode::Success {
@@ -618,10 +635,8 @@ impl<'a> HostInterface for MockHost<'a> {
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.templates = backup_programs;
-      log::info!(
-        "MockHost::call:id {:?} depth {} after restore storage item is :: {:?}",
-        self as *const Self as usize,
-        depth,
+      tracing::debug!(
+        "after restore storage item is {:?}",
         self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
       );
     }
@@ -767,7 +782,6 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      None,
       0,
       vec![],
     );
@@ -783,7 +797,6 @@ mod tests {
       1000,
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
-      None,
       None,
       100,
       vec![],
@@ -801,7 +814,6 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      None,
       10000,
       vec![],
     );
@@ -817,7 +829,6 @@ mod tests {
       1000,
       ADDRESS_BOB,
       ADDRESS_ALICE,
-      None,
       None,
       100,
       vec![],
@@ -846,5 +857,14 @@ mod tests {
     // deploying again should fail
     let address = host.deploy(blob.clone());
     assert!(address.is_err());
+  }
+
+  #[test]
+  fn test_method_selector() {
+    let selector = MethodSelector::from("test");
+    assert_eq!(selector.0, [72, 120, 202, 4]);
+
+    let selector = MethodSelector::from("test2");
+    assert_eq!(selector.0, [116, 112, 75, 76]);
   }
 }

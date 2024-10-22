@@ -8,8 +8,6 @@ package athcon
 #include <athcon/helpers.h>
 
 #include <stdlib.h> // for 'free'
-
-extern const struct athcon_host_interface athcon_go_host;
 */
 import "C"
 import (
@@ -21,14 +19,6 @@ import (
 
 	"github.com/ebitengine/purego"
 )
-
-// Address represents the 24 bytes address of an Athena account.
-type Address [24]byte
-
-// Bytes32 represents the 32 bytes of arbitrary data (e.g. the result of Keccak256
-// hash). It occasionally is used to represent 256-bit unsigned integer values
-// stored in big-endian byte order.
-type Bytes32 [32]byte
 
 // Static asserts.
 const (
@@ -64,18 +54,19 @@ const (
 	LatestStableRevision Revision = C.ATHCON_LATEST_STABLE_REVISION
 )
 
-type VM struct {
+type Library struct {
 	// handle to the opened shared library. Must be closed with Dlclose.
 	libHandle uintptr
-	// handle to the VM instance. Must be destroyed with athcon_destroy.
-	handle *C.struct_athcon_vm
+
+	create func() *C.struct_athcon_vm
+
+	encodeTxSpawn func(*C.athcon_bytes32) *C.athcon_bytes
+	encodeTxSpend func(*C.athcon_address, C.uint64_t) *C.athcon_bytes
+
+	freeBytes func(*C.athcon_bytes)
 }
 
-// Load loads the VM from the shared library and returns an instance of VM.
-//
-// It is the caller's responsibility to call Destroy on the VM instance when it
-// is no longer needed.
-func Load(path string) (*VM, error) {
+func LoadLibrary(path string) (*Library, error) {
 	libHandle, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 	if err != nil {
 		return nil, fmt.Errorf("loading library: %v", err)
@@ -85,14 +76,41 @@ func Load(path string) (*VM, error) {
 	filename = strings.TrimSuffix(filename, filepath.Ext(filename))
 	vmName := strings.TrimPrefix(filename, "lib")
 
-	var athcon_create func() *C.struct_athcon_vm
-	purego.RegisterLibFunc(&athcon_create, libHandle, "athcon_create_"+vmName)
-	vmHandle := athcon_create()
+	lib := &Library{
+		libHandle: libHandle,
+	}
+	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create_"+vmName)
+	purego.RegisterLibFunc(&lib.encodeTxSpawn, libHandle, "athcon_encode_tx_spawn")
+	purego.RegisterLibFunc(&lib.encodeTxSpend, libHandle, "athcon_encode_tx_spend")
 
+	purego.RegisterLibFunc(&lib.freeBytes, libHandle, "athcon_free_bytes")
+	return lib, nil
+}
+
+func (l *Library) Close() {
+	purego.Dlclose(l.libHandle)
+}
+
+type VM struct {
+	Lib *Library
+	// handle to the VM instance. Must be destroyed with athcon_destroy.
+	handle *C.struct_athcon_vm
+}
+
+// Load loads the VM from the shared library and returns an instance of VM.
+//
+// It is the caller's responsibility to call Destroy on the VM instance when it
+// is no longer needed.
+func Load(path string) (*VM, error) {
+	lib, err := LoadLibrary(path)
+	if err != nil {
+		return nil, err
+	}
+	vmHandle := lib.create()
 	if vmHandle == nil {
 		return nil, fmt.Errorf("failed to create VM")
 	}
-	return &VM{libHandle: libHandle, handle: vmHandle}, nil
+	return &VM{Lib: lib, handle: vmHandle}, nil
 }
 
 // LoadAndConfigure loads the VM from the shared library and configures it with
@@ -118,7 +136,7 @@ func LoadAndConfigure(filename string, config map[string]string) (vm *VM, err er
 
 func (vm *VM) Destroy() {
 	C.athcon_destroy(vm.handle)
-	purego.Dlclose(vm.libHandle)
+	vm.Lib.Close()
 }
 
 func (vm *VM) Name() string {
@@ -170,8 +188,7 @@ func (vm *VM) Execute(
 	gas int64,
 	recipient, sender Address,
 	input []byte,
-	method []byte,
-	value Bytes32,
+	value uint64,
 	code []byte,
 ) (res Result, err error) {
 	if len(code) == 0 {
@@ -181,9 +198,9 @@ func (vm *VM) Execute(
 		kind:      C.enum_athcon_call_kind(kind),
 		depth:     C.int32_t(depth),
 		gas:       C.int64_t(gas),
-		recipient: athconAddress(recipient),
-		sender:    athconAddress(sender),
-		value:     athconBytes32(value),
+		recipient: *athconAddress(recipient),
+		sender:    *athconAddress(sender),
+		value:     C.uint64_t(value),
 	}
 	if len(input) > 0 {
 		// Allocate memory for input data in C.
@@ -194,13 +211,6 @@ func (vm *VM) Execute(
 		defer C.free(cInputData)
 		msg.input_data = (*C.uchar)(cInputData)
 		msg.input_size = C.size_t(len(input))
-	}
-	if len(method) > 0 {
-		// Allocate memory for method name in C.
-		cMethodName := C.CBytes(method)
-		defer C.free(cMethodName)
-		msg.method_name = (*C.uchar)(cMethodName)
-		msg.method_name_size = C.size_t(len(method))
 	}
 
 	ctxHandle := cgo.NewHandle(ctx)
@@ -230,18 +240,35 @@ func (vm *VM) Execute(
 	return res, err
 }
 
-func athconBytes32(in Bytes32) C.athcon_bytes32 {
-	out := C.athcon_bytes32{}
+func athconBytes32(in Bytes32) *C.athcon_bytes32 {
+	var out C.athcon_bytes32
 	for i := 0; i < len(in); i++ {
 		out.bytes[i] = C.uint8_t(in[i])
 	}
-	return out
+	return &out
 }
 
-func athconAddress(address Address) C.athcon_address {
-	r := C.athcon_address{}
+func athconAddress(address Address) *C.athcon_address {
+	var out C.athcon_address
 	for i := 0; i < len(address); i++ {
-		r.bytes[i] = C.uint8_t(address[i])
+		out.bytes[i] = C.uint8_t(address[i])
 	}
-	return r
+	return &out
+}
+
+func (l *Library) EncodeTxSpawn(pubkey Bytes32) []byte {
+	encoded := l.encodeTxSpawn(athconBytes32(pubkey))
+	defer l.freeBytes(encoded)
+	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
+	return tx
+}
+
+func (l *Library) EncodeTxSpend(recipient Address, nonce uint64) []byte {
+	encoded := l.encodeTxSpend(
+		athconAddress(recipient),
+		C.uint64_t(nonce),
+	)
+	defer l.freeBytes(encoded)
+	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
+	return tx
 }

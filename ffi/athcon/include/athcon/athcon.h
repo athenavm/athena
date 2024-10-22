@@ -113,26 +113,11 @@ extern "C"
     size_t input_size;
 
     /**
-     * The destination program method to call.
-     *
-     * The arbitrary length byte array of the method name of the call.
-     * This MAY be NULL.
-     */
-    const uint8_t *method_name;
-
-    /**
-     * The size of the method name data.
-     *
-     * If method_name is NULL this MUST be 0.
-     */
-    size_t method_name_size;
-
-    /**
      * The number of coins transferred with the message.
      *
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.
      */
-    athcon_uint256be value;
+    uint64_t value;
 
     /**
      * The code to be executed.
@@ -148,7 +133,7 @@ extern "C"
   /** The transaction and block data for execution. */
   struct athcon_tx_context
   {
-    athcon_uint256be tx_gas_price; /**< The transaction gas price. */
+    uint64_t tx_gas_price;         /**< The transaction gas price. */
     athcon_address tx_origin;      /**< The transaction origin account. */
     int64_t block_height;          /**< The block height. */
     int64_t block_timestamp;       /**< The block timestamp. */
@@ -202,7 +187,7 @@ extern "C"
    */
   typedef athcon_address (*athcon_spawn_fn)(struct athcon_host_context *context, const uint8_t *blob, size_t blob_size);
 
-    /**
+  /**
    * Deploy program callback function.
    *
    * This callback function is used by a VM to deploy a new program template
@@ -568,8 +553,8 @@ extern "C"
    * @param address  The address of the account.
    * @return         The balance of the given account or 0 if the account does not exist.
    */
-  typedef athcon_uint256be (*athcon_get_balance_fn)(struct athcon_host_context *context,
-                                                    const athcon_address *address);
+  typedef uint64_t (*athcon_get_balance_fn)(struct athcon_host_context *context,
+                                            const athcon_address *address);
 
   /**
    * Pointer to the callback function supporting Athena calls.
@@ -819,6 +804,17 @@ extern "C"
    */
   struct athcon_vm *athcon_create_example_vm(void);
 #endif
+
+  typedef struct athcon_bytes_t
+  {
+    const uint8_t* ptr;
+    size_t size;
+  } athcon_bytes;
+
+  void athcon_free_bytes(athcon_bytes* v);
+
+  athcon_bytes* athcon_encode_tx_spawn(const athcon_bytes32* pubkey);
+  athcon_bytes* athcon_encode_tx_spend(const athcon_address* recipient, uint64_t amount);
 
 #ifdef __cplusplus
 }

@@ -1,3 +1,4 @@
+pub mod gdbstub;
 mod instruction;
 mod io;
 mod opcode;
@@ -7,6 +8,7 @@ mod state;
 mod syscall;
 mod utils;
 
+use athena_interface::MethodSelector;
 pub use instruction::*;
 pub use opcode::*;
 pub use program::*;
@@ -16,6 +18,7 @@ pub use syscall::*;
 pub use utils::*;
 
 use std::collections::hash_map::Entry;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
@@ -70,6 +73,8 @@ pub struct Runtime<'host> {
 
   /// The maximum number of cycles for a syscall.
   pub max_syscall_cycles: u32,
+
+  breakpoints: BTreeSet<u32>,
 }
 
 /// An record of a write to a memory address.
@@ -83,7 +88,7 @@ pub enum MemoryAccessPosition {
   A = 3,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ExecutionError {
   #[error("execution failed with exit code {0}")]
   HaltWithNonZeroExitCode(u32),
@@ -156,6 +161,7 @@ impl<'host> Runtime<'host> {
       max_gas: opts.max_gas(),
       syscall_map,
       max_syscall_cycles,
+      breakpoints: BTreeSet::new(),
     }
   }
 
@@ -653,7 +659,7 @@ impl<'host> Runtime<'host> {
 
   /// Executes one cycle of the program, returning whether the program has finished.
   #[inline]
-  fn execute_cycle(&mut self) -> Result<bool, ExecutionError> {
+  fn execute_cycle(&mut self) -> Result<Option<Event>, ExecutionError> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
@@ -668,6 +674,10 @@ impl<'host> Runtime<'host> {
     // Increment the clock.
     self.state.global_clk += 1;
 
+    if self.breakpoints.contains(&self.state.pc) {
+      return Ok(Some(Event::Break));
+    }
+
     // We're allowed to spend all of our gas, but no more.
     // Gas checking is "lazy" here: it happens _after_ the instruction is executed.
     if let Some(gas_left) = self.gas_left() {
@@ -676,10 +686,12 @@ impl<'host> Runtime<'host> {
       }
     }
 
-    Ok(
-      self.state.pc.wrapping_sub(self.program.pc_base)
-        >= (self.program.instructions.len() * 4) as u32,
-    )
+    if self.state.pc.wrapping_sub(self.program.pc_base)
+      >= (self.program.instructions.len() * 4) as u32
+    {
+      return Ok(Some(Event::Halted));
+    }
+    Ok(None)
   }
 
   pub(crate) fn gas_left(&self) -> Option<i64> {
@@ -689,7 +701,7 @@ impl<'host> Runtime<'host> {
       .map(|max_gas| max_gas as i64 - self.state.clk as i64)
   }
 
-  fn initialize(&mut self) {
+  pub fn initialize(&mut self) {
     self.state.clk = 0;
 
     // TODO: do we want to load all of the memory when executing a particular function?
@@ -701,10 +713,33 @@ impl<'host> Runtime<'host> {
     tracing::info!("starting execution");
   }
 
-  /// Execute an exported function. Does the same work as execute().
-  pub fn execute_function(&mut self, symbol_name: &str) -> Result<Option<u32>, ExecutionError> {
+  pub(crate) fn jump_to_symbol(&mut self, symbol_name: &str) -> Result<(), ExecutionError> {
     // Make sure the symbol exists, and set the program counter
     let offset = match self.program.symbol_table.get(symbol_name) {
+      Some(offset) => *offset,
+      None => return Err(ExecutionError::UnknownSymbol()),
+    };
+    self.state.pc = offset;
+    Ok(())
+  }
+
+  /// Execute an exported function. Does the same work as execute().
+  pub fn execute_function_by_name(
+    &mut self,
+    symbol_name: &str,
+  ) -> Result<Option<u32>, ExecutionError> {
+    self.jump_to_symbol(symbol_name)?;
+    // Hand over to execute
+    self.execute()
+  }
+
+  /// Execute an exported function using method selector. Does the same work as execute().
+  pub fn execute_function_by_selector(
+    &mut self,
+    selector: &MethodSelector,
+  ) -> Result<Option<u32>, ExecutionError> {
+    // Make sure the selector exists, and set the program counter
+    let offset = match self.program.selector_table.get(selector) {
       Some(offset) => *offset,
       None => return Err(ExecutionError::UnknownSymbol()),
     };
@@ -724,7 +759,7 @@ impl<'host> Runtime<'host> {
 
     // Loop until program finishes execution or until an error occurs, whichever comes first
     loop {
-      if self.execute_cycle()? {
+      if Some(Event::Halted) == self.execute_cycle()? {
         break;
       }
     }
@@ -776,6 +811,7 @@ impl<'host> Runtime<'host> {
 
 #[cfg(test)]
 pub mod tests {
+
   use crate::{runtime::ExecutionError, utils::with_max_gas};
   use athena_interface::{
     Address, AthenaContext, ExecutionResult, MockHostInterface, StatusCode, ADDRESS_LENGTH,
@@ -949,18 +985,8 @@ pub mod tests {
       Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
     );
     instructions.push(
-      // X13 is arg4 (ptr to method name)
-      // zero pointer
-      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X14 is arg5 (method name len)
-      // no input
-      Instruction::new(Opcode::ADD, Register::X14 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X15 is arg6 (value ptr)
-      Instruction::new(Opcode::ADD, Register::X15 as u32, 0, memloc2, false, true),
+      // X13 is arg4 (value ptr)
+      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, memloc2, false, true),
     );
     instructions.push(
       // X5 is syscall ID
@@ -1076,6 +1102,34 @@ pub mod tests {
     let value_low = runtime.mr(memloc);
     let value_high = runtime.mr(memloc + 4);
     assert_eq!(u64::from(value_high) << 32 | u64::from(value_low), 1111u64);
+  }
+
+  #[test]
+  fn test_syscall_fail() {
+    let instructions = vec![
+      Instruction::new(
+        Opcode::ADD,
+        Register::X5 as u32,
+        0,
+        SyscallCode::WRITE as u32,
+        false,
+        true,
+      ),
+      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+    ];
+    let program = Program::new(instructions, 0, 0);
+    let mut runtime = Runtime::new(program, None, Default::default(), None);
+
+    let mut syscall = super::MockSyscall::new();
+    syscall
+      .expect_execute()
+      .returning(|_, _, _| Err(StatusCode::Rejected));
+    runtime
+      .syscall_map
+      .insert(SyscallCode::WRITE, std::sync::Arc::new(syscall));
+
+    let err = runtime.execute().unwrap_err();
+    assert_eq!(err, ExecutionError::SyscallFailed(StatusCode::Rejected));
   }
 
   #[test]
@@ -1680,4 +1734,11 @@ pub mod tests {
     assert_eq!(runtime.register(Register::X12), 0x12346525);
     assert_eq!(runtime.register(Register::X11), 0x65256525);
   }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Event {
+  DoneStep,
+  Halted,
+  Break,
 }

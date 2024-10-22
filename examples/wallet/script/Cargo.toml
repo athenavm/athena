@@ -14,8 +14,12 @@ athena-sdk = { path = "../../../sdk" }
 athena-vm-sdk = { path = "../../../vm/sdk" }
 clap = { version = "4.0", features = ["derive", "env"] }
 hex = "0.4.3"
-borsh = "1.5.1"
+parity-scale-codec = "3.6.12"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+[dev-dependencies]
+ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
+rand = "0.8.5"
 
 [build-dependencies]
 athena-helper = { path = "../../../helper" }

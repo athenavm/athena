@@ -5,7 +5,7 @@
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{ExecutionError, Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
-use athena_interface::{AthenaContext, HostInterface};
+use athena_interface::{AthenaContext, HostInterface, MethodSelector};
 
 /// A client for interacting with Athena.
 pub struct ExecutionClient;
@@ -74,7 +74,7 @@ impl ExecutionClient {
   pub fn execute_function(
     &self,
     elf: &[u8],
-    function: &str,
+    selector: &MethodSelector,
     stdin: AthenaStdin,
     host: Option<&mut dyn HostInterface>,
     max_gas: Option<u32>,
@@ -89,12 +89,100 @@ impl ExecutionClient {
     };
     let mut runtime = Runtime::new(program, host, opts, context);
     runtime.write_vecs(&stdin.buffer);
-    runtime.execute_function(function).map(|gas_left| {
+    runtime
+      .execute_function_by_selector(selector)
+      .map(|gas_left| {
+        (
+          AthenaPublicValues::from(&runtime.state.public_values_stream),
+          gas_left,
+        )
+      })
+  }
+
+  /// Execute the program under GDB.
+  ///
+  /// The GDB will halt the program on the first instruction and
+  /// await connection from the GDB client.
+  ///
+  /// ### Examples
+  /// ```no_run
+  /// let elf = b"program elf with debug symbols";
+  /// let stdin = athena_core::io::AthenaStdin::new();
+  /// let client = athena_sdk::ExecutionClient::new();
+  /// client.execute_with_gdb(elf, stdin, None, None, None, 9001);
+  /// ```
+  /// Now, connect with GDB: `target remote localhost:9001` and debug.
+  pub fn execute_with_gdb(
+    &self,
+    elf: &[u8],
+    stdin: AthenaStdin,
+    host: Option<&mut dyn HostInterface>,
+    max_gas: Option<u32>,
+    context: Option<AthenaContext>,
+    gdb_port: u16,
+  ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
+    let program = Program::from(elf);
+    let opts = match max_gas {
+      None => AthenaCoreOpts::default(),
+      Some(max_gas) => {
+        AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)])
+      }
+    };
+    let listener = std::net::TcpListener::bind(format!("127.0.0.1:{gdb_port}")).unwrap();
+    let mut runtime = Runtime::new(program, host, opts, context);
+    runtime.write_vecs(&stdin.buffer);
+    runtime.initialize();
+    athena_core::runtime::gdbstub::run_under_gdb(&mut runtime, listener, None).map(|gas_left| {
       (
         AthenaPublicValues::from(&runtime.state.public_values_stream),
         gas_left,
       )
     })
+  }
+
+  /// Execute the program function under GDB.
+  ///
+  /// The GDB will halt the program on the first instruction and
+  /// await connection from the GDB client.
+  ///
+  /// ### Examples
+  /// ```no_run
+  /// let elf = b"program elf with debug symbols";
+  /// let stdin = athena_core::io::AthenaStdin::new();
+  /// let client = athena_sdk::ExecutionClient::new();
+  /// client.execute_function_with_gdb(elf, "athexp_deploy", stdin, None, None, None, 9001);
+  /// ```
+  /// Now, connect with GDB: `target remote localhost:9001` and debug.
+  #[allow(clippy::too_many_arguments)]
+  pub fn execute_function_with_gdb(
+    &self,
+    elf: &[u8],
+    function: &str,
+    stdin: AthenaStdin,
+    host: Option<&mut dyn HostInterface>,
+    max_gas: Option<u32>,
+    context: Option<AthenaContext>,
+    gdb_port: u16,
+  ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
+    let program = Program::from(elf);
+    let opts = match max_gas {
+      None => AthenaCoreOpts::default(),
+      Some(max_gas) => {
+        AthenaCoreOpts::default().with_options(vec![athena_core::utils::with_max_gas(max_gas)])
+      }
+    };
+    let listener = std::net::TcpListener::bind(format!("127.0.0.1:{gdb_port}")).unwrap();
+    let mut runtime = Runtime::new(program, host, opts, context);
+    runtime.write_vecs(&stdin.buffer);
+    runtime.initialize();
+    athena_core::runtime::gdbstub::run_under_gdb(&mut runtime, listener, Some(function)).map(
+      |gas_left| {
+        (
+          AthenaPublicValues::from(&runtime.state.public_values_stream),
+          gas_left,
+        )
+      },
+    )
   }
 }
 

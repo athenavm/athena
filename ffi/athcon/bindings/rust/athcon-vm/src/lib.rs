@@ -1,11 +1,15 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::too_many_arguments)]
 
+pub mod bytes;
 mod container;
+pub mod encode_tx;
 mod types;
 
+use core::ptr::null;
 use core::slice;
 
 pub use athcon_sys as ffi;
+use bytes::{allocate_output_data, deallocate_output_data};
 pub use container::AthconContainer;
 pub use types::*;
 
@@ -55,8 +59,7 @@ pub struct ExecutionMessage {
   recipient: Address,
   sender: Address,
   input: Option<Vec<u8>>,
-  method: Option<Vec<u8>>,
-  value: Uint256,
+  value: u64,
   code: Option<Vec<u8>>,
 }
 
@@ -127,8 +130,7 @@ impl ExecutionMessage {
     recipient: Address,
     sender: Address,
     input: Option<&[u8]>,
-    method: Option<&[u8]>,
-    value: Uint256,
+    value: u64,
     code: Option<&[u8]>,
   ) -> Self {
     ExecutionMessage {
@@ -138,7 +140,6 @@ impl ExecutionMessage {
       recipient,
       sender,
       input: input.map(|s| s.to_vec()),
-      method: method.map(|s| s.to_vec()),
       value,
       code: code.map(|s| s.to_vec()),
     }
@@ -174,14 +175,9 @@ impl ExecutionMessage {
     self.input.as_ref()
   }
 
-  /// Read the optional method.
-  pub fn method(&self) -> Option<&Vec<u8>> {
-    self.method.as_ref()
-  }
-
   /// Read the value of the message.
-  pub fn value(&self) -> &Uint256 {
-    &self.value
+  pub fn value(&self) -> u64 {
+    self.value
   }
 
   /// Read the optional init code.
@@ -241,7 +237,7 @@ impl<'a> ExecutionContext<'a> {
   }
 
   /// Get balance of an account.
-  pub fn get_balance(&self, address: &Address) -> Uint256 {
+  pub fn get_balance(&self, address: &Address) -> u64 {
     unsafe {
       assert!(self.host.get_balance.is_some());
       self.host.get_balance.unwrap()(self.context, address as *const Address)
@@ -256,19 +252,14 @@ impl<'a> ExecutionContext<'a> {
     let (input_data, input_size) = if let Some(input) = input {
       (input.as_ptr(), input.len())
     } else {
-      (std::ptr::null(), 0)
-    };
-    let (method_name, method_name_size) = if let Some(method) = message.method() {
-      (method.as_ptr(), method.len())
-    } else {
-      (std::ptr::null(), 0)
+      (null(), 0)
     };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
     let code_data = if let Some(code) = code {
       code.as_ptr()
     } else {
-      std::ptr::null()
+      null()
     };
     // Cannot use a nice from trait here because that complicates memory management,
     // athcon_message doesn't have a release() method we could abstract it with.
@@ -280,9 +271,7 @@ impl<'a> ExecutionContext<'a> {
       sender: *message.sender(),
       input_data,
       input_size,
-      method_name,
-      method_name_size,
-      value: *message.value(),
+      value: message.value,
       code: code_data,
       code_size,
     };
@@ -341,34 +330,6 @@ impl From<ffi::athcon_result> for ExecutionResult {
   }
 }
 
-fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
-  match output {
-    Some(buf) if !buf.is_empty() => {
-      let buf_len = buf.len();
-
-      // Manually allocate heap memory for the new home of the output buffer.
-      let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
-      let new_buf = unsafe { std::alloc::alloc(memlayout) };
-      unsafe {
-        // Copy the data into the allocated buffer.
-        std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
-      }
-
-      (new_buf as *const u8, buf_len)
-    }
-    _ => (core::ptr::null(), 0),
-  }
-}
-
-unsafe fn deallocate_output_data(ptr: *const u8, size: usize) {
-  // be careful with dangling, aligned pointers here; they are not null but
-  // not valid and cannot be deallocated!
-  if !ptr.is_null() && size > 0 {
-    let buf_layout = std::alloc::Layout::from_size_align(size, 1).expect("Bad layout");
-    std::alloc::dealloc(ptr as *mut u8, buf_layout);
-  }
-}
-
 /// Returns a pointer to a heap-allocated athcon_result.
 impl From<ExecutionResult> for *const ffi::athcon_result {
   fn from(value: ExecutionResult) -> Self {
@@ -389,7 +350,7 @@ extern "C" fn release_heap_result(result: *const ffi::athcon_result) {
 /// Returns a pointer to a stack-allocated athcon_result.
 impl From<ExecutionResult> for ffi::athcon_result {
   fn from(value: ExecutionResult) -> Self {
-    let (buffer, len) = allocate_output_data(value.output.as_ref());
+    let (buffer, len) = value.output.map_or((null(), 0), allocate_output_data);
     Self {
       status_code: value.status_code,
       gas_left: value.gas_left,
@@ -432,18 +393,6 @@ impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
         None
       } else {
         Some(unsafe { slice::from_raw_parts(message.input_data, message.input_size).to_vec() })
-      },
-      method: if message.method_name.is_null() {
-        if message.method_name_size != 0 {
-          return Err("msg.method_data is null but msg.method_size is not 0".to_string());
-        }
-        None
-      } else if message.method_name_size == 0 {
-        None
-      } else {
-        Some(unsafe {
-          slice::from_raw_parts(message.method_name, message.method_name_size).to_vec()
-        })
       },
       value: message.value,
       code: if message.code.is_null() {
@@ -524,7 +473,7 @@ mod tests {
       assert!(!(*f).output_data.is_null());
       assert_eq!((*f).output_size, 5);
       assert_eq!(
-        std::slice::from_raw_parts((*f).output_data, 5) as &[u8],
+        slice::from_raw_parts((*f).output_data, 5) as &[u8],
         &[0xc0, 0xff, 0xee, 0x71, 0x75]
       );
       assert_eq!((*f).create_address.bytes, [0u8; 24]);
@@ -567,7 +516,7 @@ mod tests {
       assert!(!f.output_data.is_null());
       assert_eq!(f.output_size, 5);
       assert_eq!(
-        std::slice::from_raw_parts(f.output_data, 5) as &[u8],
+        slice::from_raw_parts(f.output_data, 5) as &[u8],
         &[0xc0, 0xff, 0xee, 0x71, 0x75]
       );
       assert_eq!(f.create_address.bytes, [0u8; 24]);
@@ -599,7 +548,7 @@ mod tests {
     let input = vec![0xc0, 0xff, 0xee];
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
+    let value = 77;
 
     let ret = ExecutionMessage::new(
       MessageKind::ATHCON_CALL,
@@ -608,7 +557,6 @@ mod tests {
       recipient,
       sender,
       Some(&input),
-      None,
       value,
       None,
     );
@@ -620,14 +568,14 @@ mod tests {
     assert_eq!(*ret.sender(), sender);
     assert!(ret.input().is_some());
     assert_eq!(*ret.input().unwrap(), input);
-    assert_eq!(*ret.value(), value);
+    assert_eq!(ret.value, value);
   }
 
   #[test]
   fn message_new_with_code() {
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
+    let value = 0;
     let code = vec![0x5f, 0x5f, 0xfd];
 
     let ret = ExecutionMessage::new(
@@ -636,7 +584,6 @@ mod tests {
       4466,
       recipient,
       sender,
-      None,
       None,
       value,
       Some(&code),
@@ -647,7 +594,7 @@ mod tests {
     assert_eq!(ret.gas(), 4466);
     assert_eq!(*ret.recipient(), recipient);
     assert_eq!(*ret.sender(), sender);
-    assert_eq!(*ret.value(), value);
+    assert_eq!(ret.value, value);
     assert!(ret.code().is_some());
     assert_eq!(*ret.code().unwrap(), code);
   }
@@ -655,7 +602,7 @@ mod tests {
   fn valid_athcon_message() -> ffi::athcon_message {
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
-    let value = Uint256 { bytes: [0u8; 32] };
+    let value = 0;
 
     ffi::athcon_message {
       kind: MessageKind::ATHCON_CALL,
@@ -665,8 +612,6 @@ mod tests {
       sender,
       input_data: std::ptr::null(),
       input_size: 0,
-      method_name: std::ptr::null(),
-      method_name_size: 0,
       value,
       code: std::ptr::null(),
       code_size: 0,
@@ -684,7 +629,7 @@ mod tests {
     assert_eq!(*ret.recipient(), msg.recipient);
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_none());
-    assert_eq!(*ret.value(), msg.value);
+    assert_eq!(ret.value, msg.value);
     assert!(ret.code().is_none());
   }
 
@@ -707,7 +652,7 @@ mod tests {
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_some());
     assert_eq!(*ret.input().unwrap(), input);
-    assert_eq!(*ret.value(), msg.value);
+    assert_eq!(ret.value, msg.value);
     assert!(ret.code().is_none());
   }
 
@@ -729,7 +674,7 @@ mod tests {
     assert_eq!(*ret.recipient(), msg.recipient);
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_none());
-    assert_eq!(*ret.value(), msg.value);
+    assert_eq!(ret.value, msg.value);
     assert!(ret.code().is_some());
     assert_eq!(*ret.code().unwrap(), code);
   }
@@ -760,7 +705,7 @@ mod tests {
     _context: *mut ffi::athcon_host_context,
   ) -> ffi::athcon_tx_context {
     ffi::athcon_tx_context {
-      tx_gas_price: Uint256 { bytes: [0u8; 32] },
+      tx_gas_price: 0,
       tx_origin: Address { bytes: [0u8; 24] },
       block_height: 42,
       block_timestamp: 235117,
@@ -839,8 +784,7 @@ mod tests {
       test_addr,
       test_addr,
       None,
-      None,
-      Uint256::default(),
+      0,
       None,
     );
 
@@ -870,8 +814,7 @@ mod tests {
       test_addr,
       test_addr,
       Some(&data),
-      None,
-      Uint256::default(),
+      0,
       None,
     );
 

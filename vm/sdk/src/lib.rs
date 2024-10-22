@@ -1,14 +1,18 @@
-use athena_interface::{Address, Bytes32, BYTES32_LENGTH};
-use borsh_derive::{BorshDeserialize, BorshSerialize};
+use athena_interface::Bytes32;
 use cfg_if::cfg_if;
+use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
+
+pub mod wallet;
+pub use wallet::*;
+
+mod call;
+pub use call::call;
 
 cfg_if! {
   if #[cfg(target_os = "zkvm")] {
     mod spawn;
     pub use spawn::spawn;
-    mod call;
-    pub use call::call;
     mod deploy;
     pub use deploy::deploy;
     mod io;
@@ -17,9 +21,8 @@ cfg_if! {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Pubkey(pub Bytes32);
-pub const PUBKEY_LENGTH: usize = BYTES32_LENGTH;
 
 #[allow(dead_code)] // Used by RISC-V targets and tests
 /// Convert a slice of bytes to a vector of u32 little-endian values.
@@ -46,23 +49,8 @@ pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
   result
 }
 
-// These traits define the reference wallet interface.
-
 pub trait VerifiableTemplate {
-  fn verify(&self, tx: &[u8], signature: &[u8; 64]) -> bool;
-}
-
-#[derive(Clone, Copy, Debug, Default, BorshDeserialize, BorshSerialize)]
-pub struct SendArguments {
-  pub recipient: Address,
-  pub amount: u64,
-}
-
-pub trait WalletProgram {
-  fn spawn(owner: Pubkey) -> Address;
-  fn send(&self, args: SendArguments);
-  fn proxy(&self, destination: Address, args: &[u8]);
-  fn deploy(&self, code: Vec<u8>) -> Address;
+  fn verify(&self, tx: Vec<u8>, signature: [u8; 64]) -> bool;
 }
 
 #[cfg(test)]
@@ -82,7 +70,7 @@ mod tests {
   }
 
   #[test]
-  fn covnert_not_a_multiple_of_4() {
+  fn convert_not_a_multiple_of_4() {
     let result = bytes_to_u32_vec([1, 2, 3, 4, 5, 6, 7]);
     assert_eq!(result, vec![0x04030201, 0x00070605]);
   }

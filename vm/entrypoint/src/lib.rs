@@ -3,9 +3,7 @@ extern crate alloc;
 pub mod heap;
 pub mod helpers;
 pub mod syscalls;
-pub mod host {
-  pub use athena_hostfunctions::*;
-}
+
 #[cfg(feature = "lib")]
 pub mod io {
   pub use athena_lib::io::*;
@@ -82,15 +80,6 @@ mod vm {
   }
 
   static STACK_TOP: u32 = 0x0020_0400;
-
-  #[cfg(feature = "rv32e")]
-  core::arch::global_asm!(include_str!("memset-rv32e.s"));
-  #[cfg(feature = "rv32e")]
-  core::arch::global_asm!(include_str!("memcpy-rv32e.s"));
-  #[cfg(not(feature = "rv32e"))]
-  core::arch::global_asm!(include_str!("memset.s"));
-  #[cfg(not(feature = "rv32e"))]
-  core::arch::global_asm!(include_str!("memcpy.s"));
 
   core::arch::global_asm!(
       r#"

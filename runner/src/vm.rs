@@ -1,8 +1,10 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
-  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, ExecutionResult,
-  HostInterface, SetOptionError, StatusCode, VmInterface,
+  payload::{ExecutionPayload, Payload},
+  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, Decode,
+  ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
 };
+
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
@@ -47,37 +49,49 @@ where
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
     let mut stdin = AthenaStdin::new();
-
-    // input data is optional
-    if let Some(input_data) = msg.input_data {
-      stdin.write_vec(input_data);
+    let execution_payload = match msg
+      .input_data
+      .map_or(Ok(ExecutionPayload::default()), |data| {
+        ExecutionPayload::decode(&mut data.as_slice())
+      }) {
+      Ok(p) => p,
+      Err(e) => {
+        tracing::info!("Failed to deserialize execution payload: {e:?}");
+        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+      }
+    };
+    if !execution_payload.state.is_empty() {
+      stdin.write_vec(execution_payload.state);
     }
 
-    // method name is also optional
-    let execution_result = if let Some(method_name) = msg.method {
-      // TODO: use a fixed-length method selector here rather than a string
-      // https://github.com/athenavm/athena/issues/113
-      let method_name_str = match std::str::from_utf8(&method_name) {
-        Ok(name) => name,
-        Err(err) => {
-          log::info!("malformed utf-8 method name: {:?}", err);
-          return ExecutionResult::new(StatusCode::Failure, 0, None, None);
-        }
-      };
-      log::info!("Executing method {} with input data", method_name_str);
-      self.client.execute_function(
-        code,
-        method_name_str,
-        stdin,
-        Some(host),
-        Some(msg.gas),
-        Some(context),
-      )
-    } else {
-      log::info!("Executing default method with input data");
-      self
-        .client
-        .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+    let Payload { selector, input } = execution_payload.payload;
+
+    let input_len = input.len();
+    if input_len > 0 {
+      stdin.write_vec(input);
+    }
+    let execution_result = match selector {
+      Some(method) => {
+        tracing::info!(
+          "Executing method 0x{} with input length {}",
+          method,
+          input_len,
+        );
+        self.client.execute_function(
+          code,
+          &method,
+          stdin,
+          Some(host),
+          Some(msg.gas),
+          Some(context),
+        )
+      }
+      None => {
+        tracing::info!("Executing default method with input length {}", input_len,);
+        self
+          .client
+          .execute(code, stdin, Some(host), Some(msg.gas), Some(context))
+      }
     };
 
     match execution_result {
@@ -89,7 +103,7 @@ where
       ),
       // map error to execution result
       Err(e) => {
-        log::info!("Execution error: {:?}", e);
+        tracing::info!("Execution error: {e:?}");
         match e {
           ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
           ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None, None),
@@ -106,8 +120,9 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, MessageKind, MockHost, ADDRESS_ALICE,
-    STORAGE_KEY, STORAGE_VALUE,
+    payload::{ExecutionPayloadBuilder, Payload},
+    Address, AthenaMessage, AthenaRevision, Balance, Encode, MessageKind, MethodSelector, MockHost,
+    MockHostInterface, ADDRESS_ALICE, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -131,7 +146,6 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
-        None,
         Balance::default(),
         vec![],
       ),
@@ -141,6 +155,7 @@ mod tests {
 
   #[test]
   fn test_method_selector() {
+    setup_logger();
     let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
 
     // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
@@ -160,7 +175,6 @@ mod tests {
         Address::default(),
         Address::default(),
         None,
-        None,
         Balance::default(),
         vec![],
       ),
@@ -170,6 +184,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
+    let payload = Payload {
+      selector: Some(MethodSelector::from("athexp_test1")),
+      input: input.clone(),
+    };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -179,8 +198,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        Some(input),
-        Some("athexp_test1".as_bytes().to_vec()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -190,6 +208,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
+    let payload = Payload {
+      selector: Some(MethodSelector::from("athexp_test2")),
+      input: input.clone(),
+    };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -199,8 +222,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        None,
-        Some("athexp_test2".as_bytes().to_vec()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -210,6 +232,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
+    let payload = Payload {
+      selector: Some(MethodSelector::from("athexp_test3")),
+      input: input.clone(),
+    };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -219,8 +246,7 @@ mod tests {
         1000000,
         Address::default(),
         Address::default(),
-        None,
-        Some("athexp_test3".as_bytes().to_vec()),
+        Some(payload.encode()),
         Balance::default(),
         vec![],
       ),
@@ -254,7 +280,7 @@ mod tests {
         elf,
         stdin,
         Some(&mut host),
-        Some(150_000),
+        Some(200_000),
         Some(ctx.clone()),
       )
       .unwrap();
@@ -309,14 +335,18 @@ mod tests {
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
+    let payload = Payload {
+      selector: None,
+      input: vec![8, 0, 0, 0],
+    };
+
     let msg = AthenaMessage::new(
       MessageKind::Call,
       0,
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      Some(vec![8u8, 0, 0, 0]),
-      None,
+      Some(payload.into()),
       0,
       vec![],
     );
@@ -339,17 +369,18 @@ mod tests {
     setup_logger();
 
     let client = ExecutionClient::new();
-    let elf = include_bytes!("../../tests/stack_depth/elf/stack-depth-test");
-    let stdin = AthenaStdin::new();
-    let vm = AthenaVm::new();
-    let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
+    let mut stdin = AthenaStdin::new();
+    stdin.write::<u32>(&7);
+    let mut host = MockHostInterface::new();
+    host
+      .expect_call()
+      .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
-    match res {
-      Ok(_) => panic!("expected stack depth error"),
-      Err(ExecutionError::SyscallFailed(StatusCode::CallDepthExceeded)) => (),
-      Err(_) => panic!("expected stack depth error"),
-    }
+    assert!(matches!(
+      res,
+      Err(ExecutionError::SyscallFailed(StatusCode::CallDepthExceeded))
+    ));
   }
 }

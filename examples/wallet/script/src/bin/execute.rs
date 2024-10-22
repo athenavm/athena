@@ -8,12 +8,11 @@
 use std::error::Error;
 
 use athena_interface::{
-  Address, AthenaContext, HostDynamicContext, HostInterface, HostStaticContext, MockHost,
-  ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+  Address, AthenaContext, Encode, HostDynamicContext, HostInterface, HostStaticContext,
+  MethodSelector, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use athena_vm_sdk::{Pubkey, SendArguments};
-use borsh::to_vec;
+use athena_vm_sdk::{Pubkey, SpendArguments};
 use clap::Parser;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
@@ -39,13 +38,15 @@ fn parse_owner(data: &str) -> Result<Pubkey, hex::FromHexError> {
   Ok(key)
 }
 
-fn spawn(host: &mut MockHost, owner: Pubkey) -> Result<Address, Box<dyn Error>> {
+fn spawn(host: &mut MockHost, owner: &Pubkey) -> Result<Address, Box<dyn Error>> {
   let mut stdin = AthenaStdin::new();
-  stdin.write(&owner.0);
+  stdin.write_vec(owner.encode());
+
+  let method_selector = MethodSelector::from("athexp_spawn");
 
   let client = ExecutionClient::new();
   let (mut result, _) =
-    client.execute_function(ELF, "athexp_spawn", stdin, Some(host), None, None)?;
+    client.execute_function(ELF, &method_selector, stdin, Some(host), None, None)?;
 
   Ok(result.read())
 }
@@ -60,7 +61,7 @@ fn main() {
     HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
   );
   host.set_balance(&ADDRESS_ALICE, 10000);
-  let address = spawn(&mut host, args.owner).expect("spawning wallet program");
+  let address = spawn(&mut host, &args.owner).expect("spawning wallet program");
   println!(
     "spawned a wallet program at {} for {}",
     hex::encode(address),
@@ -73,32 +74,34 @@ fn main() {
   let mut stdin = AthenaStdin::new();
   let wallet = host
     .get_program(&address)
-    .expect("getting wallet program instance")
-    .clone();
+    .expect("getting wallet program instance");
 
-  stdin.write_vec(wallet);
-
-  let args = SendArguments {
+  let args = SpendArguments {
     recipient: ADDRESS_CHARLIE,
-    amount: 10,
+    amount: 120,
   };
-  stdin.write_slice(&to_vec(&args).expect("serializing send arguments"));
+
+  stdin.write_vec(wallet.clone());
+  stdin.write_vec(args.encode());
 
   let alice_balance = host.get_balance(&ADDRESS_ALICE);
-  assert!(alice_balance >= 10);
+  assert!(alice_balance >= 120);
   println!(
     "sending {} coins {} -> {}",
     args.amount,
     hex::encode(context.address()),
     hex::encode(args.recipient),
   );
-  let (_, gas_cost) = ExecutionClient::new()
+  // calculate method selector
+  let method_selector = MethodSelector::from("athexp_spend");
+  let max_gas = 25000;
+  let (_, gas_left) = ExecutionClient::new()
     .execute_function(
       ELF,
-      "athexp_send",
+      &method_selector,
       stdin,
       Some(&mut host),
-      Some(25000),
+      Some(max_gas),
       Some(context.clone()),
     )
     .expect("sending coins");
@@ -107,44 +110,54 @@ fn main() {
   let charlie_balance = host.get_balance(&ADDRESS_CHARLIE);
   println!(
     "sent coins at gas cost {}, balances: alice: {}, charlie: {}",
-    gas_cost.unwrap_or_default(),
+    max_gas - gas_left.unwrap_or_default(),
     new_alice_balance,
     charlie_balance
   );
-  assert!(gas_cost.is_some());
-  assert_eq!(charlie_balance, 10);
-  assert_eq!(new_alice_balance, alice_balance - 10);
+  assert!(gas_left.is_some());
+  assert_eq!(charlie_balance, 120);
+  assert_eq!(new_alice_balance, alice_balance - 120);
 }
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{Address, HostDynamicContext, HostStaticContext, MockHost, ADDRESS_ALICE};
+  use athena_interface::{
+    Address, Encode, HostDynamicContext, HostStaticContext, MethodSelector, MockHost, ADDRESS_ALICE,
+  };
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
+  use ed25519_dalek::ed25519::signature::Signer;
+  use ed25519_dalek::SigningKey;
+  use rand::rngs::OsRng;
+
+  fn setup_logger() {
+    let _ = tracing_subscriber::fmt()
+      .with_test_writer()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init();
+  }
 
   #[test]
   fn deploy_template() {
-    tracing_subscriber::fmt()
-      .with_test_writer()
-      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-      .init();
+    setup_logger();
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
       HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
     );
-    let address = super::spawn(&mut host, Pubkey::default()).unwrap();
+    let address = super::spawn(&mut host, &Pubkey::default()).unwrap();
 
     // deploy other contract
     let code = b"some really bad code".to_vec();
     let mut stdin = AthenaStdin::new();
     let wallet_state = host.get_program(&address).unwrap();
-    stdin.write_slice(wallet_state);
-    stdin.write_vec(borsh::to_vec(&code).unwrap());
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(code.encode());
 
+    let selector = MethodSelector::from("athexp_deploy");
     let result = ExecutionClient::new().execute_function(
       super::ELF,
-      "athexp_deploy",
+      &selector,
       stdin.clone(),
       Some(&mut host),
       Some(25000000),
@@ -156,5 +169,62 @@ mod tests {
     let address: Address = result.read();
     let template = host.template(&address);
     assert_eq!(template, Some(&code));
+  }
+
+  #[test]
+  fn verifying_tx() {
+    setup_logger();
+
+    let mut host = MockHost::new_with_context(
+      HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    );
+
+    let signing_key = SigningKey::generate(&mut OsRng);
+    let owner = Pubkey(signing_key.verifying_key().to_bytes());
+    let address = super::spawn(&mut host, &owner).unwrap();
+    let wallet_state = host.get_program(&address).unwrap().clone();
+
+    let tx = b"some really bad tx";
+
+    // First try with invalid signature
+    {
+      let mut stdin = AthenaStdin::new();
+      stdin.write_vec(wallet_state.clone());
+      stdin.write_vec(tx.as_slice().encode());
+      stdin.write_vec([0; 64].encode());
+
+      let result = ExecutionClient::new().execute_function(
+        super::ELF,
+        &MethodSelector::from("athexp_verify"),
+        stdin.clone(),
+        Some(&mut host),
+        Some(25000000),
+        None,
+      );
+      let (mut result, _) = result.unwrap();
+      let valid = result.read::<bool>();
+      assert!(!valid);
+    }
+
+    // Now with valid signature
+    let signature = signing_key.sign(tx);
+
+    let mut stdin = AthenaStdin::new();
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(tx.as_slice().encode());
+    stdin.write_vec(signature.to_bytes().encode());
+
+    let result = ExecutionClient::new().execute_function(
+      super::ELF,
+      &MethodSelector::from("athexp_verify"),
+      stdin.clone(),
+      Some(&mut host),
+      Some(25000000),
+      None,
+    );
+    let (mut result, _) = result.unwrap();
+    let valid = result.read::<bool>();
+    assert!(valid);
   }
 }

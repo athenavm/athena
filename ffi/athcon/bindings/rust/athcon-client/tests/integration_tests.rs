@@ -7,6 +7,7 @@ use athcon_client::{
   AthconVm,
 };
 use athcon_vm::{MessageKind, Revision, StatusCode, StorageStatus};
+use athena_interface::payload::ExecutionPayload;
 use athena_interface::ADDRESS_ALICE;
 
 const CONTRACT_CODE: &[u8] =
@@ -52,21 +53,14 @@ impl HostInterface for HostContext {
     StorageStatus::ATHCON_STORAGE_MODIFIED
   }
 
-  fn get_balance(&self, _addr: &Address) -> Bytes32 {
+  fn get_balance(&self, _addr: &Address) -> u64 {
     println!("Host: get_balance");
-    [0u8; BYTES32_LENGTH]
+    0
   }
 
-  fn get_tx_context(&self) -> (Bytes32, Address, i64, i64, i64, Bytes32) {
+  fn get_tx_context(&self) -> (u64, Address, i64, i64, i64, Bytes32) {
     println!("Host: get_tx_context");
-    (
-      [0u8; BYTES32_LENGTH],
-      [0u8; ADDRESS_LENGTH],
-      0,
-      0,
-      0,
-      [0u8; BYTES32_LENGTH],
-    )
+    (0, [0u8; ADDRESS_LENGTH], 0, 0, 0, [0u8; BYTES32_LENGTH])
   }
 
   fn get_block_hash(&self, _number: i64) -> Bytes32 {
@@ -79,9 +73,8 @@ impl HostInterface for HostContext {
     kind: MessageKind,
     destination: &Address,
     sender: &Address,
-    value: &Bytes32,
+    value: u64,
     input: &Bytes,
-    method: &Bytes,
     gas: i64,
     depth: i32,
   ) -> (Vec<u8>, i64, Address, StatusCode) {
@@ -106,6 +99,12 @@ impl HostInterface for HostContext {
       );
     }
 
+    // The input must be enriched with optional account state
+    // and then passed to the VM.
+    // TODO: figure out when to provide a state here
+    let state = vec![];
+    let execution_payload = ExecutionPayload::encode_with_encoded_payload(state, input);
+
     let res = self.vm.clone().execute(
       self,
       Revision::ATHCON_FRONTIER,
@@ -114,8 +113,7 @@ impl HostInterface for HostContext {
       gas,
       destination,
       sender,
-      input,
-      method,
+      &execution_payload,
       value,
       CONTRACT_CODE,
     );
@@ -140,33 +138,48 @@ impl Drop for HostContext {
   }
 }
 
-/// Test the Rust host interface to athcon
-/// We don't use this in production since Athena provides only the VM, not the Host, but
-/// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
-#[test]
-fn test_rust_host() {
-  let vm = AthconVm::new();
-  println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use athena_interface::{
+    payload::{ExecutionPayloadBuilder, Payload},
+    Encode,
+  };
 
-  let mut host = HostContext::new(vm);
-  let (output, gas_left, status_code) = host.vm.clone().execute(
-    &mut host,
-    Revision::ATHCON_FRONTIER,
-    MessageKind::ATHCON_CALL,
-    0,
-    50000000,
-    &ADDRESS_ALICE,
-    &[128u8; ADDRESS_LENGTH],
-    // the value 3 as little-endian u32
-    3u32.to_le_bytes().as_slice(),
-    // empty method name
-    &[],
-    &[0u8; BYTES32_LENGTH],
-    CONTRACT_CODE,
-  );
-  println!("Output:  {:?}", hex::encode(&output));
-  println!("GasLeft: {:?}", gas_left);
-  println!("Status:  {:?}", status_code);
-  assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
-  assert_eq!(u32::from_le_bytes(output.as_slice().try_into().unwrap()), 2);
+  /// Test the Rust host interface to athcon
+  /// We don't use this in production since Athena provides only the VM, not the Host, but
+  /// it allows us to test talking to the VM via FFI, and that the host bindings work as expected.
+  #[test]
+  fn test_rust_host() {
+    tracing_subscriber::fmt::init();
+
+    let vm = AthconVm::new();
+    println!("Instantiate: {:?}", (vm.get_name(), vm.get_version()));
+
+    let mut host = HostContext::new(vm);
+    let payload = ExecutionPayloadBuilder::new()
+      .with_payload(Payload {
+        selector: None,
+        input: vec![3u8, 0, 0, 0],
+      })
+      .build();
+
+    let (output, gas_left, status_code) = host.vm.clone().execute(
+      &mut host,
+      Revision::ATHCON_FRONTIER,
+      MessageKind::ATHCON_CALL,
+      0,
+      50000000,
+      &ADDRESS_ALICE,
+      &[128u8; ADDRESS_LENGTH],
+      payload.encode().as_slice(),
+      0,
+      CONTRACT_CODE,
+    );
+    println!("Output:  {:?}", hex::encode(&output));
+    println!("GasLeft: {:?}", gas_left);
+    println!("Status:  {:?}", status_code);
+    assert_eq!(status_code, StatusCode::ATHCON_SUCCESS);
+    assert_eq!(u32::from_le_bytes(output.as_slice().try_into().unwrap()), 2);
+  }
 }
