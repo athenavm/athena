@@ -228,7 +228,7 @@ mod tests {
   }
 
   #[test]
-  fn maxspend() {
+  fn max_spend() {
     setup_logger();
 
     let mut host = MockHost::new_with_context(
@@ -245,7 +245,7 @@ mod tests {
     stdin.write_vec(wallet_state.clone());
     stdin.write_vec(athena_vm_sdk::encode_spend_inner(&recipient, amount));
 
-    let selector = MethodSelector::from("athexp_maxspend");
+    let selector = MethodSelector::from("athexp_max_spend");
     let result = ExecutionClient::new().execute_function(
       super::ELF,
       &selector,

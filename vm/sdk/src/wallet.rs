@@ -16,7 +16,7 @@ pub trait WalletProgram {
   fn spend(&self, args: SpendArguments);
   fn proxy(&self, destination: Address, args: &[u8]);
   fn deploy(&self, code: Vec<u8>) -> Address;
-  fn maxspend(&self, args: SpendArguments) -> u64;
+  fn max_spend(&self, args: SpendArguments) -> u64;
 }
 
 pub fn encode_spend_inner(recipient: &Address, amount: u64) -> Vec<u8> {
@@ -32,9 +32,9 @@ pub fn encode_spend(recipient: &Address, amount: u64) -> Vec<u8> {
   Payload::new(Some(MethodSelector::from("athexp_spend")), input).into()
 }
 
-pub fn encode_maxspend(recipient: &Address, amount: u64) -> Vec<u8> {
+pub fn encode_max_spend(recipient: &Address, amount: u64) -> Vec<u8> {
   let input = encode_spend_inner(recipient, amount);
-  Payload::new(Some(MethodSelector::from("athexp_maxspend")), input).into()
+  Payload::new(Some(MethodSelector::from("athexp_max_spend")), input).into()
 }
 
 pub fn encode_spawn(pubkey: &Pubkey) -> Vec<u8> {

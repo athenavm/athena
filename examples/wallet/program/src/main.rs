@@ -55,7 +55,7 @@ impl WalletProgram for Wallet {
   }
 
   #[callable]
-  fn maxspend(&self, args: SpendArguments) -> u64 {
+  fn max_spend(&self, args: SpendArguments) -> u64 {
     args.amount
   }
 }
