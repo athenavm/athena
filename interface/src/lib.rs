@@ -301,21 +301,14 @@ pub struct ExecutionResult {
   pub status_code: StatusCode,
   pub gas_left: u32,
   pub output: Option<Vec<u8>>,
-  pub create_address: Option<Address>,
 }
 
 impl ExecutionResult {
-  pub fn new(
-    status_code: StatusCode,
-    gas_left: u32,
-    output: Option<Vec<u8>>,
-    create_address: Option<Address>,
-  ) -> Self {
+  pub fn new(status_code: StatusCode, gas_left: u32, output: Option<Vec<u8>>) -> Self {
     ExecutionResult {
       status_code,
       gas_left,
       output,
-      create_address,
     }
   }
 }
@@ -574,7 +567,7 @@ impl HostInterface for MockHost<'_> {
 
     // don't go too deep!
     if msg.depth > 10 {
-      return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None);
+      return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None);
     }
 
     // take snapshots of the state in case we need to roll back
@@ -595,7 +588,7 @@ impl HostInterface for MockHost<'_> {
     match self.transfer_balance(&msg.sender, &msg.recipient, msg.value) {
       StatusCode::Success => {}
       status => {
-        return ExecutionResult::new(status, 0, None, None);
+        return ExecutionResult::new(status, 0, None);
       }
     }
 
@@ -637,7 +630,7 @@ impl HostInterface for MockHost<'_> {
       };
 
       let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
-      ExecutionResult::new(status_code, gas_left, None, None)
+      ExecutionResult::new(status_code, gas_left, None)
     };
 
     self.dynamic_context = old_dynamic_context;

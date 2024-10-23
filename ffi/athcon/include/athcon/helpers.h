@@ -162,54 +162,6 @@ extern "C"
       result->release(result);
   }
 
-  /**
-   * Helpers for optional storage of athcon_result.
-   *
-   * In some contexts (i.e. athcon_result::create_address is unused) objects of
-   * type athcon_result contains a memory storage that MAY be used by the object
-   * owner. This group defines helper types and functions for accessing
-   * the optional storage.
-   *
-   * @defgroup result_optional_storage Result Optional Storage
-   * @{
-   */
-
-  /**
-   * The union representing athcon_result "optional storage".
-   *
-   * The athcon_result struct contains 24 bytes of optional storage that can be
-   * reused by the object creator if the object does not contain
-   * athcon_result::create_address.
-   *
-   * A VM implementation MAY use this memory to keep additional data
-   * when returning result from athcon_execute_fn().
-   * The host application MAY use this memory to keep additional data
-   * when returning result of performed calls from athcon_call_fn().
-   *
-   * @see athcon_get_optional_storage(), athcon_get_const_optional_storage().
-   */
-  union athcon_result_optional_storage
-  {
-    uint8_t bytes[24]; /**< 24 bytes of optional storage. */
-    void *pointer;     /**< Optional pointer. */
-  };
-
-  /** Provides read-write access to athcon_result "optional storage". */
-  static inline union athcon_result_optional_storage *athcon_get_optional_storage(
-      struct athcon_result *result)
-  {
-    return (union athcon_result_optional_storage *)&result->create_address;
-  }
-
-  /** Provides read-only access to athcon_result "optional storage". */
-  static inline const union athcon_result_optional_storage *athcon_get_const_optional_storage(
-      const struct athcon_result *result)
-  {
-    return (const union athcon_result_optional_storage *)&result->create_address;
-  }
-
-  /** @} */
-
   /** Returns text representation of the ::athcon_status_code. */
   static inline const char *athcon_status_code_to_string(enum athcon_status_code status_code)
   {

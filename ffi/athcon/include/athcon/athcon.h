@@ -390,16 +390,6 @@ extern "C"
      * function to the result itself allows VM composition.
      */
     athcon_release_result_fn release;
-
-    /**
-     * The address of the possibly created contract.
-     *
-     * The create address may be provided even though the contract creation has failed
-     * (athcon_result::status_code is not ::ATHCON_SUCCESS). This is useful in situations
-     * when the address is observable, e.g. access to it remains warm.
-     * In all other cases the address MUST be null bytes.
-     */
-    athcon_address create_address;
   };
 
   /**

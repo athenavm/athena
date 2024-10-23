@@ -77,14 +77,13 @@ impl HostInterface for HostContext {
     input: &Bytes,
     gas: i64,
     depth: i32,
-  ) -> (Vec<u8>, i64, Address, StatusCode) {
+  ) -> (Vec<u8>, i64, StatusCode) {
     println!("Host: call");
     // check depth
     if depth > 10 {
       return (
         vec![0u8; BYTES32_LENGTH],
         0,
-        [0u8; ADDRESS_LENGTH],
         StatusCode::ATHCON_CALL_DEPTH_EXCEEDED,
       );
     }
@@ -94,7 +93,6 @@ impl HostInterface for HostContext {
       return (
         vec![0u8; BYTES32_LENGTH],
         0,
-        [0u8; ADDRESS_LENGTH],
         StatusCode::ATHCON_CONTRACT_VALIDATION_FAILURE,
       );
     }
@@ -105,7 +103,7 @@ impl HostInterface for HostContext {
     let state = vec![];
     let execution_payload = ExecutionPayload::encode_with_encoded_payload(state, input);
 
-    let res = self.vm.clone().execute(
+    self.vm.clone().execute(
       self,
       Revision::ATHCON_FRONTIER,
       kind,
@@ -116,8 +114,7 @@ impl HostInterface for HostContext {
       &execution_payload,
       value,
       CONTRACT_CODE,
-    );
-    (res.0.to_vec(), res.1, [0u8; ADDRESS_LENGTH], res.2)
+    )
   }
 
   fn spawn(&mut self, _blob: &[u8]) -> Address {
