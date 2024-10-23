@@ -1,7 +1,6 @@
 package athcon
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	_ "embed"
@@ -112,20 +111,11 @@ func TestGetBalance(t *testing.T) {
 	host.balances[addr] = 1000
 	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, 0, MINIMAL_TEST_CODE)
 	require.NoError(t, err)
-	output := result.Output
 	require.EqualValues(t, result.GasLeft, 68)
-	require.Len(t, output, 32)
+	require.Len(t, result.Output, 32)
 
-	// Should return value 42 (0x2a) as defined in GetTxContext().
-	var expectedOutput Bytes32
-	binary.LittleEndian.PutUint32(expectedOutput[:], 1000)
-	if !bytes.Equal(output, expectedOutput[:]) {
-		t.Errorf("expected output: %x", expectedOutput)
-		t.Errorf("unexpected output: %x", output)
-	}
-	if err != nil {
-		t.Errorf("execution returned unexpected error: %v", err)
-	}
+	balance := binary.LittleEndian.Uint64(result.Output)
+	require.Equal(t, host.balances[addr], balance)
 }
 
 func TestCall(t *testing.T) {
