@@ -301,22 +301,19 @@ pub struct ExecutionResult {
   pub status_code: StatusCode,
   pub gas_left: u32,
   pub output: Option<Vec<u8>>,
-  pub create_address: Option<Address>,
 }
 
 impl ExecutionResult {
-  pub fn new(
-    status_code: StatusCode,
-    gas_left: u32,
-    output: Option<Vec<u8>>,
-    create_address: Option<Address>,
-  ) -> Self {
+  pub fn new(status_code: StatusCode, gas_left: u32, output: Option<Vec<u8>>) -> Self {
     ExecutionResult {
       status_code,
       gas_left,
       output,
-      create_address,
     }
+  }
+
+  pub fn failed(gas_left: u32) -> Self {
+    ExecutionResult::new(StatusCode::Failure, gas_left, None)
   }
 }
 
@@ -405,6 +402,7 @@ pub struct SpawnResult {
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
+#[derive(Default)]
 pub struct MockHost<'a> {
   // VM instance
   vm: Option<&'a dyn VmInterface<MockHost<'a>>>,
@@ -424,9 +422,6 @@ pub struct MockHost<'a> {
   // context information
   static_context: Option<HostStaticContext>,
   dynamic_context: Option<HostDynamicContext>,
-
-  // the result of the most recent spawn operation
-  spawn_result: Option<SpawnResult>,
 }
 
 impl<'a> MockHost<'a> {
@@ -452,6 +447,12 @@ impl<'a> MockHost<'a> {
     }
   }
 
+  /// Set balance of given address.
+  /// The previous balance is discarded.
+  pub fn set_balance(&mut self, address: &Address, balance: Balance) {
+    self.balance.insert(*address, balance);
+  }
+
   pub fn spawn_program(
     &mut self,
     template: &Address,
@@ -463,18 +464,7 @@ impl<'a> MockHost<'a> {
     tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
 
     self.programs.insert(address, blob.clone());
-    self.spawn_result = Some(SpawnResult {
-      address,
-      blob,
-      template: *template,
-      principal: *principal,
-      nonce,
-    });
     address
-  }
-
-  pub fn get_spawn_result(&self) -> Option<&SpawnResult> {
-    self.spawn_result.as_ref()
   }
 
   pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
@@ -509,7 +499,6 @@ impl<'a> MockHost<'a> {
 pub const ADDRESS_ALICE: Address = [1u8; ADDRESS_LENGTH];
 pub const ADDRESS_BOB: Address = [2u8; ADDRESS_LENGTH];
 pub const ADDRESS_CHARLIE: Address = [3u8; ADDRESS_LENGTH];
-pub const SOME_COINS: Balance = 1000000;
 // "sentinel value" useful for testing: 0xc0ffee
 // also useful as a morning wake up!
 pub const STORAGE_KEY: Bytes32 = [
@@ -520,32 +509,6 @@ pub const STORAGE_VALUE: Bytes32 = [
   0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-
-impl Default for MockHost<'_> {
-  fn default() -> Self {
-    // init
-    let mut storage = BTreeMap::new();
-    let mut balance = BTreeMap::new();
-    let templates = BTreeMap::new();
-    let programs = BTreeMap::new();
-
-    // pre-populate some balances, values, and code for testing
-    balance.insert(ADDRESS_ALICE, SOME_COINS);
-    // balance.insert(ADDRESS_BOB, SOME_COINS);
-    storage.insert((ADDRESS_ALICE, STORAGE_KEY), STORAGE_VALUE);
-
-    Self {
-      vm: None,
-      storage,
-      balance,
-      templates,
-      programs,
-      static_context: None,
-      dynamic_context: None,
-      spawn_result: None,
-    }
-  }
-}
 
 impl HostInterface for MockHost<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
@@ -574,7 +537,7 @@ impl HostInterface for MockHost<'_> {
 
     // don't go too deep!
     if msg.depth > 10 {
-      return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None);
+      return ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None);
     }
 
     // take snapshots of the state in case we need to roll back
@@ -595,7 +558,7 @@ impl HostInterface for MockHost<'_> {
     match self.transfer_balance(&msg.sender, &msg.recipient, msg.value) {
       StatusCode::Success => {}
       status => {
-        return ExecutionResult::new(status, 0, None, None);
+        return ExecutionResult::new(status, 0, None);
       }
     }
 
@@ -637,7 +600,7 @@ impl HostInterface for MockHost<'_> {
       };
 
       let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
-      ExecutionResult::new(status_code, gas_left, None, None)
+      ExecutionResult::new(status_code, gas_left, None)
     };
 
     self.dynamic_context = old_dynamic_context;
@@ -757,12 +720,14 @@ mod tests {
   #[test]
   fn test_transfer_balance() {
     let mut host = MockHost::new();
+    host.set_balance(&ADDRESS_ALICE, 10000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000);
     assert_eq!(
       host.transfer_balance(&ADDRESS_ALICE, &ADDRESS_CHARLIE, 1000),
       StatusCode::Success
     );
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 9000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 1000);
     assert_eq!(
       host.transfer_balance(&ADDRESS_CHARLIE, &ADDRESS_ALICE, 1001),
@@ -787,7 +752,7 @@ mod tests {
     let mut host = MockHost::new();
 
     // send zero balance
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    host.set_balance(&ADDRESS_ALICE, 10000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
     let msg = AthenaMessage::new(
       MessageKind::Call,
@@ -801,7 +766,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Success);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 0);
 
     // send some balance
@@ -817,7 +782,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Success);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
 
     // try to send more than the sender has
@@ -828,12 +793,12 @@ mod tests {
       ADDRESS_CHARLIE,
       ADDRESS_ALICE,
       None,
-      SOME_COINS,
+      10000,
       vec![],
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::InsufficientBalance);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
 
     // bob is not callable (which means coins also cannot be sent, even if we have them)
@@ -849,7 +814,7 @@ mod tests {
     );
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Failure);
-    assert_eq!(host.get_balance(&ADDRESS_ALICE), SOME_COINS - 100);
+    assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
     assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
   }
 

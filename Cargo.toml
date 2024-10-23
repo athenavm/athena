@@ -12,6 +12,7 @@ members = [
   "interface",
   "runner",
   "sdk",
+  "tests/host",
   "vm/declare",
   "vm/entrypoint",
   "vm/lib",

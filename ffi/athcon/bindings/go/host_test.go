@@ -71,14 +71,14 @@ func (host *testHostContext) Call(
 	input []byte,
 	gas int64,
 	depth int,
-) (output []byte, gasLeft int64, createAddr Address, err error) {
+) (output []byte, gasLeft int64, err error) {
 	if host.balances[sender] < value {
-		return nil, 0, Address{}, errors.New("insufficient balance")
+		return nil, 0, errors.New("insufficient balance")
 	}
 
 	host.balances[sender] -= value
 	host.balances[recipient] += value
-	return nil, gas, Address{}, nil
+	return nil, gas, nil
 }
 
 func (host *testHostContext) Spawn(blob []byte) Address {
