@@ -157,7 +157,7 @@ mod tests {
     let payload = ExecutionPayloadBuilder::new()
       .with_payload(Payload {
         selector: None,
-        input: vec![3u8, 0, 0, 0],
+        input: bincode::serialize(&(ADDRESS_ALICE, 3u32)).unwrap(),
       })
       .build();
 
