@@ -26,7 +26,7 @@ pub trait HostContext {
     input: &Bytes,
     gas: i64,
     depth: i32,
-  ) -> (Vec<u8>, i64, Address, StatusCode);
+  ) -> (Vec<u8>, i64, StatusCode);
 }
 
 pub(crate) fn get_athcon_host_interface() -> ffi::athcon_host_interface {
@@ -153,20 +153,19 @@ pub unsafe extern "C" fn call(
   msg: *const ffi::athcon_message,
 ) -> ffi::athcon_result {
   let msg = *msg;
-  let (output, gas_left, create_address, status_code) =
-    (*(context as *mut ExtendedContext)).hctx.call(
-      msg.kind,
-      &msg.recipient.bytes,
-      &msg.sender.bytes,
-      msg.value,
-      if !msg.input_data.is_null() && msg.input_size > 0 {
-        std::slice::from_raw_parts(msg.input_data, msg.input_size)
-      } else {
-        &[]
-      },
-      msg.gas,
-      msg.depth,
-    );
+  let (output, gas_left, status_code) = (*(context as *mut ExtendedContext)).hctx.call(
+    msg.kind,
+    &msg.recipient.bytes,
+    &msg.sender.bytes,
+    msg.value,
+    if !msg.input_data.is_null() && msg.input_size > 0 {
+      std::slice::from_raw_parts(msg.input_data, msg.input_size)
+    } else {
+      &[]
+    },
+    msg.gas,
+    msg.depth,
+  );
   let ptr = output.as_ptr();
   // Prevent Rust from automatically freeing the memory
   let len = output.len();
@@ -177,8 +176,5 @@ pub unsafe extern "C" fn call(
     output_data: ptr,
     output_size: len,
     release: Some(release),
-    create_address: ffi::athcon_address {
-      bytes: create_address,
-    },
   }
 }

@@ -1006,7 +1006,7 @@ pub mod tests {
     host
       .expect_call()
       .once()
-      .returning(|_| ExecutionResult::new(StatusCode::Success, 1000, None, None));
+      .returning(|_| ExecutionResult::new(StatusCode::Success, 1000, None));
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
 

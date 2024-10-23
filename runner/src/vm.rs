@@ -57,7 +57,7 @@ where
       Ok(p) => p,
       Err(e) => {
         tracing::info!("Failed to deserialize execution payload: {e:?}");
-        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+        return ExecutionResult::new(StatusCode::Failure, 0, None);
       }
     };
     if !execution_payload.state.is_empty() {
@@ -99,16 +99,15 @@ where
         StatusCode::Success,
         gas_left.unwrap(),
         Some(public_values.to_vec()),
-        None,
       ),
       // map error to execution result
       Err(e) => {
         tracing::info!("Execution error: {e:?}");
         match e {
-          ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
-          ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None, None),
+          ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None),
+          ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None),
           // general error
-          _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
+          _ => ExecutionResult::new(StatusCode::Failure, 0, None),
         }
       }
     }
@@ -375,7 +374,7 @@ mod tests {
     let mut host = MockHostInterface::new();
     host
       .expect_call()
-      .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None));
+      .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     assert!(matches!(
