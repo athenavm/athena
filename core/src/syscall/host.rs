@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult};
 use athena_interface::{
   AddressWrapper, AthenaMessage, Bytes32Wrapper, MessageKind, StatusCode, ADDRESS_LENGTH,
@@ -59,7 +61,9 @@ impl Syscall for SyscallHostWrite {
 ///  - a0 (arg1): address to call
 ///  - a1 (arg2): pointer to payload containing method selector and input to the called program
 ///  - a2 (x12): length of input (bytes)
-///  - a3 (x13): address to read the amount from (2 words, 8 bytes)
+///  - a3 (x13): address to write the result to
+///  - a4 (x14): length of result buffer (bytes)
+///  - a5 (x15): address to read the amount from (2 words, 8 bytes)
 pub(crate) struct SyscallHostCall;
 
 impl Syscall for SyscallHostCall {
@@ -104,7 +108,7 @@ impl Syscall for SyscallHostCall {
       None
     };
 
-    let amount_ptr = ctx.rt.register(Register::X13);
+    let amount_ptr = ctx.rt.register(Register::X15);
     let amount = ctx.dword(amount_ptr);
 
     // note: host is responsible for checking balance and stack depth
@@ -123,6 +127,30 @@ impl Syscall for SyscallHostCall {
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
     let res = host.call(msg);
 
+    let output_size = if let Some(output) = res.output {
+      let mut output_ptr = ctx.rt.register(Register::X13);
+      let output_size = ctx.rt.register(Register::X14);
+      let output_size = min(output.len() as u32, output_size);
+
+      if output_ptr != 0 && output_size != 0 {
+        let mut chunks = output[..output_size as usize].chunks_exact(4);
+        for c in chunks.by_ref() {
+          let v = u32::from_le_bytes(c.try_into().unwrap());
+          ctx.rt.mw(output_ptr, v);
+          output_ptr += 4;
+        }
+
+        if !chunks.remainder().is_empty() {
+          let mut value = [0u8; 4];
+          value.copy_from_slice(chunks.remainder());
+          ctx.rt.mw(output_ptr, u32::from_le_bytes(value));
+        }
+      };
+      output_size
+    } else {
+      0
+    };
+
     // calculate gas spent
     // TODO: should this be a panic or should it just return an out of gas error?
     // for now, it's a panic, since this should not happen.
@@ -132,7 +160,7 @@ impl Syscall for SyscallHostCall {
     ctx.rt.state.clk += gas_spent;
 
     match res.status_code {
-      StatusCode::Success => Ok(Outcome::Result(None)),
+      StatusCode::Success => Ok(Outcome::Result(Some(output_size))),
       status => {
         tracing::debug!("host system call failed with status code '{status}'");
         Err(status)

@@ -531,7 +531,7 @@ impl HostInterface for MockHost<'_> {
     self.balance.get(addr).copied().unwrap_or(0)
   }
 
-  #[tracing::instrument(skip(self), fields(id = self as *const Self as usize, depth = msg.depth))]
+  #[tracing::instrument(skip(self, msg), fields(id = self as *const Self as usize, depth = msg.depth))]
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
     tracing::info!(msg = ?msg);
 

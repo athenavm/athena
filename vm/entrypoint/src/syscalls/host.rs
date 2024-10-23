@@ -13,17 +13,29 @@ use athena_interface::StorageStatus;
 ///
 /// See https://github.com/athenavm/athena/issues/5 for more information.
 #[allow(unused_variables)]
-pub fn call(address: *const u32, input_ptr: *const u32, input_len: usize, amount: *const u32) {
+pub fn call(
+  address: *const u32,
+  input_ptr: *const u32,
+  input_len: usize,
+  output_ptr: *mut u32,
+  output_size: usize,
+  amount: *const u32,
+) -> usize {
   #[cfg(target_os = "zkvm")]
   unsafe {
+    let size: usize;
     asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_CALL,
         in("a0") address,
         in("a1") input_ptr,
         in("a2") input_len,
-        in("a3") amount,
-    )
+        in("a3") output_ptr,
+        in("a4") output_size,
+        in("a5") amount,
+        lateout("t0") size,
+    );
+    return size;
   }
 
   #[cfg(not(target_os = "zkvm"))]
