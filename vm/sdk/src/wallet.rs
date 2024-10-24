@@ -11,6 +11,17 @@ pub struct SpendArguments {
   pub amount: u64,
 }
 
+#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq)]
+pub struct VerifyArguments {
+  pub raw: Vec<u8>,
+  pub sig: [u8; 64],
+}
+
+pub fn encode_verify_inner(raw: Vec<u8>, sig: [u8; 64]) -> Vec<u8> {
+  let args = VerifyArguments { raw, sig };
+  args.encode()
+}
+
 pub trait WalletProgram {
   fn spawn(owner: Pubkey) -> Address;
   fn spend(&self, args: SpendArguments);
