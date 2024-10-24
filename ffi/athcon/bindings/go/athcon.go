@@ -11,6 +11,7 @@ package athcon
 */
 import "C"
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime/cgo"
@@ -51,28 +52,13 @@ func (err Error) Error() string {
 }
 
 var (
-	Failure                   = Error{Code: C.ATHCON_FAILURE}
-	Revert                    = Error{Code: C.ATHCON_REVERT}
-	OutOfGas                  = Error{Code: C.ATHCON_OUT_OF_GAS}
-	InvalidInstruction        = Error{Code: C.ATHCON_INVALID_INSTRUCTION}
-	UndefinedInstruction      = Error{Code: C.ATHCON_UNDEFINED_INSTRUCTION}
-	StackOverflow             = Error{Code: C.ATHCON_STACK_OVERFLOW}
-	StackUnderflow            = Error{Code: C.ATHCON_STACK_UNDERFLOW}
-	BadJumpDestination        = Error{Code: C.ATHCON_BAD_JUMP_DESTINATION}
-	InvalidMemoryAccess       = Error{Code: C.ATHCON_INVALID_MEMORY_ACCESS}
-	CallDepthExceeded         = Error{Code: C.ATHCON_CALL_DEPTH_EXCEEDED}
-	StaticModeViolation       = Error{Code: C.ATHCON_STATIC_MODE_VIOLATION}
-	PrecompileFailure         = Error{Code: C.ATHCON_PRECOMPILE_FAILURE}
-	ContractValidationFailure = Error{Code: C.ATHCON_CONTRACT_VALIDATION_FAILURE}
-	ArgumentOutOfRange        = Error{Code: C.ATHCON_ARGUMENT_OUT_OF_RANGE}
-	UnreachableInstruction    = Error{Code: C.ATHCON_UNREACHABLE_INSTRUCTION}
-	Trap                      = Error{Code: C.ATHCON_TRAP}
-	InsufficientBalance       = Error{Code: C.ATHCON_INSUFFICIENT_BALANCE}
-	InsufficientInput         = Error{Code: C.ATHCON_INSUFFICIENT_INPUT}
-	InvalidSyscallArgument    = Error{Code: C.ATHCON_INVALID_SYSCALL_ARGUMENT}
-	InternalError             = Error{Code: C.ATHCON_INTERNAL_ERROR}
-	Rejected                  = Error{Code: C.ATHCON_REJECTED}
-	OutOfMemory               = Error{Code: C.ATHCON_OUT_OF_MEMORY}
+	Failure             = Error{Code: C.ATHCON_FAILURE}
+	Revert              = Error{Code: C.ATHCON_REVERT}
+	OutOfGas            = Error{Code: C.ATHCON_OUT_OF_GAS}
+	CallDepthExceeded   = Error{Code: C.ATHCON_CALL_DEPTH_EXCEEDED}
+	PrecompileFailure   = Error{Code: C.ATHCON_PRECOMPILE_FAILURE}
+	InsufficientBalance = Error{Code: C.ATHCON_INSUFFICIENT_BALANCE}
+	InternalError       = Error{Code: C.ATHCON_INTERNAL_ERROR}
 )
 
 type Revision int32
@@ -223,7 +209,7 @@ func (vm *VM) Execute(
 	if len(code) == 0 {
 		return res, Error{
 			Code: C.ATHCON_FAILURE,
-			Err:  fmt.Errorf("athcon execute: no input code"),
+			Err:  errors.New("athcon execute: no input code"),
 		}
 	}
 	msg := C.struct_athcon_message{
