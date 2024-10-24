@@ -19,6 +19,8 @@ athcon_address spawn(void *ctx, uint8_t *blob, size_t len);
 */
 import "C"
 import (
+	"fmt"
+	"os"
 	"runtime/cgo"
 	"unsafe"
 )
@@ -145,7 +147,13 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 
 	statusCode := C.enum_athcon_status_code(0)
 	if err != nil {
-		statusCode = C.enum_athcon_status_code(err.(Error))
+		// Wrap unknown error types with a catch-all type
+		if e, ok := err.(Error); ok {
+			statusCode = C.enum_athcon_status_code(e.Code)
+		} else {
+			fmt.Fprintf(os.Stderr, "Caught unknown error: %v", err)
+			statusCode = C.ATHCON_INTERNAL_ERROR
+		}
 	}
 
 	outputData := (*C.uint8_t)(nil)

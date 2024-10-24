@@ -56,6 +56,5 @@ fn main() {
 
   // Check balance
   let value = get_balance();
-  // value is returned as a pointer to two 32-bit values. reconstruct the u64 value.
   assert_eq!(10000, value, "get_balance failed");
 }

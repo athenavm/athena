@@ -11,6 +11,7 @@ package athcon
 */
 import "C"
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime/cgo"
@@ -31,19 +32,33 @@ const (
 	_ = uint(C.sizeof_athcon_address - len(Address{}))
 )
 
-type Error int32
+type Error struct {
+	// athcon-compatible error code
+	Code int32
+	// underlying Go error for additional context
+	Err error
+}
 
 func (err Error) IsInternalError() bool {
-	return err < 0
+	return err.Code < 0
 }
 
+// Implement the Error method to return a string representation
 func (err Error) Error() string {
-	return C.GoString(C.athcon_status_code_to_string(C.enum_athcon_status_code(err)))
+	if err.Err != nil {
+		return fmt.Sprintf("%s: %v", C.GoString(C.athcon_status_code_to_string(C.enum_athcon_status_code(err.Code))), err.Err)
+	}
+	return C.GoString(C.athcon_status_code_to_string(C.enum_athcon_status_code(err.Code)))
 }
 
-const (
-	Failure = Error(C.ATHCON_FAILURE)
-	Revert  = Error(C.ATHCON_REVERT)
+var (
+	Failure             = Error{Code: C.ATHCON_FAILURE}
+	Revert              = Error{Code: C.ATHCON_REVERT}
+	OutOfGas            = Error{Code: C.ATHCON_OUT_OF_GAS}
+	CallDepthExceeded   = Error{Code: C.ATHCON_CALL_DEPTH_EXCEEDED}
+	PrecompileFailure   = Error{Code: C.ATHCON_PRECOMPILE_FAILURE}
+	InsufficientBalance = Error{Code: C.ATHCON_INSUFFICIENT_BALANCE}
+	InternalError       = Error{Code: C.ATHCON_INTERNAL_ERROR}
 )
 
 type Revision int32
@@ -192,7 +207,10 @@ func (vm *VM) Execute(
 	code []byte,
 ) (res Result, err error) {
 	if len(code) == 0 {
-		return res, fmt.Errorf("code is empty")
+		return res, Error{
+			Code: C.ATHCON_FAILURE,
+			Err:  errors.New("athcon execute: no input code"),
+		}
 	}
 	msg := C.struct_athcon_message{
 		kind:      C.enum_athcon_call_kind(kind),
@@ -230,7 +248,7 @@ func (vm *VM) Execute(
 	res.Output = C.GoBytes(unsafe.Pointer(result.output_data), C.int(result.output_size))
 	res.GasLeft = int64(result.gas_left)
 	if result.status_code != C.ATHCON_SUCCESS {
-		err = Error(result.status_code)
+		err = Error{Code: result.status_code}
 	}
 
 	if result.release != nil {
