@@ -24,13 +24,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
-        run: |
-          curl -L https://install.athenavm.org | bash
-          $ATHENA_DIR/bin/athup --path $GITHUB_WORKSPACE
-          echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
-          cargo install --force --locked --path cli
-          cargo athena --version
-          cargo athena install-toolchain
+        run: cargo run -p athena-cli -- athena install-toolchain 
 
       - name: Build binaries
         run: |
@@ -66,16 +60,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
-        run: |
-          curl -L https://install.athenavm.org | bash
-          $ATHENA_DIR/bin/athup --path $GITHUB_WORKSPACE
-          $ATHENA_DIR/bin/cargo-athena athena --version
-          echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
-
-      - name: Install Athena CLI
-        run: |
-          cargo install --force --locked --path cli
-          cargo athena install-toolchain
+        run: cargo run -p athena-cli -- athena install-toolchain 
 
       - name: Run cargo check
         run: cargo check --all-targets --all-features
@@ -127,7 +112,7 @@ jobs:
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
 
-      - name: Download binaries
+      - name: Download test binaries
         uses: actions/download-artifact@v4
         with:
           name: program-binaries
