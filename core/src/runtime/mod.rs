@@ -663,8 +663,6 @@ impl<'host> Runtime<'host> {
     // Fetch the instruction at the current program counter.
     let instruction = self.fetch();
 
-    tracing::debug!(instruction = ?instruction, "executing cycle");
-
     // Log the current state of the runtime.
     self.log(&instruction);
 
