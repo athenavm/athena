@@ -4,6 +4,8 @@ mod io;
 mod memory;
 mod sys;
 
+pub mod precompiles;
+
 pub use halt::*;
 pub use host::*;
 pub use io::*;
@@ -18,6 +20,9 @@ pub const HALT: u32 = 0x00_00_00_00;
 
 /// Writes to a file descriptor. Currently only used for `STDOUT/STDERR`.
 pub const WRITE: u32 = 0x00_00_00_02;
+
+/// Verifies ED25519 signature.
+pub const PRECOMPILE_ED25519_VERIFY: u32 = 0x00_64_00_20;
 
 /// Executes `HINT_LEN`.
 pub const HINT_LEN: u32 = 0x00_00_00_F0;

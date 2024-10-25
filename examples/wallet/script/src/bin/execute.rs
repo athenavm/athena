@@ -199,7 +199,7 @@ mod tests {
         &MethodSelector::from("athexp_verify"),
         stdin.clone(),
         Some(&mut host),
-        Some(25000000),
+        Some(20000),
         None,
       );
       let (mut result, _) = result.unwrap();

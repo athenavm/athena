@@ -3,6 +3,7 @@ use cfg_if::cfg_if;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
+pub mod precompiles;
 pub mod wallet;
 pub use wallet::*;
 
