@@ -2,7 +2,10 @@ package athcon
 
 import (
 	"encoding/hex"
-	"golang.org/x/crypto/blake2b"
+	"fmt"
+
+	"github.com/ChainSafe/gossamer/pkg/scale"
+	"github.com/zeebo/blake3"
 )
 
 // Address represents the 24 bytes address of an Athena account.
@@ -19,14 +22,11 @@ type MethodSelector [MethodSelectorLength]byte
 
 // FromString converts a string to a MethodSelector, similar to the Rust From<&str> implementation.
 func FromString(value string) (MethodSelector, error) {
-	hash, err := blake2b.New256(nil)
-	if err != nil {
-		return MethodSelector{}, err
-	}
-	hash.Write([]byte(value))
-	hashBytes := hash.Sum(nil)
 	var selector MethodSelector
-	copy(selector[:], hashBytes[:MethodSelectorLength])
+	hasher := blake3.New()
+	hasher.Write([]byte(value))
+	hasher.Digest().Read(selector[:])
+
 	return selector, nil
 }
 
@@ -36,6 +36,22 @@ func (ms MethodSelector) String() string {
 }
 
 type ExecutionPayload struct {
+	State   []byte
+	Payload Payload
+}
+
+type Payload struct {
 	Selector *MethodSelector
 	Input    []byte
+}
+
+// EncodedExecutionPayload combines the program state and an already encoded payload into a single byte array
+// which is equivalent to a scale-encoded `ExecutionPayload` with the same data.
+func EncodedExecutionPayload(state []byte, encodedPayload []byte) []byte {
+	encodedState, err := scale.Marshal(state)
+	if err != nil {
+		panic(fmt.Errorf("unable to encode state: %w", err))
+	}
+
+	return append(encodedState, encodedPayload...)
 }

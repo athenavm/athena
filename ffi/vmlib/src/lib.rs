@@ -317,9 +317,6 @@ impl From<AthconExecutionResult> for ExecutionResultWrapper {
       StatusCodeWrapper::from(result.status_code()).into(),
       u32::try_from(result.gas_left()).expect("Gas value out of range"),
       result.output().cloned(),
-      result
-        .create_address()
-        .map(|address| AddressWrapper::from(*address).into()),
     ))
   }
 }

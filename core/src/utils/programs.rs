@@ -13,12 +13,5 @@ pub mod tests {
     include_bytes!("../../../examples/wallet/program/elf/wallet-template");
 
   /// Tests.
-  pub const TEST_FIBONACCI_ELF: &[u8] =
-    include_bytes!("../../../tests/fibonacci/elf/fibonacci-test");
-
-  pub const TEST_HOST: &[u8] = include_bytes!("../../../tests/host/elf/host-test");
-
-  pub const TEST_HINT_IO: &[u8] = include_bytes!("../../../tests/hint-io/elf/hint-io-test");
-
   pub const TEST_PANIC_ELF: &[u8] = include_bytes!("../../../tests/panic/elf/panic-test");
 }

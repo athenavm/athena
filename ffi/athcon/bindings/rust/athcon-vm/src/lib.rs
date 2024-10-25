@@ -1,11 +1,15 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::too_many_arguments)]
 
+pub mod bytes;
 mod container;
+pub mod encode_tx;
 mod types;
 
+use core::ptr::null;
 use core::slice;
 
 pub use athcon_sys as ffi;
+use bytes::{allocate_output_data, deallocate_output_data};
 pub use container::AthconContainer;
 pub use types::*;
 
@@ -43,7 +47,6 @@ pub struct ExecutionResult {
   status_code: StatusCode,
   gas_left: i64,
   output: Option<Vec<u8>>,
-  create_address: Option<Address>,
 }
 
 /// ATHCON execution message structure.
@@ -77,7 +80,6 @@ impl ExecutionResult {
       status_code,
       gas_left,
       output: output.map(|s| s.to_vec()),
-      create_address: None,
     }
   }
 
@@ -109,12 +111,6 @@ impl ExecutionResult {
   /// Read the output returned.
   pub fn output(&self) -> Option<&Vec<u8>> {
     self.output.as_ref()
-  }
-
-  /// Read the address of the created account. This will likely be set when
-  /// returned from a CREATE/CREATE2.
-  pub fn create_address(&self) -> Option<&Address> {
-    self.create_address.as_ref()
   }
 }
 
@@ -248,14 +244,14 @@ impl<'a> ExecutionContext<'a> {
     let (input_data, input_size) = if let Some(input) = input {
       (input.as_ptr(), input.len())
     } else {
-      (std::ptr::null(), 0)
+      (null(), 0)
     };
     let code = message.code();
     let code_size = if let Some(code) = code { code.len() } else { 0 };
     let code_data = if let Some(code) = code {
       code.as_ptr()
     } else {
-      std::ptr::null()
+      null()
     };
     // Cannot use a nice from trait here because that complicates memory management,
     // athcon_message doesn't have a release() method we could abstract it with.
@@ -311,8 +307,6 @@ impl From<ffi::athcon_result> for ExecutionResult {
       } else {
         Some(unsafe { slice::from_raw_parts(result.output_data, result.output_size).to_vec() })
       },
-      // Consider it is always valid.
-      create_address: Some(result.create_address),
     };
 
     // Release allocated ffi struct.
@@ -323,34 +317,6 @@ impl From<ffi::athcon_result> for ExecutionResult {
     }
 
     ret
-  }
-}
-
-fn allocate_output_data(output: Option<&Vec<u8>>) -> (*const u8, usize) {
-  match output {
-    Some(buf) if !buf.is_empty() => {
-      let buf_len = buf.len();
-
-      // Manually allocate heap memory for the new home of the output buffer.
-      let memlayout = std::alloc::Layout::from_size_align(buf_len, 1).expect("Bad layout");
-      let new_buf = unsafe { std::alloc::alloc(memlayout) };
-      unsafe {
-        // Copy the data into the allocated buffer.
-        std::ptr::copy(buf.as_ptr(), new_buf, buf_len);
-      }
-
-      (new_buf as *const u8, buf_len)
-    }
-    _ => (core::ptr::null(), 0),
-  }
-}
-
-unsafe fn deallocate_output_data(ptr: *const u8, size: usize) {
-  // be careful with dangling, aligned pointers here; they are not null but
-  // not valid and cannot be deallocated!
-  if !ptr.is_null() && size > 0 {
-    let buf_layout = std::alloc::Layout::from_size_align(size, 1).expect("Bad layout");
-    std::alloc::dealloc(ptr as *mut u8, buf_layout);
   }
 }
 
@@ -374,18 +340,13 @@ extern "C" fn release_heap_result(result: *const ffi::athcon_result) {
 /// Returns a pointer to a stack-allocated athcon_result.
 impl From<ExecutionResult> for ffi::athcon_result {
   fn from(value: ExecutionResult) -> Self {
-    let (buffer, len) = allocate_output_data(value.output.as_ref());
+    let (buffer, len) = value.output.map_or((null(), 0), allocate_output_data);
     Self {
       status_code: value.status_code,
       gas_left: value.gas_left,
       output_data: buffer,
       output_size: len,
       release: Some(release_stack_result),
-      create_address: if value.create_address.is_some() {
-        value.create_address.unwrap()
-      } else {
-        Address { bytes: [0u8; 24] }
-      },
     }
   }
 }
@@ -444,7 +405,6 @@ mod tests {
     assert_eq!(r.status_code(), StatusCode::ATHCON_FAILURE);
     assert_eq!(r.gas_left(), 420);
     assert!(r.output().is_none());
-    assert!(r.create_address().is_none());
   }
 
   // Test-specific helper to dispose of execution results in unit tests
@@ -469,7 +429,6 @@ mod tests {
       output_data: Box::into_raw(Box::new([0xde, 0xad, 0xbe, 0xef])) as *const u8,
       output_size: 4,
       release: Some(test_result_dispose),
-      create_address: Address { bytes: [0u8; 24] },
     };
 
     let r: ExecutionResult = f.into();
@@ -478,7 +437,6 @@ mod tests {
     assert_eq!(r.gas_left(), 1337);
     assert!(r.output().is_some());
     assert_eq!(r.output().unwrap().len(), 4);
-    assert!(r.create_address().is_some());
   }
 
   #[test]
@@ -497,10 +455,9 @@ mod tests {
       assert!(!(*f).output_data.is_null());
       assert_eq!((*f).output_size, 5);
       assert_eq!(
-        std::slice::from_raw_parts((*f).output_data, 5) as &[u8],
+        slice::from_raw_parts((*f).output_data, 5) as &[u8],
         &[0xc0, 0xff, 0xee, 0x71, 0x75]
       );
-      assert_eq!((*f).create_address.bytes, [0u8; 24]);
       if (*f).release.is_some() {
         (*f).release.unwrap()(f);
       }
@@ -518,7 +475,6 @@ mod tests {
       assert_eq!((*f).gas_left, 420);
       assert!((*f).output_data.is_null(),);
       assert_eq!((*f).output_size, 0);
-      assert_eq!((*f).create_address.bytes, [0u8; 24]);
       if (*f).release.is_some() {
         (*f).release.unwrap()(f);
       }
@@ -540,10 +496,9 @@ mod tests {
       assert!(!f.output_data.is_null());
       assert_eq!(f.output_size, 5);
       assert_eq!(
-        std::slice::from_raw_parts(f.output_data, 5) as &[u8],
+        slice::from_raw_parts(f.output_data, 5) as &[u8],
         &[0xc0, 0xff, 0xee, 0x71, 0x75]
       );
-      assert_eq!(f.create_address.bytes, [0u8; 24]);
       if f.release.is_some() {
         f.release.unwrap()(&f);
       }
@@ -560,7 +515,6 @@ mod tests {
       assert_eq!(f.gas_left, 420);
       assert!(f.output_data.is_null());
       assert_eq!(f.output_size, 0);
-      assert_eq!(f.create_address.bytes, [0u8; 24]);
       if f.release.is_some() {
         f.release.unwrap()(&f);
       }
@@ -760,7 +714,6 @@ mod tests {
       output_data: msg.input_data,
       output_size: msg.input_size,
       release: None,
-      create_address: Address::default(),
     }
   }
 
@@ -817,8 +770,6 @@ mod tests {
     assert_eq!(b.status_code(), StatusCode::ATHCON_SUCCESS);
     assert_eq!(b.gas_left(), 2);
     assert!(b.output().is_none());
-    assert!(b.create_address().is_some());
-    assert_eq!(b.create_address().unwrap(), &Address::default());
   }
 
   #[test]
@@ -848,7 +799,5 @@ mod tests {
     assert_eq!(b.gas_left(), 2);
     assert!(b.output().is_some());
     assert_eq!(b.output().unwrap(), &data);
-    assert!(b.create_address().is_some());
-    assert_eq!(b.create_address().unwrap(), &Address::default());
   }
 }

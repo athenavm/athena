@@ -1,8 +1,10 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
+  payload::{ExecutionPayload, Payload},
   AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, Decode,
-  ExecutionPayload, ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
+  ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
 };
+
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
 pub struct AthenaVm {
@@ -55,14 +57,20 @@ where
       Ok(p) => p,
       Err(e) => {
         tracing::info!("Failed to deserialize execution payload: {e:?}");
-        return ExecutionResult::new(StatusCode::Failure, 0, None, None);
+        return ExecutionResult::new(StatusCode::Failure, 0, None);
       }
     };
-    let input_len = execution_payload.input.len();
-    if input_len > 0 {
-      stdin.write_vec(execution_payload.input);
+    if !execution_payload.state.is_empty() {
+      stdin.write_vec(execution_payload.state);
     }
-    let execution_result = match execution_payload.selector {
+
+    let Payload { selector, input } = execution_payload.payload;
+
+    let input_len = input.len();
+    if input_len > 0 {
+      stdin.write_vec(input);
+    }
+    let execution_result = match selector {
       Some(method) => {
         tracing::info!(
           "Executing method 0x{} with input length {}",
@@ -91,16 +99,15 @@ where
         StatusCode::Success,
         gas_left.unwrap(),
         Some(public_values.to_vec()),
-        None,
       ),
       // map error to execution result
       Err(e) => {
         tracing::info!("Execution error: {e:?}");
         match e {
-          ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None, None),
-          ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None, None),
+          ExecutionError::OutOfGas() => ExecutionResult::new(StatusCode::OutOfGas, 0, None),
+          ExecutionError::SyscallFailed(code) => ExecutionResult::new(code, 0, None),
           // general error
-          _ => ExecutionResult::new(StatusCode::Failure, 0, None, None),
+          _ => ExecutionResult::new(StatusCode::Failure, 0, None),
         }
       }
     }
@@ -112,9 +119,9 @@ mod tests {
 
   use super::*;
   use athena_interface::{
-    Address, AthenaMessage, AthenaRevision, Balance, Encode, ExecutionPayload, MessageKind,
-    MethodSelector, MockHost, MockHostInterface, ADDRESS_ALICE, SOME_COINS, STORAGE_KEY,
-    STORAGE_VALUE,
+    payload::{ExecutionPayloadBuilder, Payload},
+    Address, AthenaMessage, AthenaRevision, Balance, Encode, MessageKind, MethodSelector, MockHost,
+    MockHostInterface, ADDRESS_ALICE, STORAGE_KEY, STORAGE_VALUE,
   };
 
   fn setup_logger() {
@@ -176,10 +183,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
 
     // this will execute a specific method
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: Some(MethodSelector::from("athexp_test1")),
       input: input.clone(),
     };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -199,10 +207,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: Some(MethodSelector::from("athexp_test2")),
       input: input.clone(),
     };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -222,10 +231,11 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Success);
 
     // this will execute a specific method
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: Some(MethodSelector::from("athexp_test3")),
-      input,
+      input: input.clone(),
     };
+    let payload = ExecutionPayloadBuilder::new().with_payload(payload).build();
     let result = AthenaVm::new().execute(
       &mut host,
       AthenaRevision::AthenaFrontier,
@@ -258,6 +268,7 @@ mod tests {
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
@@ -295,12 +306,13 @@ mod tests {
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    host.set_balance(&ADDRESS_ALICE, 9999);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
       .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
       .unwrap();
     let result = output.read::<Balance>();
-    assert_eq!(result, SOME_COINS, "got wrong output value");
+    assert_eq!(result, 9999, "got wrong output value");
   }
 
   #[test]
@@ -317,21 +329,23 @@ mod tests {
     // trying to go any higher should result in an out-of-gas error
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
     assert_eq!(
       host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
       STORAGE_VALUE
     );
-    let payload = ExecutionPayload {
+    let payload = Payload {
       selector: None,
       input: vec![8, 0, 0, 0],
     };
+
     let msg = AthenaMessage::new(
       MessageKind::Call,
       0,
       150_000,
       ADDRESS_ALICE,
       ADDRESS_ALICE,
-      Some(payload.encode()),
+      Some(payload.into()),
       0,
       vec![],
     );
@@ -360,7 +374,7 @@ mod tests {
     let mut host = MockHostInterface::new();
     host
       .expect_call()
-      .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None, None));
+      .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None));
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     assert!(matches!(
