@@ -23,8 +23,10 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install Athena toolchain
-        run: cargo run -p athena-cli -- athena install-toolchain 
+      - name: Install Athena CLI & toolchain
+        run: |
+          cargo install --path cli
+          cargo athena install-toolchain 
 
       - name: Build binaries
         run: |
