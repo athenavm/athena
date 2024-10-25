@@ -68,7 +68,7 @@ where
 
     let input_len = input.len();
     if input_len > 0 {
-      stdin.write_vec(input);
+      stdin.write_vec(input.clone());
     }
     let execution_result = match selector {
       Some(method) => {
@@ -77,6 +77,7 @@ where
           method,
           input_len,
         );
+        tracing::debug!("Input: 0x{}", hex::encode(input));
         self.client.execute_function(
           code,
           &method,
@@ -87,7 +88,8 @@ where
         )
       }
       None => {
-        tracing::info!("Executing default method with input length {}", input_len,);
+        tracing::info!("Executing default method with input length {}", input_len);
+        tracing::debug!("Input: 0x{}", hex::encode(input));
         self
           .client
           .execute(code, stdin, Some(host), Some(msg.gas), Some(context))

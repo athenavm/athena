@@ -122,8 +122,11 @@ fn main() {
 #[cfg(test)]
 mod tests {
   use athena_interface::{
-    Address, Encode, HostDynamicContext, HostStaticContext, MethodSelector, MockHost, ADDRESS_ALICE,
+    payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, AthenaRevision,
+    Balance, Encode, HostDynamicContext, HostStaticContext, MessageKind, MethodSelector, MockHost,
+    StatusCode, VmInterface, ADDRESS_ALICE,
   };
+  use athena_runner::AthenaVm;
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
   use ed25519_dalek::ed25519::signature::Signer;
@@ -172,7 +175,7 @@ mod tests {
   }
 
   #[test]
-  fn verifying_tx() {
+  fn verifying_direct() {
     setup_logger();
 
     let mut host = MockHost::new_with_context(
@@ -226,6 +229,92 @@ mod tests {
     let (mut result, _) = result.unwrap();
     let valid = result.read::<bool>();
     assert!(valid);
+  }
+
+  #[test]
+  fn verifying_tx() {
+    setup_logger();
+
+    let mut host = MockHost::new_with_context(
+      HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
+      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    );
+
+    let signing_key = SigningKey::generate(&mut OsRng);
+    let owner = Pubkey(signing_key.verifying_key().to_bytes());
+    let address = super::spawn(&mut host, &owner).unwrap();
+    let wallet_state = host.get_program(&address).unwrap().clone();
+
+    let tx = b"some really bad tx";
+
+    let vm = AthenaVm::new();
+    let mut host = MockHost::new_with_vm(&vm);
+
+    // First try with invalid signature
+    {
+      // Construct the payload
+      let verify_args = (tx.to_vec(), [0; 64]).encode();
+      let payload = Payload::new(Some(MethodSelector::from("athexp_verify")), verify_args);
+      let payload = ExecutionPayloadBuilder::new()
+        .with_payload(payload)
+        .with_state(wallet_state.clone())
+        .build();
+      let result = vm.execute(
+        &mut host,
+        AthenaRevision::AthenaFrontier,
+        AthenaMessage::new(
+          MessageKind::Call,
+          0,
+          25000000,
+          Address::default(),
+          Address::default(),
+          Some(payload.into()),
+          Balance::default(),
+          vec![],
+        ),
+        super::ELF,
+      );
+
+      // the call should succeed, and it should return false
+      assert_eq!(result.status_code, StatusCode::Success);
+
+      let result = result.output.unwrap();
+      assert_eq!(result.len(), 1);
+      assert_eq!(result[0], 0);
+    }
+
+    // Now with valid signature
+    let signature = signing_key.sign(tx);
+
+    // Construct the payload
+    let verify_args = (tx.to_vec(), signature.to_bytes()).encode();
+    let payload = Payload::new(Some(MethodSelector::from("athexp_verify")), verify_args);
+    let payload = ExecutionPayloadBuilder::new()
+      .with_payload(payload)
+      .with_state(wallet_state)
+      .build();
+    let result = vm.execute(
+      &mut host,
+      AthenaRevision::AthenaFrontier,
+      AthenaMessage::new(
+        MessageKind::Call,
+        0,
+        25000000,
+        Address::default(),
+        Address::default(),
+        Some(payload.into()),
+        Balance::default(),
+        vec![],
+      ),
+      super::ELF,
+    );
+
+    // the call should succeed, and it should return true
+    assert_eq!(result.status_code, StatusCode::Success);
+
+    let result = result.output.unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0], 1);
   }
 
   #[test]
