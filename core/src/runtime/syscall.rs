@@ -111,10 +111,12 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
   }
 
   pub fn mw(&mut self, addr: u32, value: u32) {
+    assert_eq!(addr % 4, 0);
     self.rt.mw(addr, value);
   }
 
   pub fn mw_slice(&mut self, addr: u32, values: &[u32]) {
+    assert_eq!(addr % 4, 0);
     for i in 0..values.len() {
       self.mw(addr + i as u32 * 4, values[i]);
     }
@@ -129,14 +131,17 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
   }
 
   pub fn word(&self, addr: u32) -> u32 {
+    assert_eq!(addr % 4, 0);
     self.rt.word(addr)
   }
 
   pub fn dword(&self, addr: u32) -> u64 {
+    assert_eq!(addr % 4, 0);
     self.word(addr) as u64 | (self.word(addr + 4) as u64) << 32
   }
 
   pub fn slice(&self, addr: u32, len: usize) -> Vec<u32> {
+    assert_eq!(addr % 4, 0);
     let mut values = Vec::new();
     for i in 0..len {
       values.push(self.word(addr + i as u32 * 4));
@@ -144,25 +149,29 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
     values
   }
 
-  /// Read `len` bytes from `addr`
+  /// Read `len` bytes from `addr`.
+  ///
+  /// Supports unaligned read:
+  /// - `addr` doesn't need to be aligned to 4B,
+  /// - `len` doesn't need to be a multiple of 4.
   #[tracing::instrument(skip(self))]
   pub fn bytes(&self, mut addr: u32, len: usize) -> Vec<u8> {
-    let mut values = Vec::new();
+    let mut bytes = Vec::new();
     // handle case when addr is not aligned to 4B
     let addr_offset = (addr % 4) as usize;
     if addr_offset != 0 {
-      let word = self.word(addr).to_le_bytes();
-      values.extend_from_slice(&word[addr_offset..]);
-      addr += values.len() as u32;
+      let word = self.word(addr - addr_offset as u32).to_le_bytes();
+      bytes.extend_from_slice(&word[addr_offset..]);
+      addr += bytes.len() as u32;
     }
 
-    for addr in (addr..addr + (len - values.len()) as u32).step_by(4) {
-      values.extend_from_slice(&self.word(addr).to_le_bytes());
+    for addr in (addr..addr + (len - bytes.len()) as u32).step_by(4) {
+      bytes.extend_from_slice(&self.word(addr).to_le_bytes());
     }
-    values.truncate(len); // handle case when len is not a multiple of 4
+    bytes.truncate(len); // handle case when len is not a multiple of 4
 
-    tracing::debug!(values = hex::encode(&values), "read bytes");
-    values
+    tracing::debug!(result = hex::encode(&bytes), "read bytes");
+    bytes
   }
 
   pub fn array<const N: usize>(&self, addr: u32) -> [u8; N] {
@@ -260,7 +269,7 @@ mod tests {
     // initialize memory
     let mut memory = Vec::<u8>::new();
     for (i, addr) in (0x100..0x200).step_by(4).enumerate() {
-      let value = i as u32;
+      let value = (9876 * i) as u32;
       rt.mw(addr, value);
       memory.extend_from_slice(&value.to_le_bytes());
     }
@@ -270,8 +279,8 @@ mod tests {
     assert_eq!(read, memory);
 
     // address not aligned
-    let read = ctx.bytes(0x101, 0x100 - 1);
-    assert_eq!(read, memory[1..]);
+    let read = ctx.bytes(0x100 + 21, 0x100 - 21);
+    assert_eq!(read, memory[21..]);
 
     // length not a multiple of 4
     let read = ctx.bytes(0x100, 27);

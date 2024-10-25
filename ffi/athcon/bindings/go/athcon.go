@@ -233,6 +233,9 @@ func (vm *VM) Execute(
 
 	ctxHandle := cgo.NewHandle(ctx)
 
+	cCode := C.CBytes(code)
+	defer C.free(cCode)
+
 	hostInterface := newHostInterface()
 	result := C.athcon_execute(
 		vm.handle,
@@ -240,7 +243,7 @@ func (vm *VM) Execute(
 		(*C.struct_athcon_host_context)(unsafe.Pointer(&ctxHandle)),
 		uint32(rev),
 		&msg,
-		(*C.uint8_t)(unsafe.Pointer(&code[0])),
+		(*C.uchar)(cCode),
 		C.size_t(len(code)),
 	)
 	ctxHandle.Delete()
