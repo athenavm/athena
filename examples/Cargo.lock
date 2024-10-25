@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "athena-builder"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -105,8 +105,9 @@ dependencies = [
 
 [[package]]
 name = "athena-core"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
+ "athena-helper",
  "athena-interface",
  "bincode",
  "cfg-if",
@@ -125,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "athena-helper"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "athena-builder",
  "cargo_metadata",
@@ -133,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "athena-interface"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -145,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "athena-lib"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -169,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "athena-sdk"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "athena-core",
@@ -184,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "athena-interface",
  "athena-lib",
@@ -198,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-sdk"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "athena-interface",
  "athena-vm",

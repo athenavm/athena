@@ -11,6 +11,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-binaries:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    env:
+      ATHENA_DIR: "${{ github.workspace }}/.athena"
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Athena CLI & toolchain
+        run: |
+          cargo install --path cli
+          cargo athena install-toolchain 
+
+      - name: Build binaries
+        run: |
+          make -C tests
+          make -C examples
+
+      - name: Upload host-test binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: program-binaries
+          path: |
+            tests/**/elf/*
+            examples/**/program/elf/*
+
   test-rust:
     name: Test
     strategy:
@@ -19,29 +49,26 @@ jobs:
           - ubuntu-latest
           - [runs-on, runner=8cpu-linux-arm64, "run-id=${{ github.run_id }}"]
           - macos-latest
-          - macos-13
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     env:
+      ATHENA_DIR: "${{ github.workspace }}/.athena"
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Athena toolchain
+        run: cargo run -p athena-cli -- athena install-toolchain 
 
       - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets --all-features
+        run: cargo check --all-targets --all-features
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release
+        run: cargo test --release
         env:
           RUSTFLAGS: -Copt-level=3 -Cdebug-assertions -Coverflow-checks=y -Cdebuginfo=0 -C target-cpu=native
           RUST_BACKTRACE: 1
@@ -49,12 +76,21 @@ jobs:
   test-go:
     name: Test (Go)
     runs-on: ubuntu-latest
+    needs: build-binaries
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'ffi/athcon/bindings/go/go.mod'
+          cache-dependency-path: "**/go.sum"
+
+      - name: Download test binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: program-binaries
 
       - name: Run go test
         run: |
@@ -65,30 +101,26 @@ jobs:
   lint:
     name: Formatting & Clippy
     runs-on: ubuntu-latest
+    needs: build-binaries
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
+        run: cargo fmt --all -- --check
+
+      - name: Download test binaries
+        uses: actions/download-artifact@v4
         with:
-          command: fmt
-          args: --all -- --check
-        env:
-          CARGO_INCREMENTAL: 1
+          name: program-binaries
 
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-features --all-targets -- -D warnings -A incomplete-features
-        env:
-          CARGO_INCREMENTAL: 1
+        run: cargo clippy --all-features --all-targets -- -D warnings -A incomplete-features
 
   examples:
     name: Examples
@@ -100,8 +132,8 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
         run: |
@@ -112,8 +144,7 @@ jobs:
 
       - name: Install Athena CLI
         run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli
           cargo athena install-toolchain
 
       - name: Run cargo check
@@ -135,8 +166,8 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
         run: |
@@ -147,8 +178,7 @@ jobs:
 
       - name: Install Athena CLI
         run: |
-          cd cli
-          cargo install --force --locked --path .
+          cargo install --force --locked --path cli
           cargo athena install-toolchain
 
       - name: Run cargo athena new
@@ -157,11 +187,10 @@ jobs:
 
       - name: Build program and run script
         run: |
-          cd fibonacci
-          cd program
+          cd fibonacci/program
           cargo add athena-vm --path $GITHUB_WORKSPACE/vm/entrypoint
           cargo athena build
           cd ../script
           cargo add athena-interface --path $GITHUB_WORKSPACE/interface
           cargo add athena-sdk --path $GITHUB_WORKSPACE/sdk
-          RUST_LOG=info cargo run --release
+          RUST_LOG=info cargo run
