@@ -49,6 +49,9 @@ jobs:
           else
             echo "tag_name=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
             echo "release_name=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            if [[ ${GITHUB_REF_NAME} =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "semver_release=true" >> $GITHUB_OUTPUT
+            fi
           fi
 
       # Creates a `nightly-SHA` tag for this specific nightly
@@ -228,6 +231,14 @@ jobs:
           files: |
             ${{ steps.artifacts.outputs.file_name_1 }}
             ${{ steps.artifacts.outputs.file_name_2 }}
+
+      # Create a release tag for the Go module
+      - name: Tag Go release
+        if: needs.prepare.outputs.semver_release == 'true'
+        uses: rickstaa/action-create-tag@v1
+        with:
+          tag: ffi/athcon/bindings/go/${{ needs.prepare.outputs.tag_name }}
+          tag_exists_error: false
 
   cleanup:
     name: Release cleanup
