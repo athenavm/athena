@@ -6,7 +6,6 @@ extern crate alloc;
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::{call, spawn, Pubkey, SpendArguments, VerifiableTemplate, WalletProgram};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use parity_scale_codec::{Decode, Encode};
 #[derive(Debug, Encode, Decode)]
 pub struct Wallet {
