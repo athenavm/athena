@@ -31,7 +31,7 @@ impl Syscall for SyscallEd25519Verify {
   }
 
   fn num_extra_cycles(&self) -> u32 {
-    // TODO: decide the cost
+    // TODO: decide the cost, see https://github.com/athenavm/athena/issues/176
     100
   }
 }
