@@ -30,11 +30,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup CI
-        uses: ./.github/actions/setup
-        with:
-          pull_token: ${{ secrets.PULL_TOKEN }}
-
       # If it's a nightly release, tag with the release time. If the tag is `main`, we want to use
       # `latest` as the tag name. Else, use the tag name as is.
       - name: Compute release name and tag
@@ -60,13 +55,18 @@ jobs:
       # the changelog.
       - name: Create build-specific nightly tag
         if: ${{ env.IS_NIGHTLY }}
-        uses: actions/github-script@v7
-        env:
-          TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
+        uses: rickstaa/action-create-tag@v1
         with:
-          script: |
-            const createTag = require('./.github/scripts/create-tag.js')
-            await createTag({ github, context }, process.env.TAG_NAME)
+          tag: ${{ steps.release_info.outputs.tag_name }}
+          tag_exists_error: false
+
+      # Create a release tag for the Go module as well, which needs to be different
+      - name: Create Go release tag
+        if: steps.release_info.outputs.semver_release == 'true'
+        uses: rickstaa/action-create-tag@v1
+        with:
+          tag: ffi/athcon/bindings/go/${{ steps.release_info.outputs.tag_name }}
+          tag_exists_error: false
 
       - name: Build changelog
         id: build_changelog
@@ -231,14 +231,6 @@ jobs:
           files: |
             ${{ steps.artifacts.outputs.file_name_1 }}
             ${{ steps.artifacts.outputs.file_name_2 }}
-
-      # Create a release tag for the Go module
-      - name: Tag Go release
-        if: needs.prepare.outputs.semver_release == 'true'
-        uses: rickstaa/action-create-tag@v1
-        with:
-          tag: ffi/athcon/bindings/go/${{ needs.prepare.outputs.tag_name }}
-          tag_exists_error: false
 
   cleanup:
     name: Release cleanup
