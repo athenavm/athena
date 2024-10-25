@@ -80,14 +80,14 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "athcon-sys"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "bindgen",
 ]
 
 [[package]]
 name = "athcon-vm"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "athcon-sys",
  "athena-interface",
@@ -156,11 +156,12 @@ dependencies = [
 
 [[package]]
 name = "athena-runner"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "athcon-sys",
  "athcon-vm",
  "athena-core",
+ "athena-helper",
  "athena-interface",
  "athena-sdk",
  "bincode",

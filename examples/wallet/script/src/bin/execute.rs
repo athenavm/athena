@@ -128,7 +128,7 @@ mod tests {
   };
   use athena_runner::AthenaVm;
   use athena_sdk::{AthenaStdin, ExecutionClient};
-  use athena_vm_sdk::{wallet::encode_verify_inner, Pubkey};
+  use athena_vm_sdk::Pubkey;
   use ed25519_dalek::ed25519::signature::Signer;
   use ed25519_dalek::SigningKey;
   use rand::rngs::OsRng;
@@ -253,7 +253,7 @@ mod tests {
     // First try with invalid signature
     {
       // Construct the payload
-      let verify_args = encode_verify_inner(tx.to_vec(), [0; 64]);
+      let verify_args = (tx.to_vec(), [0; 64]).encode();
       let payload = Payload::new(Some(MethodSelector::from("athexp_verify")), verify_args);
       let payload = ExecutionPayloadBuilder::new()
         .with_payload(payload)
@@ -287,7 +287,7 @@ mod tests {
     let signature = signing_key.sign(tx);
 
     // Construct the payload
-    let verify_args = encode_verify_inner(tx.to_vec(), signature.into());
+    let verify_args = (tx.to_vec(), signature.to_bytes()).encode();
     let payload = Payload::new(Some(MethodSelector::from("athexp_verify")), verify_args);
     let payload = ExecutionPayloadBuilder::new()
       .with_payload(payload)
