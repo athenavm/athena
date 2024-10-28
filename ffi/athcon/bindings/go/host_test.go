@@ -234,7 +234,7 @@ func TestVerify(t *testing.T) {
 
 	executionPayload := EncodedExecutionPayload(host.programs[walletAddress], payloadEncoded)
 
-	result, err := vm.Execute(host, Frontier, Call, 1, 1000000000, principal, principal, executionPayload, 0, WALLET_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 100000, principal, principal, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 	require.Zero(t, result.Output[0])
 
@@ -252,7 +252,7 @@ func TestVerify(t *testing.T) {
 
 	executionPayload = EncodedExecutionPayload(host.programs[walletAddress], payloadEncoded)
 
-	result, err = vm.Execute(host, Frontier, Call, 1, 1000000000, principal, principal, executionPayload, 0, WALLET_TEST)
+	result, err = vm.Execute(host, Frontier, Call, 1, 100000, principal, principal, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 	require.Equal(t, uint8(1), result.Output[0])
 }

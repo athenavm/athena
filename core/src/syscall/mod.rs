@@ -1,6 +1,7 @@
 mod halt;
 mod hint;
 mod host;
+pub(crate) mod precompiles;
 mod write;
 
 pub(crate) use halt::*;
