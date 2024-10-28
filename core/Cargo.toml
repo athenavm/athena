@@ -20,7 +20,7 @@ hex = "0.4.3"
 tracing = "0.1.40"
 strum_macros = "0.26"
 strum = "0.26"
-thiserror = "1.0.64"
+thiserror = "1.0.65"
 mockall = "0.13.0"
 gdbstub = "0.7.2"
 
