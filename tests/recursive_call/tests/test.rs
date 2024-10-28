@@ -12,7 +12,6 @@ fn test() {
   let mut host = MockHost::new_with_vm(&vm);
   let template_address = [0x77; 24];
   stdin.write(&(template_address, 6u32));
-  //   stdin.write(&);
   host.deploy_code(template_address, elf.to_vec());
 
   let context = AthenaContext::new(template_address, template_address, 0);

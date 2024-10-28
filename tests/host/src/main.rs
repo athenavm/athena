@@ -4,7 +4,7 @@
 athena_vm::entrypoint!(main);
 
 use athena_interface::ADDRESS_CHARLIE;
-use athena_vm::helpers::{address_to_32bit_words, bytes32_to_32bit_words};
+use athena_vm::helpers::bytes32_to_32bit_words;
 use athena_vm::syscalls::{call, get_balance, read_storage, write_storage};
 use athena_vm::types::{
   StorageStatus::StorageAdded, StorageStatus::StorageModified, STORAGE_KEY, STORAGE_VALUE,
@@ -17,7 +17,6 @@ fn main() {
   let key = bytes32_to_32bit_words(STORAGE_KEY);
   let value = bytes32_to_32bit_words(STORAGE_VALUE);
   let value2: [u32; 8] = [0xaa; 8];
-  let address_charlie = address_to_32bit_words(ADDRESS_CHARLIE);
 
   // Alice already has a storage item
   let res = read_storage(&key);
@@ -44,17 +43,7 @@ fn main() {
   assert_eq!(value, res, "read_storage failed");
 
   // Charlie does accept calls
-  // Note: there is no way to check the result of a call
-  // It either works, or it panics
-  let value: [u32; 2] = [0, 0];
-  call(
-    address_charlie.as_ptr(),
-    std::ptr::null(),
-    0,
-    std::ptr::null_mut(),
-    0,
-    value.as_ptr(),
-  );
+  call(&ADDRESS_CHARLIE, &[], std::ptr::null_mut(), 0, 0);
 
   // Check balance
   let value = get_balance();
