@@ -19,6 +19,8 @@ athcon_address spawn(void *ctx, uint8_t *blob, size_t len);
 */
 import "C"
 import (
+	"fmt"
+	"os"
 	"runtime/cgo"
 	"unsafe"
 )
@@ -85,7 +87,7 @@ type HostContext interface {
 	GetTxContext() TxContext
 	GetBlockHash(number int64) Bytes32
 	Call(kind CallKind, recipient Address, sender Address, value uint64, input []byte, gas int64, depth int) (
-		output []byte, gasLeft int64, createAddr Address, err error)
+		output []byte, gasLeft int64, err error)
 	Spawn(blob []byte) Address
 	Deploy(code []byte) Address
 }
@@ -140,12 +142,18 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
 
 	kind := CallKind(msg.kind)
-	output, gasLeft, createAddr, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), uint64(msg.value),
+	output, gasLeft, err := ctx.Call(kind, goAddress(msg.recipient), goAddress(msg.sender), uint64(msg.value),
 		goByteSlice(msg.input_data, msg.input_size), int64(msg.gas), int(msg.depth))
 
 	statusCode := C.enum_athcon_status_code(0)
 	if err != nil {
-		statusCode = C.enum_athcon_status_code(err.(Error))
+		// Wrap unknown error types with a catch-all type
+		if e, ok := err.(Error); ok {
+			statusCode = C.enum_athcon_status_code(e.Code)
+		} else {
+			fmt.Fprintf(os.Stderr, "Caught unknown error: %v", err)
+			statusCode = C.ATHCON_INTERNAL_ERROR
+		}
 	}
 
 	outputData := (*C.uint8_t)(nil)
@@ -154,7 +162,6 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 	}
 
 	result := C.athcon_make_result(statusCode, C.int64_t(gasLeft), outputData, C.size_t(len(output)))
-	result.create_address = *athconAddress(createAddr)
 	return result
 }
 

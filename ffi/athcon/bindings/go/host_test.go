@@ -1,7 +1,6 @@
 package athcon
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	_ "embed"
@@ -72,14 +71,14 @@ func (host *testHostContext) Call(
 	input []byte,
 	gas int64,
 	depth int,
-) (output []byte, gasLeft int64, createAddr Address, err error) {
+) (output []byte, gasLeft int64, err error) {
 	if host.balances[sender] < value {
-		return nil, 0, Address{}, errors.New("insufficient balance")
+		return nil, 0, errors.New("insufficient balance")
 	}
 
 	host.balances[sender] -= value
 	host.balances[recipient] += value
-	return nil, gas, Address{}, nil
+	return nil, gas, nil
 }
 
 func (host *testHostContext) Spawn(blob []byte) Address {
@@ -112,20 +111,11 @@ func TestGetBalance(t *testing.T) {
 	host.balances[addr] = 1000
 	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, 0, MINIMAL_TEST_CODE)
 	require.NoError(t, err)
-	output := result.Output
 	require.EqualValues(t, result.GasLeft, 68)
-	require.Len(t, output, 32)
+	require.Len(t, result.Output, 32)
 
-	// Should return value 42 (0x2a) as defined in GetTxContext().
-	var expectedOutput Bytes32
-	binary.LittleEndian.PutUint32(expectedOutput[:], 1000)
-	if !bytes.Equal(output, expectedOutput[:]) {
-		t.Errorf("expected output: %x", expectedOutput)
-		t.Errorf("unexpected output: %x", output)
-	}
-	if err != nil {
-		t.Errorf("execution returned unexpected error: %v", err)
-	}
+	balance := binary.LittleEndian.Uint64(result.Output)
+	require.Equal(t, host.balances[addr], balance)
 }
 
 func TestCall(t *testing.T) {
