@@ -111,6 +111,7 @@ dependencies = [
  "athena-interface",
  "bincode",
  "cfg-if",
+ "ed25519-dalek",
  "elf",
  "gdbstub",
  "hex",

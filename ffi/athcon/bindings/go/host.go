@@ -168,14 +168,14 @@ func call(pCtx unsafe.Pointer, msg *C.struct_athcon_message) C.struct_athcon_res
 //export spawn
 func spawn(pCtx unsafe.Pointer, pBlob *C.uint8_t, blobSize C.size_t) C.athcon_address {
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
-	blob := goByteSlice(pBlob, blobSize)
+	blob := C.GoBytes(unsafe.Pointer(pBlob), C.int(blobSize))
 	return *athconAddress(ctx.Spawn(blob))
 }
 
 //export deploy
 func deploy(pCtx unsafe.Pointer, pCode *C.uint8_t, codeSize C.size_t) C.athcon_address {
 	ctx := (*cgo.Handle)(pCtx).Value().(HostContext)
-	code := goByteSlice(pCode, codeSize)
+	code := C.GoBytes(unsafe.Pointer(pCode), C.int(codeSize))
 	return *athconAddress(ctx.Deploy(code))
 }
 
