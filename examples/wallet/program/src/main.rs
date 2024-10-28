@@ -6,7 +6,6 @@ extern crate alloc;
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::{call, spawn, Pubkey, SpendArguments, VerifiableTemplate, WalletProgram};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use parity_scale_codec::{Decode, Encode};
 #[derive(Debug, Encode, Decode)]
 pub struct Wallet {
@@ -62,10 +61,7 @@ impl WalletProgram for Wallet {
 
 impl VerifiableTemplate for Wallet {
   fn verify(&self, tx: alloc::vec::Vec<u8>, signature: [u8; 64]) -> bool {
-    // Check that the transaction is signed by the owner
-    let public_key = VerifyingKey::from_bytes(&self.owner.0).unwrap();
-    let signature = Signature::from_bytes(&signature);
-    public_key.verify(&tx, &signature).is_ok()
+    athena_vm_sdk::precompiles::ed25519::verify(&tx, &self.owner.0, &signature)
   }
 }
 

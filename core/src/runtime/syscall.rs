@@ -5,6 +5,7 @@ use athena_interface::StatusCode;
 use strum_macros::EnumIter;
 
 use crate::runtime::{Register, Runtime};
+use crate::syscall::precompiles::ed25519::SyscallEd25519Verify;
 use crate::syscall::{
   SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostCall, SyscallHostDeploy,
   SyscallHostGetBalance, SyscallHostRead, SyscallHostSpawn, SyscallHostWrite, SyscallWrite,
@@ -25,6 +26,9 @@ pub enum SyscallCode {
 
   /// Write to the output buffer.
   WRITE = 0x00_00_00_02,
+
+  // Precompiles
+  PRECOMPILE_ED25519_VERIFY = 0x00_64_00_20,
 
   /// Host functions
   HOST_READ = 0x00_00_00_A0,
@@ -47,6 +51,7 @@ impl SyscallCode {
     match value {
       0x00_00_00_00 => SyscallCode::HALT,
       0x00_00_00_02 => SyscallCode::WRITE,
+      0x00_64_00_20 => SyscallCode::PRECOMPILE_ED25519_VERIFY,
       0x00_00_00_A0 => SyscallCode::HOST_READ,
       0x00_00_00_A1 => SyscallCode::HOST_WRITE,
       0x00_00_00_A2 => SyscallCode::HOST_CALL,
@@ -106,10 +111,12 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
   }
 
   pub fn mw(&mut self, addr: u32, value: u32) {
+    assert_eq!(addr % 4, 0);
     self.rt.mw(addr, value);
   }
 
   pub fn mw_slice(&mut self, addr: u32, values: &[u32]) {
+    assert_eq!(addr % 4, 0);
     for i in 0..values.len() {
       self.mw(addr + i as u32 * 4, values[i]);
     }
@@ -124,19 +131,51 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
   }
 
   pub fn word(&self, addr: u32) -> u32 {
+    assert_eq!(addr % 4, 0);
     self.rt.word(addr)
   }
 
   pub fn dword(&self, addr: u32) -> u64 {
+    assert_eq!(addr % 4, 0);
     self.word(addr) as u64 | (self.word(addr + 4) as u64) << 32
   }
 
   pub fn slice(&self, addr: u32, len: usize) -> Vec<u32> {
+    assert_eq!(addr % 4, 0);
     let mut values = Vec::new();
     for i in 0..len {
       values.push(self.word(addr + i as u32 * 4));
     }
     values
+  }
+
+  /// Read `len` bytes from `addr`.
+  ///
+  /// Supports unaligned read:
+  /// - `addr` doesn't need to be aligned to 4B,
+  /// - `len` doesn't need to be a multiple of 4.
+  #[tracing::instrument(skip(self))]
+  pub fn bytes(&self, mut addr: u32, len: usize) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    // handle case when addr is not aligned to 4B
+    let addr_offset = (addr % 4) as usize;
+    if addr_offset != 0 {
+      let word = self.word(addr - addr_offset as u32).to_le_bytes();
+      bytes.extend_from_slice(&word[addr_offset..]);
+      addr += bytes.len() as u32;
+    }
+
+    for addr in (addr..addr + (len - bytes.len()) as u32).step_by(4) {
+      bytes.extend_from_slice(&self.word(addr).to_le_bytes());
+    }
+    bytes.truncate(len); // handle case when len is not a multiple of 4
+
+    tracing::debug!(result = hex::encode(&bytes), "read bytes");
+    bytes
+  }
+
+  pub fn array<const N: usize>(&self, addr: u32) -> [u8; N] {
+    self.bytes(addr, N).try_into().unwrap()
   }
 }
 
@@ -144,6 +183,12 @@ pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
   let mut syscall_map = HashMap::<SyscallCode, Arc<dyn Syscall>>::default();
   syscall_map.insert(SyscallCode::HALT, Arc::new(SyscallHalt {}));
   syscall_map.insert(SyscallCode::WRITE, Arc::new(SyscallWrite {}));
+
+  syscall_map.insert(
+    SyscallCode::PRECOMPILE_ED25519_VERIFY,
+    Arc::new(SyscallEd25519Verify {}),
+  );
+
   syscall_map.insert(SyscallCode::HOST_READ, Arc::new(SyscallHostRead {}));
   syscall_map.insert(SyscallCode::HOST_WRITE, Arc::new(SyscallHostWrite {}));
   syscall_map.insert(SyscallCode::HOST_CALL, Arc::new(SyscallHostCall {}));
@@ -161,7 +206,12 @@ pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
 
 #[cfg(test)]
 mod tests {
-  use super::{default_syscall_map, SyscallCode};
+  use crate::{
+    runtime::{Program, Runtime},
+    utils::AthenaCoreOpts,
+  };
+
+  use super::{default_syscall_map, SyscallCode, SyscallContext};
   use strum::IntoEnumIterator;
 
   #[test]
@@ -194,6 +244,11 @@ mod tests {
       match code {
         SyscallCode::HALT => assert_eq!(code as u32, athena_vm::syscalls::HALT),
         SyscallCode::WRITE => assert_eq!(code as u32, athena_vm::syscalls::WRITE),
+
+        SyscallCode::PRECOMPILE_ED25519_VERIFY => {
+          assert_eq!(code as u32, athena_vm::syscalls::PRECOMPILE_ED25519_VERIFY)
+        }
+
         SyscallCode::HOST_READ => assert_eq!(code as u32, athena_vm::syscalls::HOST_READ),
         SyscallCode::HOST_WRITE => assert_eq!(code as u32, athena_vm::syscalls::HOST_WRITE),
         SyscallCode::HOST_CALL => assert_eq!(code as u32, athena_vm::syscalls::HOST_CALL),
@@ -206,5 +261,33 @@ mod tests {
         SyscallCode::HOST_DEPLOY => assert_eq!(code as u32, athena_vm::syscalls::HOST_DEPLOY),
       }
     }
+  }
+
+  #[test]
+  fn reading_bytes_from_memory() {
+    let mut rt = Runtime::new(Program::default(), None, AthenaCoreOpts::default(), None);
+    // initialize memory
+    let mut memory = Vec::<u8>::new();
+    for (i, addr) in (0x100..0x200).step_by(4).enumerate() {
+      let value = (9876 * i) as u32;
+      rt.mw(addr, value);
+      memory.extend_from_slice(&value.to_le_bytes());
+    }
+
+    let ctx = SyscallContext::new(&mut rt);
+    let read = ctx.bytes(0x100, 0x100);
+    assert_eq!(read, memory);
+
+    // address not aligned
+    let read = ctx.bytes(0x100 + 21, 0x100 - 21);
+    assert_eq!(read, memory[21..]);
+
+    // length not a multiple of 4
+    let read = ctx.bytes(0x100, 27);
+    assert_eq!(read, memory[..27]);
+
+    // address not aligned and length not a multiple of 4
+    let read = ctx.bytes(0x103, 59);
+    assert_eq!(read, memory[3..3 + 59]);
   }
 }
