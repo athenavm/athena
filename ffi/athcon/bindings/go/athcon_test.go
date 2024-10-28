@@ -4,6 +4,7 @@
 package athcon
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -82,9 +83,13 @@ func TestErrorMessage(t *testing.T) {
 
 	check(Failure, "failure")
 	check(Revert, "revert")
-	check(Error(3), "out of gas")
-	check(Error(-1), "internal error")
-	check(Error(1000), "<unknown>")
+	check(Error{}, "success")
+	check(Error{Code: 3}, "out of gas")
+	check(Error{Code: -1}, "internal error")
+	check(Error{Code: 1000}, "<unknown>")
+	check(Error{Err: fmt.Errorf("custom error")}, "success: custom error")
+	check(Error{Code: 4, Err: fmt.Errorf("custom error")}, "invalid instruction: custom error")
+	check(Error{Code: 1000, Err: fmt.Errorf("custom error")}, "<unknown>: custom error")
 }
 
 func TestLibraryEncodeTx(t *testing.T) {
