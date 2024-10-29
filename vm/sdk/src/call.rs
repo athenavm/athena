@@ -18,7 +18,7 @@ pub fn call(
   let input_payload = payload.encode();
 
   // Allocate output buffer on the heap, aligned to 4B.
-  // It's capacity might be configureable and changed in the future.
+  // Its capacity might be configurable and changed in the future.
   // See https://github.com/athenavm/athena/issues/177.
   let output_cap = 1024;
   // Prevent `output_buf` from being dropped, as we're transferring ownership.
