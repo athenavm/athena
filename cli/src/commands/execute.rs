@@ -64,8 +64,6 @@ impl ExecuteCmd {
   pub fn run(&self) -> Result<()> {
     let elf_path = build_program(&self.build_args, None)?;
 
-    tracing_subscriber::fmt::init();
-
     let mut elf = Vec::new();
     File::open(elf_path.as_path().as_str())
       .expect("failed to open input file")

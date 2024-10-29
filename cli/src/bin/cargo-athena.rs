@@ -34,6 +34,8 @@ pub enum AthenaCliCommands {
 }
 
 fn main() -> Result<()> {
+  tracing_subscriber::fmt::init();
+
   let Cargo::Athena(args) = Cargo::parse();
   let command = args
     .command

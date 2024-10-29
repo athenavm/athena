@@ -24,6 +24,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena CLI & toolchain
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
         run: |
           cargo install --path cli
           cargo athena install-toolchain
@@ -62,6 +64,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Athena toolchain
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
         run: cargo run -p athena-cli -- athena install-toolchain
 
       - name: Run cargo check
@@ -143,6 +147,8 @@ jobs:
           echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
 
       - name: Install Athena CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
         run: |
           cargo install --force --locked --path cli
           cargo athena install-toolchain
@@ -177,6 +183,8 @@ jobs:
           echo "$ATHENA_DIR/bin" >> $GITHUB_PATH
 
       - name: Install Athena CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
         run: |
           cargo install --force --locked --path cli
           cargo athena install-toolchain
