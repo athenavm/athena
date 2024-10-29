@@ -266,36 +266,24 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
-    stdin.write::<u32>(&7);
+    stdin.write(&(ADDRESS_ALICE, 7));
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
     host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
-    assert_eq!(
-      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
-      STORAGE_VALUE
-    );
+
     let (mut output, _) = client
       .execute(
         elf,
         stdin,
         Some(&mut host),
-        Some(200_000),
+        Some(2_000_000),
         Some(ctx.clone()),
       )
       .unwrap();
     let result = output.read::<u32>();
     assert_eq!(result, 13, "got wrong fibonacci value");
-
-    // expect storage value to also have been updated
-    assert_eq!(
-      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
-      [
-        13u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0
-      ]
-    );
   }
 
   #[test]
@@ -338,7 +326,7 @@ mod tests {
     );
     let payload = Payload {
       selector: None,
-      input: vec![8, 0, 0, 0],
+      input: (bincode::serialize(&(ADDRESS_ALICE, 7)).unwrap()),
     };
 
     let msg = AthenaMessage::new(
@@ -372,7 +360,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
-    stdin.write::<u32>(&7);
+    stdin.write(&(ADDRESS_ALICE, 7));
     let mut host = MockHostInterface::new();
     host
       .expect_call()

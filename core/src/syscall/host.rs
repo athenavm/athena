@@ -1,7 +1,8 @@
+use std::cmp::min;
+
 use crate::runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult};
 use athena_interface::{
-  AddressWrapper, AthenaMessage, Bytes32Wrapper, MessageKind, StatusCode, ADDRESS_LENGTH,
-  BYTES32_LENGTH,
+  AthenaMessage, Bytes32Wrapper, MessageKind, StatusCode, ADDRESS_LENGTH, BYTES32_LENGTH,
 };
 
 pub(crate) struct SyscallHostRead;
@@ -59,11 +60,13 @@ impl Syscall for SyscallHostWrite {
 ///  - a0 (arg1): address to call
 ///  - a1 (arg2): pointer to payload containing method selector and input to the called program
 ///  - a2 (x12): length of input (bytes)
-///  - a3 (x13): address to read the amount from (2 words, 8 bytes)
+///  - a3 (x13): address to write the result to
+///  - a4 (x14): length of result buffer (bytes)
+///  - a5 (x15): address to read the amount from (2 words, 8 bytes)
 pub(crate) struct SyscallHostCall;
 
 impl Syscall for SyscallHostCall {
-  fn execute(&self, ctx: &mut SyscallContext, arg1: u32, arg2: u32) -> SyscallResult {
+  fn execute(&self, ctx: &mut SyscallContext, address_ptr: u32, payload_ptr: u32) -> SyscallResult {
     // make sure we have a runtime context
     let athena_ctx = ctx
       .rt
@@ -81,10 +84,7 @@ impl Syscall for SyscallHostCall {
 
     // note: the host is responsible for checking stack depth, not us
 
-    // marshal inputs
-    let address_words = ADDRESS_LENGTH / 4;
-    let address = ctx.slice(arg1, address_words);
-    let address = AddressWrapper::from(address);
+    let address: [u8; ADDRESS_LENGTH] = ctx.array(address_ptr);
 
     // read the input length from the next register
     let len = ctx.rt.register(Register::X12) as usize;
@@ -92,19 +92,12 @@ impl Syscall for SyscallHostCall {
     // `len` is denominated in number of bytes; we read words in chunks of four bytes
     // then convert into a byte array.
     let input = if len > 0 {
-      // Round up the length to the nearest word boundary
-      let input_words = ctx.slice(arg2, (len + 3) / 4);
-      let input_bytes = input_words
-        .into_iter()
-        .flat_map(|word| word.to_le_bytes())
-        .take(len) // this removes any extra padding from the input
-        .collect::<Vec<u8>>();
-      Some(input_bytes)
+      Some(ctx.bytes(payload_ptr, len))
     } else {
       None
     };
 
-    let amount_ptr = ctx.rt.register(Register::X13);
+    let amount_ptr = ctx.rt.register(Register::X15);
     let amount = ctx.dword(amount_ptr);
 
     // note: host is responsible for checking balance and stack depth
@@ -114,7 +107,7 @@ impl Syscall for SyscallHostCall {
       MessageKind::Call,
       athena_ctx.depth() + 1,
       gas_left,
-      address.into(),
+      address,
       *athena_ctx.address(),
       input,
       amount,
@@ -122,6 +115,10 @@ impl Syscall for SyscallHostCall {
     );
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
     let res = host.call(msg);
+
+    let output_size = res
+      .output
+      .map_or(0, |output| self.copy_result(ctx, &output));
 
     // calculate gas spent
     // TODO: should this be a panic or should it just return an out of gas error?
@@ -132,12 +129,48 @@ impl Syscall for SyscallHostCall {
     ctx.rt.state.clk += gas_spent;
 
     match res.status_code {
-      StatusCode::Success => Ok(Outcome::Result(None)),
+      StatusCode::Success => Ok(Outcome::Result(Some(output_size))),
       status => {
         tracing::debug!("host system call failed with status code '{status}'");
         Err(status)
       }
     }
+  }
+}
+
+impl SyscallHostCall {
+  fn copy_result(&self, ctx: &mut SyscallContext, output: &[u8]) -> u32 {
+    let mut output_ptr = ctx.rt.register(Register::X13);
+    if output_ptr == 0 {
+      tracing::debug!("no output buffer allocated - not copying the result");
+      return 0;
+    }
+    let output_buf_len = ctx.rt.register(Register::X14);
+    if output.len() as u32 > output_buf_len {
+      tracing::warn!(
+        output_buf_len,
+        output_len = output.len(),
+        "output buffer too small to hold the entire result - truncating"
+      )
+    }
+    let output_size = min(output.len() as u32, output_buf_len);
+
+    if output_ptr != 0 && output_size != 0 {
+      let mut chunks = output[..output_size as usize].chunks_exact(4);
+      for c in chunks.by_ref() {
+        let v = u32::from_le_bytes(c.try_into().unwrap());
+        ctx.rt.mw(output_ptr, v);
+        output_ptr += 4;
+      }
+
+      if !chunks.remainder().is_empty() {
+        let mut value = [0u8; 4];
+        value.copy_from_slice(chunks.remainder());
+        ctx.rt.mw(output_ptr, u32::from_le_bytes(value));
+      }
+    };
+
+    output_size
   }
 }
 

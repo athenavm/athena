@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/ChainSafe/gossamer/pkg/scale"
@@ -25,12 +26,14 @@ var RECURSIVE_CALL_TEST []byte
 var WALLET_TEST []byte
 
 type testHostContext struct {
+	vm       *VM
 	balances map[Address]uint64
 	programs map[Address][]byte
 }
 
-func newHost() *testHostContext {
+func newHost(vm *VM) *testHostContext {
 	return &testHostContext{
+		vm:       vm,
 		balances: make(map[Address]uint64),
 		programs: make(map[Address][]byte),
 	}
@@ -78,7 +81,20 @@ func (host *testHostContext) Call(
 
 	host.balances[sender] -= value
 	host.balances[recipient] += value
-	return nil, gas, nil
+
+	p, ok := host.programs[recipient]
+	if !ok {
+		// nobody to call
+		return nil, gas, nil
+	}
+
+	encoded := EncodedExecutionPayload(nil, input)
+	result, err := host.vm.Execute(host, Frontier, Call, depth+1, gas, recipient, sender, encoded, 0, p)
+	if err != nil {
+		return nil, gas, fmt.Errorf("executing call: %w", err)
+	}
+
+	return result.Output, result.GasLeft, nil
 }
 
 func (host *testHostContext) Spawn(blob []byte) Address {
@@ -106,7 +122,7 @@ func TestGetBalance(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
 
-	host := newHost()
+	host := newHost(vm)
 	addr := randomAddress()
 	host.balances[addr] = 1000
 	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, 0, MINIMAL_TEST_CODE)
@@ -122,29 +138,32 @@ func TestCall(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
 
-	host := newHost()
-	addr := Address{}
-	payload := Payload{Input: []byte{2, 0, 0, 0}}
-	executionPayload := ExecutionPayload{Payload: payload}
+	host := newHost(vm)
+	addr := randomAddress()
+	host.programs[addr] = RECURSIVE_CALL_TEST
+	type InputArgs struct {
+		Call Address
+		N    uint32
+	}
+	input, err := scale.Marshal(InputArgs{Call: addr, N: 3})
+	require.NoError(t, err)
+
+	executionPayload := ExecutionPayload{Payload: Payload{Input: input}}
 
 	encoded, err := scale.Marshal(executionPayload)
 	require.NoError(t, err)
-	result, err := vm.Execute(host, Frontier, Call, 1, 100000, addr, addr, encoded, 0, RECURSIVE_CALL_TEST)
-	output := result.Output
-
-	if len(output) != 4 {
-		t.Errorf("execution unexpected output length: %d", len(output))
-	}
-	if err != nil {
-		t.Errorf("execution returned unexpected error: %v", err)
-	}
+	result, err := vm.Execute(host, Frontier, Call, 0, 100000, addr, addr, encoded, 0, RECURSIVE_CALL_TEST)
+	require.NoError(t, err)
+	require.Len(t, result.Output, 4)
+	value := binary.LittleEndian.Uint32(result.Output)
+	require.Equal(t, uint32(2), value)
 }
 
 func TestSpawn(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
 
-	host := newHost()
+	host := newHost(vm)
 	principal := randomAddress()
 	pubkey := Bytes32([32]byte{1, 1, 2, 2, 3, 3, 4, 4})
 
@@ -162,7 +181,7 @@ func TestSpend(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
 
-	host := newHost()
+	host := newHost(vm)
 	// Step 1: Spawn wallet
 	principal := Address{1, 2, 3, 4}
 	var walletAddress Address
@@ -197,7 +216,7 @@ func TestVerify(t *testing.T) {
 	vm, _ := Load(modulePath)
 	defer vm.Destroy()
 
-	host := newHost()
+	host := newHost(vm)
 	// Step 1: Spawn wallet
 	principal := randomAddress()
 	pubkey, privkey, err := ed25519.GenerateKey(nil)
