@@ -67,6 +67,7 @@ pub fn get_target() -> String {
   target_lexicon::HOST.to_string()
 }
 
+#[tracing::instrument(skip(client))]
 pub async fn get_toolchain_download_url(client: &Client, target: String) -> String {
   // Get latest tag and use it to construct the download URL.
   let json = client
@@ -77,6 +78,7 @@ pub async fn get_toolchain_download_url(client: &Client, target: String) -> Stri
     .json::<serde_json::Value>()
     .await
     .unwrap();
+  tracing::debug!(%json, "got latest release response");
   let tag = json["tag_name"].as_str().expect(
     "Failed to download toolchain. Likely caused by GitHub rate limiting. Please try again.",
   );
