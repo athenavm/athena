@@ -19,6 +19,8 @@ jobs:
     name: Prepare release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
     outputs:
       tag_name: ${{ steps.release_info.outputs.tag_name }}
       release_name: ${{ steps.release_info.outputs.release_name }}
