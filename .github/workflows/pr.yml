@@ -28,7 +28,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
         run: |
           cargo install --path cli
-          cargo athena install-toolchain 
+          cargo athena install-toolchain
 
       - name: Build binaries
         run: |
@@ -66,7 +66,7 @@ jobs:
       - name: Install Athena toolchain
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
-        run: cargo run -p athena-cli -- athena install-toolchain 
+        run: cargo run -p athena-cli -- athena install-toolchain
 
       - name: Run cargo check
         run: cargo check --all-targets --all-features
