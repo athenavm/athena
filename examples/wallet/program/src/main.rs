@@ -4,9 +4,11 @@
 extern crate alloc;
 
 use athena_interface::Address;
+use athena_vm::entrypoint;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::{call, spawn, Pubkey, SpendArguments, VerifiableTemplate, WalletProgram};
 use parity_scale_codec::{Decode, Encode};
+
 #[derive(Debug, Encode, Decode)]
 pub struct Wallet {
   nonce: u64,
@@ -23,6 +25,8 @@ impl Wallet {
     }
   }
 }
+
+athena_vm::entrypoint!();
 
 #[cfg(all(
   any(target_arch = "riscv32", target_arch = "riscv64"),
@@ -59,18 +63,10 @@ impl WalletProgram for Wallet {
   }
 }
 
+#[template]
 impl VerifiableTemplate for Wallet {
+  #[callable]
   fn verify(&self, tx: alloc::vec::Vec<u8>, signature: [u8; 64]) -> bool {
     athena_vm_sdk::precompiles::ed25519::verify(&tx, &self.owner.0, &signature)
   }
 }
-
-#[link_section = ".text.athexp.verify"]
-#[no_mangle]
-pub unsafe extern "C" fn athexp_verify() {
-  athena_vm::program::Method::call_method(Wallet::verify, &mut athena_vm::io::Io::default());
-  syscall_halt(0);
-}
-#[used]
-#[link_section = ".init_array"]
-static DUMMY_VERIFY: unsafe extern "C" fn() = athexp_verify;

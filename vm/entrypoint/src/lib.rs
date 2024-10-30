@@ -21,31 +21,21 @@ pub mod types {
   pub use athena_interface::*;
 }
 
-// This macro should be used for libraries with multiple exported functions
-#[cfg(feature = "noentrypoint")]
+/// Define the program entrypoint.
+///
+/// Configures the global allocator and an optional entrypoint function.
+/// The entrypoint function is called by the runtime if no other method is
+/// explicitly selected.
 #[macro_export]
 macro_rules! entrypoint {
   () => {
-    use $crate::heap::SimpleAlloc;
-
-    #[global_allocator]
-    static HEAP: SimpleAlloc = SimpleAlloc;
-
-    mod vm_generated_main {
-      #[no_mangle]
-      fn main() {
-        panic!("noentrypoint feature is enabled");
-      }
+    fn main() {
+      panic!("No entrypoint found");
     }
+    entrypoint!(main);
   };
-}
-
-// This macro should be used for programs with a single entrypoint
-#[cfg(not(feature = "noentrypoint"))]
-#[macro_export]
-macro_rules! entrypoint {
-  ($path:path) => {
-    const VM_ENTRY: fn() = $path;
+  ($entry:path) => {
+    const VM_ENTRY: fn() = $entry;
 
     use $crate::heap::SimpleAlloc;
 

@@ -22,5 +22,4 @@ athena-lib = { path = "../lib", optional = true }
 [features]
 default = ["lib"]
 lib = ["dep:athena-lib"]
-noentrypoint = []
 rv32e = []
