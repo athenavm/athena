@@ -1,11 +1,13 @@
 //! The Spacemesh standard wallet template.
 #![no_main]
-#![no_std]
+// #![no_std]
 extern crate alloc;
 
 use athena_interface::Address;
 use athena_vm_declare::{callable, template};
-use athena_vm_sdk::{call, spawn, Pubkey, SpendArguments, VerifiableTemplate, WalletProgram};
+use athena_vm_sdk::{
+  call, spawn, Pubkey, Receive, SpendArguments, VerifiableTemplate, WalletProgram,
+};
 use parity_scale_codec::{Decode, Encode};
 #[derive(Debug, Encode, Decode)]
 pub struct Wallet {
@@ -41,7 +43,7 @@ impl WalletProgram for Wallet {
   fn spend(&self, args: SpendArguments) {
     // Send coins
     // Note: error checking happens inside the host
-    call(args.recipient, None, None, args.amount);
+    call(args.recipient, None, Some("athexp_receive"), args.amount);
   }
 
   fn proxy(&self, _destination: Address, _args: &[u8]) {
@@ -74,3 +76,20 @@ pub unsafe extern "C" fn athexp_verify() {
 #[used]
 #[link_section = ".init_array"]
 static DUMMY_VERIFY: unsafe extern "C" fn() = athexp_verify;
+
+impl Receive for Wallet {
+  fn receive(&self) {
+    println!("received coins");
+  }
+}
+
+#[link_section = ".text.athexp.receive"]
+#[no_mangle]
+pub unsafe extern "C" fn athexp_receive() {
+  athena_vm::program::Method::call_method(Wallet::receive, &mut athena_vm::io::Io::default());
+  syscall_halt(0);
+}
+
+#[used]
+#[link_section = ".init_array"]
+static DUMMY_RECEIVE: unsafe extern "C" fn() = athexp_receive;

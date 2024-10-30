@@ -88,6 +88,26 @@ where
   }
 }
 
+/// Implement Method for methods taking 0 arguments:
+/// # Example:
+/// ```ignore
+/// impl Foo {
+///   fn foo(&self) -> impl IntoResult<IO>
+/// }
+/// ```
+impl<F, IO, S, R> Method<&S, R, IO> for F
+where
+  IO: Read + Write,
+  F: Fn(&S) -> R,
+  S: IntoArgument<S, IO>,
+  R: IntoResult<IO>,
+{
+  fn call_method(self, io: &mut IO) {
+    let instance = S::into_argument(io);
+    self(&instance).into_result(io);
+  }
+}
+
 /// Implement Method for methods taking 1 argument:
 /// # Example:
 /// ```ignore

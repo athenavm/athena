@@ -399,6 +399,12 @@ pub struct SpawnResult {
   pub nonce: u64,
 }
 
+#[derive(Debug, Clone)]
+struct Account {
+  state: Vec<u8>,
+  template: Address,
+}
+
 // a very simple mock host implementation for testing
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
@@ -416,12 +422,32 @@ pub struct MockHost<'a> {
   // stores contract code
   templates: BTreeMap<Address, Vec<u8>>,
 
-  // stores program instances
-  programs: BTreeMap<Address, Vec<u8>>,
+  // stores accounts
+  programs: BTreeMap<Address, Account>,
 
   // context information
   static_context: Option<HostStaticContext>,
   dynamic_context: Option<HostDynamicContext>,
+}
+
+pub struct MockHostBuilder<'a> {
+  host: MockHost<'a>,
+}
+
+impl<'a> MockHostBuilder<'a> {
+  pub fn new() -> Self {
+    return Self {
+      host: MockHost::default(),
+    };
+  }
+  pub fn build(self) -> MockHost<'a> {
+    self.host
+  }
+
+  pub fn vm(mut self, vm: &'a dyn VmInterface<MockHost<'a>>) -> Self {
+    self.host.vm = Some(vm);
+    self
+  }
 }
 
 impl<'a> MockHost<'a> {
@@ -447,6 +473,14 @@ impl<'a> MockHost<'a> {
     }
   }
 
+  pub fn set_dynamic_ctx(&mut self, ctx: HostDynamicContext) {
+    self.dynamic_context = Some(ctx);
+  }
+
+  pub fn set_static_ctx(&mut self, ctx: HostStaticContext) {
+    self.static_context = Some(ctx);
+  }
+
   /// Set balance of given address.
   /// The previous balance is discarded.
   pub fn set_balance(&mut self, address: &Address, balance: Balance) {
@@ -463,12 +497,18 @@ impl<'a> MockHost<'a> {
     let address = calculate_address(template, &blob, principal, nonce);
     tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
 
-    self.programs.insert(address, blob.clone());
+    self.programs.insert(
+      address,
+      Account {
+        state: blob.clone(),
+        template: *template,
+      },
+    );
     address
   }
 
   pub fn get_program(&self, address: &Address) -> Option<&Vec<u8>> {
-    self.programs.get(address)
+    self.programs.get(address).map(|account| &account.state)
   }
 
   pub fn template(&self, address: &Address) -> Option<&Vec<u8>> {
@@ -551,6 +591,12 @@ impl HostInterface for MockHost<'_> {
     let backup_balance = self.balance.clone();
     let backup_programs = self.templates.clone();
 
+    let recipient_account = if let Some(account) = self.programs.get(&msg.recipient) {
+      account.clone()
+    } else {
+      return ExecutionResult::failed(0);
+    };
+
     // transfer balance
     // note: the host should have already subtracted an amount from the sender
     // equal to the maximum amount of gas that could be paid, so this should
@@ -569,26 +615,24 @@ impl HostInterface for MockHost<'_> {
     });
 
     // check programs list first
-    let res = if let Some(code) = self.templates.get(&msg.recipient).cloned() {
-      // create an owned copy of VM before taking the host from self
-      let vm = self.vm;
-
+    let Account { state, template } = recipient_account;
+    let res = if let Some(code) = self.templates.get(&template).cloned() {
       // The optional msg.input_data must be enriched with optional account state
       // and then passed to the VM.
       let msg = match msg.input_data {
-        Some(data) => {
-          // TODO: figure out when to provide a state here
-          let state = vec![];
-          AthenaMessage {
-            input_data: Some(ExecutionPayload::encode_with_encoded_payload(state, data)),
-            ..msg
-          }
-        }
+        Some(data) => AthenaMessage {
+          input_data: Some(ExecutionPayload::encode_with_encoded_payload(state, data)),
+          ..msg
+        },
         None => msg,
       };
 
-      vm.expect("missing VM instance")
-        .execute(self, AthenaRevision::AthenaFrontier, msg, &code)
+      self.vm.expect("missing VM instance").execute(
+        self,
+        AthenaRevision::AthenaFrontier,
+        msg,
+        &code,
+      )
     } else {
       // otherwise, pass a call to Charlie, fail all other calls
       let status_code = if msg.recipient == ADDRESS_CHARLIE {
@@ -823,7 +867,7 @@ mod tests {
     let mut host = MockHost::new();
     let blob = vec![1, 2, 3, 4];
     let address = host.spawn_program(&ADDRESS_ALICE, blob.clone(), &ADDRESS_ALICE, 0);
-    assert_eq!(host.programs.get(&address), Some(&blob));
+    assert_eq!(host.get_program(&address), Some(&blob));
   }
 
   #[test]

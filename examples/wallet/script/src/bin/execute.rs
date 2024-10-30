@@ -126,6 +126,7 @@ mod tests {
     Balance, Encode, HostDynamicContext, HostStaticContext, MessageKind, MethodSelector, MockHost,
     StatusCode, VmInterface, ADDRESS_ALICE,
   };
+  use athena_interface::{HostInterface, MockHostBuilder};
   use athena_runner::AthenaVm;
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
@@ -347,5 +348,56 @@ mod tests {
     let (mut result, gas_cost) = result.unwrap();
     assert!(gas_cost.is_some());
     assert_eq!(result.read::<u64>(), amount);
+  }
+
+  #[test]
+  fn spend_receive() {
+    setup_logger();
+
+    let spawning_address = Address::default();
+
+    let vm = AthenaVm::new();
+    let mut host = MockHostBuilder::new().vm(&vm).build();
+
+    let wallet_template = host.deploy(super::ELF.to_vec()).unwrap();
+    host.set_static_ctx(HostStaticContext::new(
+      spawning_address,
+      0,
+      spawning_address,
+    ));
+    host.set_dynamic_ctx(HostDynamicContext::new(wallet_template, spawning_address));
+
+    let sender_key = SigningKey::generate(&mut OsRng);
+    let sender_pubkey = Pubkey(sender_key.verifying_key().to_bytes());
+    let sender = super::spawn(&mut host, &sender_pubkey).unwrap();
+
+    let recipient_key = SigningKey::generate(&mut OsRng);
+    let recipient_pubkey = Pubkey(recipient_key.verifying_key().to_bytes());
+    let recipient = super::spawn(&mut host, &recipient_pubkey).unwrap();
+
+    host.set_balance(&sender, 10000);
+
+    let args = super::SpendArguments {
+      recipient,
+      amount: 120,
+    };
+
+    let mut stdin = AthenaStdin::new();
+    let wallet_state = host.get_program(&sender).unwrap();
+    stdin.write_vec(wallet_state.clone());
+    stdin.write_vec(args.encode());
+
+    let context = super::AthenaContext::new(sender, sender, 0);
+
+    let (_, _) = ExecutionClient::new()
+      .execute_function(
+        super::ELF,
+        &MethodSelector::from("athexp_spend"),
+        stdin,
+        Some(&mut host),
+        Some(2500000),
+        Some(context.clone()),
+      )
+      .expect("sending coins");
   }
 }
