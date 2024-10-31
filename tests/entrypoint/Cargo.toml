@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 athena-vm = { path = "../../vm/entrypoint", features = [
-  "noentrypoint",
   "rv32e",
 ] }
 athena-vm-declare = { path = "../../vm/declare" }

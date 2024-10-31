@@ -1,8 +1,11 @@
 #![no_main]
+use athena_vm::entrypoint;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::call;
 
 pub struct EntrypointTest {}
+
+athena_vm::entrypoint!();
 
 #[cfg(all(
   any(target_arch = "riscv32", target_arch = "riscv64"),
