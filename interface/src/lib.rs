@@ -8,9 +8,9 @@ pub use context::*;
 
 use blake3::Hasher;
 pub use parity_scale_codec::{Decode, Encode};
-use payload::ExecutionPayload;
+use payload::{ExecutionPayloadBuilder, Payload};
 
-use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
+use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt, rc::Rc};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -420,7 +420,7 @@ pub struct MockHost<'a> {
   balance: BTreeMap<Address, Balance>,
 
   // stores contract code
-  templates: BTreeMap<Address, Vec<u8>>,
+  templates: BTreeMap<Address, Rc<Vec<u8>>>,
 
   // stores accounts
   programs: BTreeMap<Address, Account>,
@@ -495,12 +495,12 @@ impl<'a> MockHost<'a> {
     nonce: u64,
   ) -> Address {
     let address = calculate_address(template, &blob, principal, nonce);
-    tracing::info!("spawning program {blob:?} at address {address:?} for principal {principal:?} with template {template:?}");
+    tracing::info!(state = ?blob, ?template, ?address, ?principal, nonce,"spawning program");
 
     self.programs.insert(
       address,
       Account {
-        state: blob.clone(),
+        state: blob,
         template: *template,
       },
     );
@@ -511,14 +511,16 @@ impl<'a> MockHost<'a> {
     self.programs.get(address).map(|account| &account.state)
   }
 
-  pub fn template(&self, address: &Address) -> Option<&Vec<u8>> {
-    self.templates.get(address)
+  pub fn template(&self, address: &Address) -> Option<Rc<Vec<u8>>> {
+    self.templates.get(address).cloned()
   }
 
   pub fn deploy_code(&mut self, address: Address, code: Vec<u8>) {
-    self.templates.insert(address, code);
+    tracing::info!(?address, len = code.len(), "deploying code");
+    self.templates.insert(address, Rc::new(code));
   }
 
+  #[tracing::instrument(skip(self))]
   pub fn transfer_balance(&mut self, from: &Address, to: &Address, value: u64) -> StatusCode {
     let balance_from = self.get_balance(from);
     let balance_to = self.get_balance(to);
@@ -529,6 +531,7 @@ impl<'a> MockHost<'a> {
       Some(new_balance) => {
         self.balance.insert(*from, balance_from - value);
         self.balance.insert(*to, new_balance);
+        tracing::info!("balance transfer complete");
         StatusCode::Success
       }
       None => StatusCode::InternalError,
@@ -571,7 +574,7 @@ impl HostInterface for MockHost<'_> {
     self.balance.get(addr).copied().unwrap_or(0)
   }
 
-  #[tracing::instrument(skip(self, msg), fields(id = self as *const Self as usize, depth = msg.depth))]
+  #[tracing::instrument(skip(self, msg), fields(depth = msg.depth))]
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
     tracing::info!(msg = ?msg);
 
@@ -583,19 +586,9 @@ impl HostInterface for MockHost<'_> {
     // take snapshots of the state in case we need to roll back
     // this is relatively expensive and we'd want to do something more sophisticated in production
     // (journaling? CoW?) but it's fine for testing.
-    tracing::debug!(
-      "before backup storage item is {:?}",
-      self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
-    );
     let backup_storage = self.storage.clone();
     let backup_balance = self.balance.clone();
     let backup_programs = self.templates.clone();
-
-    let recipient_account = if let Some(account) = self.programs.get(&msg.recipient) {
-      account.clone()
-    } else {
-      return ExecutionResult::failed(0);
-    };
 
     // transfer balance
     // note: the host should have already subtracted an amount from the sender
@@ -615,18 +608,27 @@ impl HostInterface for MockHost<'_> {
     });
 
     // check programs list first
-    let Account { state, template } = recipient_account;
-    let res = if let Some(code) = self.templates.get(&template).cloned() {
-      // The optional msg.input_data must be enriched with optional account state
+    let res = if let Some(Account { state, template }) = self.programs.get(&msg.recipient) {
+      let code = self.templates.get(template).unwrap().clone();
+      // The msg.input_data must be enriched with account state
       // and then passed to the VM.
-      let msg = match msg.input_data {
-        Some(data) => AthenaMessage {
-          input_data: Some(ExecutionPayload::encode_with_encoded_payload(state, data)),
-          ..msg
-        },
-        None => msg,
+      let data = msg.input_data.expect("input must be present for call");
+      let mut p = Payload::decode(&mut data.as_slice()).unwrap();
+      // Call receive() for coin transfers if no other method is
+      // explicitly selected.
+      if msg.value > 0 && p.selector.is_none() {
+        p.selector = Some(MethodSelector::from("athexp_receive"));
+      }
+      let msg = AthenaMessage {
+        input_data: Some(
+          ExecutionPayloadBuilder::new()
+            .with_state(state.as_slice())
+            .with_payload(p)
+            .build()
+            .encode(),
+        ),
+        ..msg
       };
-
       self.vm.expect("missing VM instance").execute(
         self,
         AthenaRevision::AthenaFrontier,
@@ -649,20 +651,13 @@ impl HostInterface for MockHost<'_> {
 
     self.dynamic_context = old_dynamic_context;
 
-    tracing::debug!(
-      "finished with storage item {:?}",
-      self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
-    );
     if res.status_code != StatusCode::Success {
-      // rollback state
+      tracing::debug!(status = %res.status_code, "rolling back state");
       self.storage = backup_storage;
       self.balance = backup_balance;
       self.templates = backup_programs;
-      tracing::debug!(
-        "after restore storage item is {:?}",
-        self.get_storage(&ADDRESS_ALICE, &STORAGE_KEY)
-      );
     }
+    tracing::debug!(?res, "finished call");
     res
   }
 
@@ -875,7 +870,7 @@ mod tests {
     let mut host = MockHost::new();
     let blob = vec![1, 2, 3, 4];
     let address = host.deploy(blob.clone());
-    assert_eq!(host.template(&address.unwrap()), Some(&blob));
+    assert_eq!(*host.template(&address.unwrap()).unwrap(), blob);
 
     // deploying again should fail
     let address = host.deploy(blob.clone());

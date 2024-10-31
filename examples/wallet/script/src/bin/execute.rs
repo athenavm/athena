@@ -172,7 +172,7 @@ mod tests {
 
     let address: Address = result.read();
     let template = host.template(&address);
-    assert_eq!(template, Some(&code));
+    assert_eq!(*template.unwrap(), code);
   }
 
   #[test]

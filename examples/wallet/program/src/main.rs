@@ -30,10 +30,6 @@ impl Wallet {
 
 athena_vm::entrypoint!();
 
-#[cfg(all(
-  any(target_arch = "riscv32", target_arch = "riscv64"),
-  target_feature = "e"
-))]
 #[template]
 impl WalletProgram for Wallet {
   #[callable]
@@ -47,7 +43,7 @@ impl WalletProgram for Wallet {
   fn spend(&self, args: SpendArguments) {
     // Send coins
     // Note: error checking happens inside the host
-    call(args.recipient, None, Some("athexp_receive"), args.amount);
+    call(args.recipient, None, None, args.amount);
   }
 
   fn proxy(&self, _destination: Address, _args: &[u8]) {
@@ -73,19 +69,10 @@ impl VerifiableTemplate for Wallet {
   }
 }
 
+#[template]
 impl Receive for Wallet {
+  #[callable]
   fn receive(&self) {
     println!("received coins");
   }
 }
-
-#[link_section = ".text.athexp.receive"]
-#[no_mangle]
-pub unsafe extern "C" fn athexp_receive() {
-  athena_vm::program::Method::call_method(Wallet::receive, &mut athena_vm::io::Io::default());
-  syscall_halt(0);
-}
-
-#[used]
-#[link_section = ".init_array"]
-static DUMMY_RECEIVE: unsafe extern "C" fn() = athexp_receive;
