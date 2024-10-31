@@ -42,7 +42,7 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
           #[no_mangle]
           pub unsafe extern "C" fn #c_func_name() {
             #call;
-            syscall_halt(0);
+            athena_vm::syscalls::syscall_halt(0);
           }
 
           // This black magic ensures the function symbol makes it into the final binary.
@@ -55,10 +55,6 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
   }
 
   let output = quote! {
-      // Basic Athena preamble, for use without a main entrypoint.
-      use athena_vm::syscalls::syscall_halt;
-      athena_vm::entrypoint!();
-
       #input
 
       #(#c_functions)*
