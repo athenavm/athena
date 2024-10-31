@@ -58,7 +58,7 @@ fn main() {
 
   let mut host = MockHost::new_with_context(
     HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
-    HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    HostDynamicContext::new(Address::default(), ADDRESS_ALICE),
   );
   host.set_balance(&ADDRESS_ALICE, 10000);
   let address = spawn(&mut host, &args.owner).expect("spawning wallet program");

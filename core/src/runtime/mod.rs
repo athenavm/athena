@@ -814,7 +814,6 @@ pub mod tests {
   use athena_interface::{
     Address, AthenaContext, ExecutionResult, MockHostInterface, StatusCode, ADDRESS_LENGTH,
   };
-  use athena_vm::helpers::address_to_32bit_words;
 
   use crate::{
     runtime::Register,
@@ -899,23 +898,23 @@ pub mod tests {
     setup_logger();
 
     // recipient address
-    let address_words = address_to_32bit_words([0xCA; ADDRESS_LENGTH]);
+    let address = Address([0xCA; ADDRESS_LENGTH]);
 
     let amount_to_send = 1000;
 
     // arbitrary memory locations
     let memloc: u32 = 0x12345678;
-    let memloc2 = memloc.wrapping_add(address_words.len() as u32 * 4);
+    let memloc2 = memloc.wrapping_add(address.0.len() as u32);
 
     let mut instructions = vec![];
 
     // write address to memory
-    for (i, word) in (0u32..).zip(address_words.iter()) {
+    for (i, word) in address.0.chunks_exact(4).enumerate() {
       instructions.push(Instruction::new(
         Opcode::ADD,
         Register::X16 as u32,
         0,
-        *word,
+        u32::from_le_bytes(word.try_into().unwrap()),
         false,
         true,
       ));
@@ -923,7 +922,7 @@ pub mod tests {
         Opcode::SW,
         Register::X16 as u32,
         0,
-        memloc + i * 4,
+        memloc + i as u32 * 4,
         false,
         true,
       ));

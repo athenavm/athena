@@ -3,14 +3,15 @@
 #[cfg(target_os = "zkvm")]
 athena_vm::entrypoint!(main);
 
+use athena_interface::Address;
 use athena_vm_sdk::call;
 
 fn return_value(value: u32) {
   athena_vm::io::write::<u32>(&value);
 }
 
-fn recursive_call(address: [u8; 24], value: u32) -> u32 {
-  let mut input = address.to_vec();
+fn recursive_call(address: Address, value: u32) -> u32 {
+  let mut input = address.0.to_vec();
   input.extend_from_slice(&value.to_le_bytes());
   let output = call(address, Some(input), None, 0);
   u32::from_le_bytes(output.as_slice().try_into().unwrap())
@@ -20,7 +21,7 @@ fn main() {
   // Read an input to the program.
   //
   // Behind the scenes, this compiles down to a custom system call which handles reading inputs.
-  let (address, n) = athena_vm::io::read::<([u8; 24], u32)>();
+  let (address, n) = athena_vm::io::read::<(Address, u32)>();
   // Base case
   if n <= 1 {
     return_value(n);

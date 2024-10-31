@@ -8,7 +8,7 @@ use athcon_client::{
 };
 use athcon_vm::{MessageKind, Revision, StatusCode, StorageStatus};
 use athena_interface::payload::ExecutionPayload;
-use athena_interface::ADDRESS_ALICE;
+const ADDRESS_ALICE: Address = [0xAAu8; 24];
 
 const CONTRACT_CODE: &[u8] =
   include_bytes!("../../../../../../tests/recursive_call/elf/recursive-call-test");

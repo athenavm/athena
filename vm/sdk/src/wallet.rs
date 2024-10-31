@@ -44,7 +44,7 @@ pub fn encode_spawn(pubkey: &Pubkey) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{payload::Payload, MethodSelector};
+  use athena_interface::{payload::Payload, Address, MethodSelector};
   use parity_scale_codec::{Decode, IoReader};
 
   use super::SpendArguments;
@@ -52,7 +52,7 @@ mod tests {
   #[test]
   fn encode_decode_spend() {
     let args = SpendArguments {
-      recipient: [22u8; 24],
+      recipient: Address([22u8; 24]),
       amount: 800,
     };
     let encoded = super::encode_spend(&args.recipient, args.amount);

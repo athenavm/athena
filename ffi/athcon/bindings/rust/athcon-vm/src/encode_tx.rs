@@ -1,6 +1,7 @@
 //! Implements encoding athena method payloads
 
 use athcon_sys as ffi;
+use athena_interface::Address;
 use athena_vm_sdk::{encode_spawn, encode_spend, Pubkey};
 
 /// Encode Athena Spawn transaction payload.
@@ -42,7 +43,7 @@ unsafe extern "C" fn athcon_encode_tx_spend(
     return std::ptr::null_mut();
   }
   let recipient = unsafe { &(*recipient).bytes };
-  let payload = encode_spend(recipient, amount);
+  let payload = encode_spend(&Address(*recipient), amount);
 
   let (ptr, size) = crate::allocate_output_data(payload);
   Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
@@ -53,7 +54,7 @@ mod tests {
   use athcon_sys as ffi;
   use athena_interface::{
     payload::{Decode, Payload},
-    MethodSelector,
+    Address, MethodSelector,
   };
   use athena_vm_sdk::{Pubkey, SpendArguments};
   use parity_scale_codec::IoReader;
@@ -75,10 +76,10 @@ mod tests {
 
   #[test]
   fn encoding_spend_tx() {
-    let address = [0x1C; 24];
+    let address = Address([0x1C; 24]);
     let amount = 781237;
     let encoded_bytes =
-      unsafe { athcon_encode_tx_spend(&ffi::athcon_address { bytes: address }, amount) };
+      unsafe { athcon_encode_tx_spend(&ffi::athcon_address { bytes: address.0 }, amount) };
 
     let mut encoded_slice = unsafe { (*encoded_bytes).as_slice() };
     let tx = Payload::decode(&mut encoded_slice).unwrap();
