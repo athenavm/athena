@@ -8,13 +8,13 @@ license.workspace = true
 edition.workspace = true
 
 [build-dependencies]
-anyhow = { version = "1.0.83", features = ["backtrace"] }
+anyhow = { version = "1.0.92", features = ["backtrace"] }
 vergen-git2 = { version = "1.0.0", default-features = false, features = [
   "build",
 ] }
 
 [dependencies]
-anyhow = { version = "1.0.83", features = ["backtrace"] }
+anyhow = { version = "1.0.92", features = ["backtrace"] }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
 athena-builder = { path = "../builder" }
