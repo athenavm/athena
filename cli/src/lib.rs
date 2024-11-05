@@ -55,7 +55,7 @@ pub fn is_supported_target() -> bool {
   return true;
 
   #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
-  return true;
+  return false;
 
   #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
   return true;
