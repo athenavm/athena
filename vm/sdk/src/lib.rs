@@ -7,11 +7,10 @@ pub mod precompiles;
 pub mod wallet;
 pub use wallet::*;
 
-mod call;
-pub use call::call;
-
 cfg_if! {
   if #[cfg(target_os = "zkvm")] {
+    mod call;
+    pub use call::call;
     mod spawn;
     pub use spawn::spawn;
     mod deploy;

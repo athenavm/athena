@@ -13,7 +13,6 @@ members = [
   "runner",
   "sdk",
   "tests/host",
-  "tests/recursive_call",
   "vm/declare",
   "vm/entrypoint",
   "vm/lib",
