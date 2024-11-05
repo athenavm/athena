@@ -16,23 +16,18 @@
 // Note: We inherit this constraint from SP1, and I don't see a reason to remove it.
 const MAX_MEMORY: usize = 0x78000000;
 
+// Platform-agnostic heap allocation starting at 1MB mark
+static mut HEAP_START: usize = 1024 * 1024;
+static mut HEAP_POS: usize = 0;
+
 #[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn sys_alloc_aligned(bytes: usize, align: usize) -> *mut u8 {
-  extern "C" {
-    // https://lld.llvm.org/ELF/linker_script.html#sections-command
-    static _end: u8;
-  }
-
-  // Pointer to next heap address to use, or 0 if the heap has not yet been
-  // initialized.
-  static mut HEAP_POS: usize = 0;
-
   // SAFETY: Single threaded, so nothing else can touch this while we're working.
   let mut heap_pos = unsafe { HEAP_POS };
 
   if heap_pos == 0 {
-    heap_pos = unsafe { (&_end) as *const u8 as usize };
+    heap_pos = HEAP_START;
   }
 
   let offset = heap_pos & (align - 1);
