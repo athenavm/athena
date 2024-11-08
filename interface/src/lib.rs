@@ -54,7 +54,31 @@ impl std::fmt::Display for MethodSelector {
   Deserialize,
   Serialize,
 )]
-pub struct Address(pub [u8; ADDRESS_LENGTH]);
+pub struct Address([u8; ADDRESS_LENGTH]);
+
+impl From<&Address> for [u8; ADDRESS_LENGTH] {
+  fn from(value: &Address) -> Self {
+    value.0
+  }
+}
+
+impl From<Address> for [u8; ADDRESS_LENGTH] {
+  fn from(value: Address) -> Self {
+    value.0
+  }
+}
+
+impl From<[u8; ADDRESS_LENGTH]> for Address {
+  fn from(value: [u8; ADDRESS_LENGTH]) -> Self {
+    Address(value)
+  }
+}
+
+impl AsRef<[u8; ADDRESS_LENGTH]> for Address {
+  fn as_ref(&self) -> &[u8; ADDRESS_LENGTH] {
+    &self.0
+  }
+}
 
 impl std::fmt::Display for Address {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

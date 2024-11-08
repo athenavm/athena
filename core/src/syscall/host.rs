@@ -84,7 +84,7 @@ impl Syscall for SyscallHostCall {
 
     // note: the host is responsible for checking stack depth, not us
 
-    let address = Address(ctx.array(address_ptr));
+    let address = Address::from(ctx.array(address_ptr));
 
     // read the input length from the next register
     let len = ctx.rt.register(Register::X12) as usize;
@@ -215,7 +215,7 @@ impl Syscall for SyscallHostSpawn {
       .rt
       .rr(Register::X12, crate::runtime::MemoryAccessPosition::A);
 
-    for (idx, c) in address.0.chunks_exact(4).enumerate() {
+    for (idx, c) in address.as_ref().chunks_exact(4).enumerate() {
       let v = u32::from_le_bytes(c.try_into().unwrap());
       ctx.rt.mw(out_addr + idx as u32 * 4, v);
     }
@@ -248,7 +248,7 @@ impl Syscall for SyscallHostDeploy {
       .rt
       .rr(Register::X12, crate::runtime::MemoryAccessPosition::A);
 
-    for (idx, c) in address.0.chunks_exact(4).enumerate() {
+    for (idx, c) in address.as_ref().chunks_exact(4).enumerate() {
       let v = u32::from_le_bytes(c.try_into().unwrap());
       ctx.rt.mw(out_addr + idx as u32 * 4, v);
     }

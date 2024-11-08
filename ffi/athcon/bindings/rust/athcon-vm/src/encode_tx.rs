@@ -43,7 +43,7 @@ unsafe extern "C" fn athcon_encode_tx_spend(
     return std::ptr::null_mut();
   }
   let recipient = unsafe { &(*recipient).bytes };
-  let payload = encode_spend(&Address(*recipient), amount);
+  let payload = encode_spend(&Address::from(*recipient), amount);
 
   let (ptr, size) = crate::allocate_output_data(payload);
   Box::into_raw(Box::new(ffi::athcon_bytes { ptr, size }))
@@ -76,10 +76,16 @@ mod tests {
 
   #[test]
   fn encoding_spend_tx() {
-    let address = Address([0x1C; 24]);
+    let address = Address::from([0x1C; 24]);
     let amount = 781237;
-    let encoded_bytes =
-      unsafe { athcon_encode_tx_spend(&ffi::athcon_address { bytes: address.0 }, amount) };
+    let encoded_bytes = unsafe {
+      athcon_encode_tx_spend(
+        &ffi::athcon_address {
+          bytes: address.into(),
+        },
+        amount,
+      )
+    };
 
     let mut encoded_slice = unsafe { (*encoded_bytes).as_slice() };
     let tx = Payload::decode(&mut encoded_slice).unwrap();

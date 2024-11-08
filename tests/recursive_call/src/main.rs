@@ -11,7 +11,7 @@ fn return_value(value: u32) {
 }
 
 fn recursive_call(address: Address, value: u32) -> u32 {
-  let mut input = address.0.to_vec();
+  let mut input = address.as_ref().to_vec();
   input.extend_from_slice(&value.to_le_bytes());
   let output = call(address, Some(input), None, 0);
   u32::from_le_bytes(output.as_slice().try_into().unwrap())

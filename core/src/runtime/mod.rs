@@ -898,18 +898,18 @@ pub mod tests {
     setup_logger();
 
     // recipient address
-    let address = Address([0xCA; ADDRESS_LENGTH]);
+    let address = Address::from([0xCA; ADDRESS_LENGTH]);
 
     let amount_to_send = 1000;
 
     // arbitrary memory locations
     let memloc: u32 = 0x12345678;
-    let memloc2 = memloc.wrapping_add(address.0.len() as u32);
+    let memloc2 = memloc.wrapping_add(address.as_ref().len() as u32);
 
     let mut instructions = vec![];
 
     // write address to memory
-    for (i, word) in address.0.chunks_exact(4).enumerate() {
+    for (i, word) in address.as_ref().chunks_exact(4).enumerate() {
       instructions.push(Instruction::new(
         Opcode::ADD,
         Register::X16 as u32,

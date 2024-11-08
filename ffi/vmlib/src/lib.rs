@@ -131,8 +131,8 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       kind: kind.0,
       depth: u32::try_from(item.depth).expect("Depth value out of range"),
       gas: u32::try_from(item.gas).expect("Gas value out of range"),
-      recipient: Address(item.recipient.bytes),
-      sender: Address(item.sender.bytes),
+      recipient: Address::from(item.recipient.bytes),
+      sender: Address::from(item.sender.bytes),
       input_data,
       value: item.value,
       code,
@@ -155,10 +155,10 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       item.0.depth as i32,
       item.0.gas as i64,
       ffi::athcon_address {
-        bytes: item.0.recipient.0,
+        bytes: item.0.recipient.into(),
       },
       ffi::athcon_address {
-        bytes: item.0.sender.0,
+        bytes: item.0.sender.into(),
       },
       item.0.input_data.as_deref(),
       item.0.value,
@@ -174,8 +174,8 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       kind: kind.0,
       depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
-      recipient: Address(item.recipient().bytes),
-      sender: Address(item.sender().bytes),
+      recipient: Address::from(item.recipient().bytes),
+      sender: Address::from(item.sender().bytes),
       input_data: item.input().cloned(),
       value: item.value(),
       code: item.code().cloned().unwrap_or_default(),
@@ -341,7 +341,7 @@ impl From<TransactionContextWrapper> for TransactionContext {
     let tx_context = context.0;
     TransactionContext {
       gas_price: tx_context.tx_gas_price,
-      origin: Address(tx_context.tx_origin.bytes),
+      origin: Address::from(tx_context.tx_origin.bytes),
       block_height: tx_context.block_height,
       block_timestamp: tx_context.block_timestamp,
       block_gas_limit: tx_context.block_gas_limit,
@@ -365,7 +365,7 @@ impl HostInterface for WrappedHostInterface<'_> {
     let value_wrapper: Bytes32Wrapper = self
       .context
       .get_storage(
-        &ffi::athcon_address { bytes: addr.0 },
+        &ffi::athcon_address { bytes: addr.into() },
         &Bytes32Wrapper(*key).into(),
       )
       .into();
@@ -374,7 +374,7 @@ impl HostInterface for WrappedHostInterface<'_> {
 
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     convert_storage_status(self.context.set_storage(
-      &ffi::athcon_address { bytes: addr.0 },
+      &ffi::athcon_address { bytes: addr.into() },
       &Bytes32Wrapper(*key).into(),
       &Bytes32Wrapper(*value).into(),
     ))
@@ -383,7 +383,7 @@ impl HostInterface for WrappedHostInterface<'_> {
   fn get_balance(&self, addr: &Address) -> Balance {
     self
       .context
-      .get_balance(&ffi::athcon_address { bytes: addr.0 })
+      .get_balance(&ffi::athcon_address { bytes: addr.into() })
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
@@ -394,10 +394,10 @@ impl HostInterface for WrappedHostInterface<'_> {
   }
 
   fn spawn(&mut self, blob: Vec<u8>) -> Address {
-    Address(self.context.spawn(&blob).bytes)
+    Address::from(self.context.spawn(&blob).bytes)
   }
 
   fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>> {
-    Ok(Address(self.context.deploy(&code).bytes))
+    Ok(Address::from(self.context.deploy(&code).bytes))
   }
 }

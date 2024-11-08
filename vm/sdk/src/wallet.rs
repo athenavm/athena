@@ -52,7 +52,7 @@ mod tests {
   #[test]
   fn encode_decode_spend() {
     let args = SpendArguments {
-      recipient: Address([22u8; 24]),
+      recipient: Address::from([22u8; 24]),
       amount: 800,
     };
     let encoded = super::encode_spend(&args.recipient, args.amount);
