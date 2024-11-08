@@ -68,7 +68,7 @@ fn main() {
   );
 
   // send some coins
-  let address_bob = Address([0xBB; 24]);
+  let address_bob = Address::from([0xBB; 24]);
   let context = AthenaContext::new(ADDRESS_ALICE, address_bob, 0);
 
   let mut stdin = AthenaStdin::new();
