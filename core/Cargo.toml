@@ -22,7 +22,7 @@ strum_macros = "0.26"
 strum = "0.26"
 thiserror = "1.0.67"
 mockall = "0.13.0"
-gdbstub = "0.7.2"
+gdbstub = "0.7.3"
 
 [dev-dependencies]
 athena-core = { path = ".", features = ["unittest"] }
