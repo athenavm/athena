@@ -22,7 +22,7 @@ impl ExecutionPayload {
   /// Effectively: encode(state) | payload
   pub fn encode_with_encoded_payload<S, P>(state: S, payload: P) -> Vec<u8>
   where
-    S: Into<Vec<u8>>,
+    S: AsRef<[u8]>,
     P: AsRef<[u8]>,
   {
     // create a dummy instance to get a compilation error when `ExecutionPayload` is changed
@@ -32,7 +32,7 @@ impl ExecutionPayload {
       payload: Payload::default(),
     };
 
-    let mut encoded = state.into().encode();
+    let mut encoded = state.as_ref().encode();
     encoded.extend_from_slice(payload.as_ref());
     encoded
   }

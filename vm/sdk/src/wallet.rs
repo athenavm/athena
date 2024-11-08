@@ -19,6 +19,10 @@ pub trait WalletProgram {
   fn max_spend(&self, args: SpendArguments) -> u64;
 }
 
+pub trait Receive {
+  fn receive(&self);
+}
+
 pub fn encode_spend_inner(recipient: &Address, amount: u64) -> Vec<u8> {
   let args = SpendArguments {
     recipient: *recipient,

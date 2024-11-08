@@ -163,7 +163,8 @@ mod tests {
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
-    let input = bincode::serialize(&ADDRESS_ALICE).unwrap();
+    let program_address = host.spawn_program(&ADDRESS_ALICE, vec![], &ADDRESS_ALICE, 0);
+    let input = bincode::serialize(&program_address).unwrap();
 
     // this will execute from the default entry point
     let result = AthenaVm::new().execute(
