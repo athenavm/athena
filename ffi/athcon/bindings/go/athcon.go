@@ -284,10 +284,10 @@ func (l *Library) EncodeTxSpawn(pubkey Bytes32) []byte {
 	return tx
 }
 
-func (l *Library) EncodeTxSpend(recipient Address, nonce uint64) []byte {
+func (l *Library) EncodeTxSpend(recipient Address, amount uint64) []byte {
 	encoded := l.encodeTxSpend(
 		athconAddress(recipient),
-		C.uint64_t(nonce),
+		C.uint64_t(amount),
 	)
 	defer l.freeBytes(encoded)
 	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
