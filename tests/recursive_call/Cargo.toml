@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+athena-interface = {path = "../../interface"}
 athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }
 athena-vm-sdk = { path = "../../vm/sdk" }
 
 [dev-dependencies]
 tracing-subscriber = "0.3.18"
 athena-sdk = { path = "../../sdk" }
-athena-interface = { path = "../../interface" }
 athena-runner = { path = "../../runner" }

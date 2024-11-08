@@ -78,26 +78,6 @@ impl From<Revision> for RevisionWrapper {
   }
 }
 
-struct AddressWrapper(Address);
-
-impl From<ffi::athcon_address> for AddressWrapper {
-  fn from(address: ffi::athcon_address) -> Self {
-    AddressWrapper(address.bytes)
-  }
-}
-
-impl From<AddressWrapper> for Address {
-  fn from(address: AddressWrapper) -> Self {
-    address.0
-  }
-}
-
-impl From<AddressWrapper> for ffi::athcon_address {
-  fn from(address: AddressWrapper) -> Self {
-    ffi::athcon_address { bytes: address.0 }
-  }
-}
-
 struct Bytes32Wrapper(Bytes32);
 
 impl From<Bytes32Wrapper> for ffi::athcon_bytes32 {
@@ -151,8 +131,8 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       kind: kind.0,
       depth: u32::try_from(item.depth).expect("Depth value out of range"),
       gas: u32::try_from(item.gas).expect("Gas value out of range"),
-      recipient: AddressWrapper::from(item.recipient).into(),
-      sender: AddressWrapper::from(item.sender).into(),
+      recipient: Address::from(item.recipient.bytes),
+      sender: Address::from(item.sender.bytes),
       input_data,
       value: item.value,
       code,
@@ -174,8 +154,12 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       kind,
       item.0.depth as i32,
       item.0.gas as i64,
-      AddressWrapper(item.0.recipient).into(),
-      AddressWrapper(item.0.sender).into(),
+      ffi::athcon_address {
+        bytes: item.0.recipient.into(),
+      },
+      ffi::athcon_address {
+        bytes: item.0.sender.into(),
+      },
       item.0.input_data.as_deref(),
       item.0.value,
       code,
@@ -190,8 +174,8 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       kind: kind.0,
       depth: u32::try_from(item.depth()).expect("Depth value out of range"),
       gas: u32::try_from(item.gas()).expect("Gas value out of range"),
-      recipient: item.recipient().bytes,
-      sender: item.sender().bytes,
+      recipient: Address::from(item.recipient().bytes),
+      sender: Address::from(item.sender().bytes),
       input_data: item.input().cloned(),
       value: item.value(),
       code: item.code().cloned().unwrap_or_default(),
@@ -357,7 +341,7 @@ impl From<TransactionContextWrapper> for TransactionContext {
     let tx_context = context.0;
     TransactionContext {
       gas_price: tx_context.tx_gas_price,
-      origin: AddressWrapper::from(tx_context.tx_origin).into(),
+      origin: Address::from(tx_context.tx_origin.bytes),
       block_height: tx_context.block_height,
       block_timestamp: tx_context.block_timestamp,
       block_gas_limit: tx_context.block_gas_limit,
@@ -380,21 +364,26 @@ impl HostInterface for WrappedHostInterface<'_> {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     let value_wrapper: Bytes32Wrapper = self
       .context
-      .get_storage(&AddressWrapper(*addr).into(), &Bytes32Wrapper(*key).into())
+      .get_storage(
+        &ffi::athcon_address { bytes: addr.into() },
+        &Bytes32Wrapper(*key).into(),
+      )
       .into();
     value_wrapper.into()
   }
 
   fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
     convert_storage_status(self.context.set_storage(
-      &AddressWrapper(*addr).into(),
+      &ffi::athcon_address { bytes: addr.into() },
       &Bytes32Wrapper(*key).into(),
       &Bytes32Wrapper(*value).into(),
     ))
   }
 
   fn get_balance(&self, addr: &Address) -> Balance {
-    self.context.get_balance(&AddressWrapper(*addr).into())
+    self
+      .context
+      .get_balance(&ffi::athcon_address { bytes: addr.into() })
   }
 
   fn call(&mut self, msg: AthenaMessage) -> ExecutionResult {
@@ -405,10 +394,10 @@ impl HostInterface for WrappedHostInterface<'_> {
   }
 
   fn spawn(&mut self, blob: Vec<u8>) -> Address {
-    AddressWrapper::from(self.context.spawn(&blob)).into()
+    Address::from(self.context.spawn(&blob).bytes)
   }
 
   fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>> {
-    Ok(AddressWrapper::from(self.context.deploy(&code)).into())
+    Ok(Address::from(self.context.deploy(&code).bytes))
   }
 }

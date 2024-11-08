@@ -9,13 +9,13 @@ pub use context::*;
 use blake3::Hasher;
 pub use parity_scale_codec::{Decode, Encode};
 use payload::ExecutionPayload;
+use serde::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
 pub const METHOD_SELECTOR_LENGTH: usize = 4;
-pub type Address = [u8; ADDRESS_LENGTH];
 pub type Balance = u64;
 pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
@@ -40,23 +40,49 @@ impl std::fmt::Display for MethodSelector {
   }
 }
 
-pub struct AddressWrapper(Address);
+#[derive(
+  Debug,
+  Default,
+  Copy,
+  Clone,
+  PartialOrd,
+  Ord,
+  PartialEq,
+  Eq,
+  Decode,
+  Encode,
+  Deserialize,
+  Serialize,
+)]
+pub struct Address([u8; ADDRESS_LENGTH]);
 
-impl From<Vec<u32>> for AddressWrapper {
-  fn from(value: Vec<u32>) -> Self {
-    assert!(value.len() == ADDRESS_LENGTH / 4, "Invalid address length");
-    let mut bytes = [0u8; ADDRESS_LENGTH];
-    for (i, word) in value.iter().enumerate() {
-      let value_bytes = word.to_le_bytes();
-      bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
-    }
-    AddressWrapper(bytes)
+impl From<&Address> for [u8; ADDRESS_LENGTH] {
+  fn from(value: &Address) -> Self {
+    value.0
   }
 }
 
-impl From<AddressWrapper> for Address {
-  fn from(value: AddressWrapper) -> Address {
+impl From<Address> for [u8; ADDRESS_LENGTH] {
+  fn from(value: Address) -> Self {
     value.0
+  }
+}
+
+impl From<[u8; ADDRESS_LENGTH]> for Address {
+  fn from(value: [u8; ADDRESS_LENGTH]) -> Self {
+    Address(value)
+  }
+}
+
+impl AsRef<[u8; ADDRESS_LENGTH]> for Address {
+  fn as_ref(&self) -> &[u8; ADDRESS_LENGTH] {
+    &self.0
+  }
+}
+
+impl std::fmt::Display for Address {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", hex::encode(self.0))
   }
 }
 
@@ -89,14 +115,6 @@ impl From<Bytes32Wrapper> for Vec<u32> {
 impl From<Bytes32Wrapper> for Bytes32 {
   fn from(value: Bytes32Wrapper) -> Bytes32 {
     value.0
-  }
-}
-
-impl From<Address> for Bytes32Wrapper {
-  fn from(value: Address) -> Bytes32Wrapper {
-    let mut bytes = [0u8; 32];
-    bytes[..24].copy_from_slice(&value);
-    Bytes32Wrapper(bytes)
   }
 }
 
@@ -337,11 +355,11 @@ pub fn calculate_address(
 ) -> Address {
   // calculate address by hashing the template, blob, principal, and nonce
   let mut hasher = Hasher::new();
-  hasher.update(template);
+  hasher.update(&template.0);
   hasher.update(blob);
-  hasher.update(principal);
+  hasher.update(&principal.0);
   hasher.update(&nonce.to_le_bytes());
-  hasher.finalize().as_bytes()[..24].try_into().unwrap()
+  Address(hasher.finalize().as_bytes()[..24].try_into().unwrap())
 }
 // Stores some of the context that a running host would store to keep
 // track of what's going on in the VM execution
@@ -496,9 +514,8 @@ impl<'a> MockHost<'a> {
   }
 }
 
-pub const ADDRESS_ALICE: Address = [1u8; ADDRESS_LENGTH];
-pub const ADDRESS_BOB: Address = [2u8; ADDRESS_LENGTH];
-pub const ADDRESS_CHARLIE: Address = [3u8; ADDRESS_LENGTH];
+pub const ADDRESS_ALICE: Address = Address([1u8; ADDRESS_LENGTH]);
+pub const ADDRESS_CHARLIE: Address = Address([3u8; ADDRESS_LENGTH]);
 // "sentinel value" useful for testing: 0xc0ffee
 // also useful as a morning wake up!
 pub const STORAGE_KEY: Bytes32 = [
@@ -650,7 +667,7 @@ impl HostInterface for MockHost<'_> {
     // template_address := HASH(template_code)
     let hash = blake3::hash(&code);
     let hash_bytes = hash.as_bytes().as_slice();
-    let address = Address::try_from(&hash_bytes[..ADDRESS_LENGTH]).unwrap();
+    let address = Address(hash_bytes[..ADDRESS_LENGTH].try_into().unwrap());
 
     if self.templates.contains_key(&address) {
       return Err("template already exists".into());
@@ -698,7 +715,7 @@ mod tests {
   #[test]
   fn test_get_storage() {
     let mut host = MockHost::new();
-    let address = [8; 24];
+    let address = Address([8; 24]);
     let key = [1; 32];
     let value = [2; 32];
     assert_eq!(
@@ -712,7 +729,7 @@ mod tests {
   #[test]
   fn test_get_balance() {
     let host = MockHost::new();
-    let address = [8; 24];
+    let address = Address([8; 24]);
     let balance = host.get_balance(&address);
     assert_eq!(balance, 0);
   }
@@ -802,11 +819,12 @@ mod tests {
     assert_eq!(host.get_balance(&ADDRESS_CHARLIE), 100);
 
     // bob is not callable (which means coins also cannot be sent, even if we have them)
+    let address_bob = Address([0xBB; 24]);
     let msg = AthenaMessage::new(
       MessageKind::Call,
       0,
       1000,
-      ADDRESS_BOB,
+      address_bob,
       ADDRESS_ALICE,
       None,
       100,
@@ -815,7 +833,7 @@ mod tests {
     let res = host.call(msg);
     assert_eq!(res.status_code, StatusCode::Failure);
     assert_eq!(host.get_balance(&ADDRESS_ALICE), 10000 - 100);
-    assert_eq!(host.get_balance(&ADDRESS_BOB), 0);
+    assert_eq!(host.get_balance(&address_bob), 0);
   }
 
   #[test]
@@ -823,7 +841,7 @@ mod tests {
     let mut host = MockHost::new();
     let blob = vec![1, 2, 3, 4];
     let address = host.spawn_program(&ADDRESS_ALICE, blob.clone(), &ADDRESS_ALICE, 0);
-    assert_eq!(host.programs.get(&address), Some(&blob));
+    assert_eq!(host.get_program(&address), Some(&blob));
   }
 
   #[test]
@@ -831,7 +849,7 @@ mod tests {
     let mut host = MockHost::new();
     let blob = vec![1, 2, 3, 4];
     let address = host.deploy(blob.clone());
-    assert_eq!(host.template(&address.unwrap()), Some(&blob));
+    assert_eq!(*host.template(&address.unwrap()).unwrap(), blob);
 
     // deploying again should fail
     let address = host.deploy(blob.clone());

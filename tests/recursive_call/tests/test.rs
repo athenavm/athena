@@ -1,4 +1,4 @@
-use athena_interface::{AthenaContext, MockHost};
+use athena_interface::{Address, AthenaContext, MockHost};
 use athena_runner::AthenaVm;
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
@@ -10,7 +10,7 @@ fn test() {
   let mut stdin = AthenaStdin::new();
   let vm = AthenaVm::new();
   let mut host = MockHost::new_with_vm(&vm);
-  let template_address = [0x77; 24];
+  let template_address = Address::from([0x77; 24]);
   stdin.write(&(template_address, 6u32));
   host.deploy_code(template_address, elf.to_vec());
 

@@ -9,7 +9,7 @@ use std::error::Error;
 
 use athena_interface::{
   Address, AthenaContext, Encode, HostDynamicContext, HostInterface, HostStaticContext,
-  MethodSelector, MockHost, ADDRESS_ALICE, ADDRESS_BOB, ADDRESS_CHARLIE,
+  MethodSelector, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{Pubkey, SpendArguments};
@@ -58,18 +58,18 @@ fn main() {
 
   let mut host = MockHost::new_with_context(
     HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
-    HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+    HostDynamicContext::new(Address::default(), ADDRESS_ALICE),
   );
   host.set_balance(&ADDRESS_ALICE, 10000);
   let address = spawn(&mut host, &args.owner).expect("spawning wallet program");
   println!(
-    "spawned a wallet program at {} for {}",
-    hex::encode(address),
+    "spawned a wallet program at {address} for {}",
     hex::encode(args.owner.0),
   );
 
   // send some coins
-  let context = AthenaContext::new(ADDRESS_ALICE, ADDRESS_BOB, 0);
+  let address_bob = Address::from([0xBB; 24]);
+  let context = AthenaContext::new(ADDRESS_ALICE, address_bob, 0);
 
   let mut stdin = AthenaStdin::new();
   let wallet = host
@@ -89,8 +89,8 @@ fn main() {
   println!(
     "sending {} coins {} -> {}",
     args.amount,
-    hex::encode(context.address()),
-    hex::encode(args.recipient),
+    context.address(),
+    args.recipient,
   );
   // calculate method selector
   let method_selector = MethodSelector::from("athexp_spend");
@@ -146,7 +146,7 @@ mod tests {
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
-      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+      HostDynamicContext::new(Address::default(), ADDRESS_ALICE),
     );
     let address = super::spawn(&mut host, &Pubkey::default()).unwrap();
 
@@ -171,7 +171,7 @@ mod tests {
 
     let address: Address = result.read();
     let template = host.template(&address);
-    assert_eq!(template, Some(&code));
+    assert_eq!(*template.unwrap(), code);
   }
 
   #[test]
@@ -180,7 +180,7 @@ mod tests {
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
-      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+      HostDynamicContext::new(Address::default(), ADDRESS_ALICE),
     );
 
     let signing_key = SigningKey::generate(&mut OsRng);
@@ -237,7 +237,7 @@ mod tests {
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
-      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+      HostDynamicContext::new(Address::default(), ADDRESS_ALICE),
     );
 
     let signing_key = SigningKey::generate(&mut OsRng);
@@ -323,7 +323,7 @@ mod tests {
 
     let mut host = MockHost::new_with_context(
       HostStaticContext::new(ADDRESS_ALICE, 0, ADDRESS_ALICE),
-      HostDynamicContext::new([0u8; 24], ADDRESS_ALICE),
+      HostDynamicContext::new(Address::default(), ADDRESS_ALICE),
     );
 
     let address = super::spawn(&mut host, &Pubkey::default()).unwrap();
