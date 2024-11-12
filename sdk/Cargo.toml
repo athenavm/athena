@@ -8,7 +8,7 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-serde = { version = "1.0.210", features = ["derive"] }
+serde = { version = "1.0.215", features = ["derive"] }
 anyhow = "1.0.93"
 athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
