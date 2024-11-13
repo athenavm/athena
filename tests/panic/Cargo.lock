@@ -34,25 +34,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "athena-lib"
-version = "0.5.2"
-dependencies = [
- "bincode",
- "cfg-if",
- "parity-scale-codec",
- "serde",
-]
-
-[[package]]
 name = "athena-vm"
 version = "0.5.2"
 dependencies = [
  "athena-interface",
- "athena-lib",
  "bincode",
  "bytemuck",
  "cfg-if",
  "getrandom",
+ "parity-scale-codec",
  "rand",
  "serde",
 ]

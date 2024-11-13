@@ -16,7 +16,6 @@ members = [
   "tests/recursive_call",
   "vm/declare",
   "vm/entrypoint",
-  "vm/lib",
   "vm/sdk",
 ]
 exclude = ["examples"]

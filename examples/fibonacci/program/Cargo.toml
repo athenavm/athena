@@ -5,4 +5,4 @@ name = "fibonacci-program"
 edition = "2021"
 
 [dependencies]
-athena-vm = { path = "../../../vm/entrypoint", features = ["rv32e"] }
+athena-vm = { path = "../../../vm/entrypoint"}

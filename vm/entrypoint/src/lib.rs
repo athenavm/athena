@@ -2,21 +2,10 @@ extern crate alloc;
 
 pub mod heap;
 pub mod helpers;
+pub mod io;
+pub mod program;
 pub mod syscalls;
 
-#[cfg(feature = "lib")]
-pub mod io {
-  pub use athena_lib::io::*;
-}
-
-#[cfg(feature = "lib")]
-pub mod program {
-  pub use athena_lib::program::*;
-}
-#[cfg(feature = "lib")]
-pub mod lib {
-  pub use athena_lib::*;
-}
 pub mod types {
   pub use athena_interface::*;
 }
