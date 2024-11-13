@@ -16,9 +16,10 @@
 // Note: We inherit this constraint from SP1, and I don't see a reason to remove it.
 const MAX_MEMORY: usize = 0x78000000;
 
-#[allow(clippy::missing_safety_doc)]
-#[no_mangle]
-pub unsafe extern "C" fn sys_alloc_aligned(bytes: usize, align: usize) -> *mut u8 {
+/// # Safety
+/// - `align` must not be zero and must be a power of 2
+/// - `bytes` must not be zero
+pub unsafe fn sys_alloc_aligned(bytes: usize, align: usize) -> *mut u8 {
   extern "C" {
     // https://lld.llvm.org/ELF/linker_script.html#sections-command
     static _end: u8;
