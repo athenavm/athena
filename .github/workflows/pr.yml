@@ -191,7 +191,7 @@ jobs:
 
       - name: Run cargo athena new
         run: |
-          cargo athena new fibonacci
+          cargo athena new fibonacci --version=dont-use-rv32e-feature
 
       - name: Build program and run script
         run: |
