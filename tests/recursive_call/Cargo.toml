@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 athena-interface = {path = "../../interface"}
-athena-vm = { path = "../../vm/entrypoint", features = ["rv32e"] }
+athena-vm = { path = "../../vm/entrypoint"}
 athena-vm-sdk = { path = "../../vm/sdk" }
 
 [dev-dependencies]

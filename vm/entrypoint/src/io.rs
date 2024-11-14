@@ -1,5 +1,5 @@
-use crate::syscall_write;
-use crate::{syscall_hint_len, syscall_hint_read};
+use crate::syscalls::syscall_write;
+use crate::syscalls::{syscall_hint_len, syscall_hint_read};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::alloc::Layout;
@@ -21,9 +21,7 @@ impl Write for SyscallWriter {
   fn write(&mut self, buf: &[u8]) -> Result<usize> {
     let nbytes = buf.len();
     let write_buf = buf.as_ptr();
-    unsafe {
-      syscall_write(self.fd, write_buf, nbytes);
-    }
+    syscall_write(self.fd, write_buf, nbytes);
     Ok(nbytes)
   }
 
@@ -40,7 +38,7 @@ impl Write for SyscallWriter {
 /// ```
 pub fn read_vec() -> Vec<u8> {
   // Round up to the nearest multiple of 4 so that the memory allocated is in whole words
-  let len = unsafe { syscall_hint_len() };
+  let len = syscall_hint_len();
   let capacity = (len + 3) / 4 * 4;
 
   // Allocate a buffer of the required length that is 4 byte aligned
