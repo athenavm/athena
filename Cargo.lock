@@ -98,7 +98,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "athcon-client"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athcon-sys",
  "athcon-vm",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "athcon-declare"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athcon-vm",
  "heck",
@@ -122,14 +122,14 @@ dependencies = [
 
 [[package]]
 name = "athcon-sys"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "bindgen",
 ]
 
 [[package]]
 name = "athcon-vm"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athcon-sys",
  "athena-interface",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "athena-builder"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "athena-cli"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -176,7 +176,7 @@ dependencies = [
 
 [[package]]
 name = "athena-core"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athena-core",
  "athena-helper",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "athena-helper"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athena-builder",
  "cargo_metadata",
@@ -211,7 +211,7 @@ dependencies = [
 
 [[package]]
 name = "athena-interface"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "athena-runner"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athcon-sys",
  "athcon-vm",
@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "athena-sdk"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "athena-core",
@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athena-interface",
  "bincode",
@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-declare"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -280,7 +280,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-sdk"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athena-interface",
  "athena-vm",
@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vmlib"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athcon-declare",
  "athcon-sys",
@@ -1003,7 +1003,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "host-test"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "athena-interface",
  "athena-sdk",
@@ -1747,7 +1747,7 @@ dependencies = [
 
 [[package]]
 name = "recursive-call-test"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "athena-interface",
  "athena-runner",
