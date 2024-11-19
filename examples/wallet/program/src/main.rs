@@ -11,18 +11,12 @@ use parity_scale_codec::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode)]
 pub struct Wallet {
-  nonce: u64,
-  balance: u64,
   owner: Pubkey,
 }
 
 impl Wallet {
   fn new(owner: Pubkey) -> Self {
-    Wallet {
-      nonce: 0,
-      balance: 0,
-      owner,
-    }
+    Wallet { owner }
   }
 }
 
