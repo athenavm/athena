@@ -22,7 +22,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "athena-interface"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athena-interface",
  "bincode",
@@ -49,7 +49,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-declare"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-sdk"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "athena-interface",
  "athena-vm",

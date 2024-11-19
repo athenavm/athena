@@ -1003,7 +1003,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "host-test"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "athena-interface",
  "athena-sdk",
@@ -1747,7 +1747,7 @@ dependencies = [
 
 [[package]]
 name = "recursive-call-test"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "athena-interface",
  "athena-runner",
