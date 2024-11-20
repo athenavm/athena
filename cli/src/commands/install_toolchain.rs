@@ -176,14 +176,17 @@ impl InstallToolchainCmd {
     println!("Successfully linked toolchain to rustup.");
 
     // Ensure permissions.
-    let bin_dir = new_toolchain_dir.join("bin");
-    let rustlib_bin_dir = new_toolchain_dir.join(format!("lib/rustlib/{}/bin", target));
-    for entry in fs::read_dir(bin_dir)?.chain(fs::read_dir(rustlib_bin_dir)?) {
-      let entry = entry?;
-      if entry.path().is_file() {
-        let mut perms = entry.metadata()?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(entry.path(), perms)?;
+    #[cfg(target_family = "unix")]
+    {
+      let bin_dir = new_toolchain_dir.join("bin");
+      let rustlib_bin_dir = new_toolchain_dir.join(format!("lib/rustlib/{}/bin", target));
+      for entry in fs::read_dir(bin_dir)?.chain(fs::read_dir(rustlib_bin_dir)?) {
+        let entry = entry?;
+        if entry.path().is_file() {
+          let mut perms = entry.metadata()?.permissions();
+          perms.set_mode(0o755);
+          fs::set_permissions(entry.path(), perms)?;
+        }
       }
     }
 
