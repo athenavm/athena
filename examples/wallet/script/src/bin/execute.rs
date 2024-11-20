@@ -12,7 +12,7 @@ use athena_interface::{
   MethodSelector, MockHost, ADDRESS_ALICE, ADDRESS_CHARLIE,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
-use athena_vm_sdk::{Pubkey, SpendArguments};
+use athena_vm_sdk::{wallet::SpendArguments, Pubkey};
 use clap::Parser;
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
@@ -333,7 +333,9 @@ mod tests {
 
     let mut stdin = AthenaStdin::new();
     stdin.write_vec(wallet_state.clone());
-    stdin.write_vec(athena_vm_sdk::encode_spend_inner(&recipient, amount));
+    stdin.write_vec(athena_vm_sdk::wallet::encode_spend_inner(
+      &recipient, amount,
+    ));
 
     let selector = MethodSelector::from("athexp_max_spend");
     let result = ExecutionClient::new().execute_function(
