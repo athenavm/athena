@@ -100,10 +100,10 @@ jobs:
             target: aarch64-apple-darwin
             platform: darwin
             arch: arm64
-          # - runner: windows-latest
-          #   target: x86_64-pc-windows-msvc
-          #   platform: win32
-          #   arch: amd64
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: win32
+            arch: amd64
     steps:
       - uses: actions/checkout@v4
 
