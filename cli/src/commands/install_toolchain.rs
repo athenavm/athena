@@ -182,6 +182,7 @@ impl InstallToolchainCmd {
       let entry = entry?;
       if entry.path().is_file() {
         let mut perms = entry.metadata()?.permissions();
+        #[cfg(target_family = "unix")]
         perms.set_mode(0o755);
         fs::set_permissions(entry.path(), perms)?;
       }
