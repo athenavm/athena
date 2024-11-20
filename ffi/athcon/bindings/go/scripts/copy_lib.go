@@ -3,26 +3,28 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 )
 
 func main() {
-	var ext string
+	var (
+		srcPath string
+		dstPath string
+	)
 	switch runtime.GOOS {
 	case "linux":
-		ext = "so"
+		srcPath = "../../../../target/release/libathena_vmlib.so"
+		dstPath = "libathenavmwrapper.so"
 	case "darwin":
-		ext = "dylib"
+		srcPath = "../../../../target/release/libathena_vmlib.dylib"
+		dstPath = "libathenavmwrapper.dylib"
 	case "windows":
-		ext = "dll"
+		srcPath = "../../../../target/release/athena_vmlib.dll"
+		dstPath = "libathenavmwrapper.dll"
 	default:
 		fmt.Printf("Unsupported operating system: %s", runtime.GOOS)
 		os.Exit(1)
 	}
-
-	srcPath := filepath.Join("../../../../target/release", fmt.Sprintf("libathena_vmlib.%s", ext))
-	dstPath := filepath.Join(".", fmt.Sprintf("libathenavmwrapper.%s", ext))
 
 	fmt.Printf("+ Copying %s to %s\n", srcPath, dstPath)
 	input, err := os.ReadFile(srcPath)
