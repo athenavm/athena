@@ -8,20 +8,29 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-var modulePath string
-
-func init() {
+func libPath(tb testing.TB) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Failed to get current working directory: %v", err)
 	}
-	modulePath = filepath.Join(cwd, "libathenavmwrapper.so")
-	log.Printf("modulePath: %s", modulePath)
+	var ext string
+	switch runtime.GOOS {
+	case "linux":
+		ext = "so"
+	case "darwin":
+		ext = "dylib"
+	case "windows":
+		ext = "dll"
+	}
+	require.NotEmpty(tb, ext, "OS not supported")
+
+	return filepath.Join(cwd, fmt.Sprintf("libathenavmwrapper.%s", ext))
 }
 
 func TestLoad(t *testing.T) {
@@ -31,7 +40,7 @@ func TestLoad(t *testing.T) {
 		require.Nil(t, vm)
 	})
 	t.Run("valid lib path", func(t *testing.T) {
-		vm, err := Load(modulePath)
+		vm, err := Load(libPath(t))
 		require.NoError(t, err)
 		defer vm.Destroy()
 		require.Equal(t, "Athena", vm.Name())
@@ -42,7 +51,7 @@ func TestLoad(t *testing.T) {
 
 func TestLoadConfigure(t *testing.T) {
 	// TODO: would be good if the VM accepted any options to test their behavior
-	vm, err := LoadAndConfigure(modulePath, nil)
+	vm, err := LoadAndConfigure(libPath(t), nil)
 	require.NoError(t, err)
 	defer vm.Destroy()
 
@@ -53,7 +62,7 @@ func TestLoadConfigure(t *testing.T) {
 
 // Execute with no code is an error.
 func TestExecuteEmptyCode(t *testing.T) {
-	vm, err := Load(modulePath)
+	vm, err := Load(libPath(t))
 	require.NoError(t, err)
 	defer vm.Destroy()
 
@@ -93,7 +102,7 @@ func TestErrorMessage(t *testing.T) {
 }
 
 func TestLibraryEncodeTx(t *testing.T) {
-	lib, err := LoadLibrary(modulePath)
+	lib, err := LoadLibrary(libPath(t))
 	require.NoError(t, err)
 	t.Run("spawn", func(t *testing.T) {
 		tx := lib.EncodeTxSpawn(Bytes32{9, 8, 7, 6})
