@@ -1,5 +1,5 @@
 //go:generate cargo build --release --manifest-path ../../../vmlib/Cargo.toml
-//go:generate cp ../../../../target/release/libathena_vmlib.so ./libathenavmwrapper.so
+//go:generate go run ./scripts/copy_lib.go
 
 package athcon
 
