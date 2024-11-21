@@ -119,7 +119,7 @@ func randomAddress() Address {
 // TestGetBalance tests the GetBalance() host function. It's a minimal test that
 // only executes a few instructions.
 func TestGetBalance(t *testing.T) {
-	vm, _ := Load(modulePath)
+	vm, _ := Load(libPath(t))
 	defer vm.Destroy()
 
 	host := newHost(vm)
@@ -135,7 +135,7 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	vm, _ := Load(modulePath)
+	vm, _ := Load(libPath(t))
 	defer vm.Destroy()
 
 	host := newHost(vm)
@@ -160,7 +160,7 @@ func TestCall(t *testing.T) {
 }
 
 func TestSpawn(t *testing.T) {
-	vm, _ := Load(modulePath)
+	vm, _ := Load(libPath(t))
 	defer vm.Destroy()
 
 	host := newHost(vm)
@@ -178,7 +178,7 @@ func TestSpawn(t *testing.T) {
 }
 
 func TestSpend(t *testing.T) {
-	vm, _ := Load(modulePath)
+	vm, _ := Load(libPath(t))
 	defer vm.Destroy()
 
 	host := newHost(vm)
@@ -213,7 +213,7 @@ func TestSpend(t *testing.T) {
 }
 
 func TestVerify(t *testing.T) {
-	vm, _ := Load(modulePath)
+	vm, _ := Load(libPath(t))
 	defer vm.Destroy()
 
 	host := newHost(vm)

@@ -2,7 +2,8 @@
 
 use athcon_sys as ffi;
 use athena_interface::Address;
-use athena_vm_sdk::{encode_spawn, encode_spend, Pubkey};
+use athena_vm_sdk::wallet::{encode_spawn, encode_spend};
+use athena_vm_sdk::Pubkey;
 
 /// Encode Athena Spawn transaction payload.
 ///
@@ -56,7 +57,7 @@ mod tests {
     payload::{Decode, Payload},
     Address, MethodSelector,
   };
-  use athena_vm_sdk::{Pubkey, SpendArguments};
+  use athena_vm_sdk::{wallet::SpendArguments, Pubkey};
   use parity_scale_codec::IoReader;
 
   use crate::encode_tx::{athcon_encode_tx_spawn, athcon_encode_tx_spend};

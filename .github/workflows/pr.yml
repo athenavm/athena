@@ -79,7 +79,14 @@ jobs:
 
   test-go:
     name: Test (Go)
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - [runs-on, runner=8cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.runner }}
     needs: build-binaries
     steps:
       - name: Checkout sources

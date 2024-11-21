@@ -3,14 +3,19 @@ use cfg_if::cfg_if;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
-pub mod precompiles;
 pub mod wallet;
-pub use wallet::*;
-
-mod call;
-pub use call::call;
 
 cfg_if! {
+  if #[cfg(feature = "vm")] {
+    pub mod precompiles;
+    mod call;
+    pub use call::call;
+  }
+}
+
+cfg_if! {
+  // TODO: migrate to feature instead of target_os
+  // reasoning: using a feature allows testing the code, enables LSP etc.
   if #[cfg(target_os = "zkvm")] {
     mod spawn;
     pub use spawn::spawn;
@@ -25,10 +30,10 @@ cfg_if! {
 #[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Pubkey(pub Bytes32);
 
-#[allow(dead_code)] // Used by RISC-V targets and tests
 /// Convert a slice of bytes to a vector of u32 little-endian values.
 /// In case the length of the input slice is not a multiple of 4, the remaining bytes are
 /// zero-padded and appended as the last u32 value.
+#[cfg(any(test, target_os = "zkvm"))]
 pub(crate) fn bytes_to_u32_vec<T: AsRef<[u8]>>(bytes: T) -> Vec<u32> {
   let mut chunks = bytes.as_ref().chunks_exact(4);
   let mut result = chunks
