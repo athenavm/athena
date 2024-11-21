@@ -177,13 +177,10 @@ jobs:
             -C $GITHUB_WORKSPACE/ffi/athcon include
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           else
-            cd ./target/${TARGET}/release
-            7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" cargo-athena.exe
-            mv "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
+            7z a -tzip "cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ./target/${TARGET}/release/cargo-athena.exe
             echo "file_name_1=cargo_athena_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
-            # TODO: add athcon headers
-            7z a -tzip "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" libathena_vmlib.dll
-            mv "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
+            7z a -tzip "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ./target/${TARGET}/release/athena_vmlib.dll
+            7z a "athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ./ffi/athcon/include
             echo "file_name_2=athena_vmlib_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
           fi
 
