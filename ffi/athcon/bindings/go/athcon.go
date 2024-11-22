@@ -18,6 +18,7 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/athenavm/athena/ffi/athcon/bindings/go/internal/load"
 	"github.com/ebitengine/purego"
 )
 
@@ -82,7 +83,7 @@ type Library struct {
 }
 
 func LoadLibrary(path string) (*Library, error) {
-	libHandle, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	libHandle, err := load.LoadLibrary(path)
 	if err != nil {
 		return nil, fmt.Errorf("loading library: %v", err)
 	}
@@ -102,8 +103,8 @@ func LoadLibrary(path string) (*Library, error) {
 	return lib, nil
 }
 
-func (l *Library) Close() {
-	purego.Dlclose(l.libHandle)
+func (l *Library) Close() error {
+	return load.CloseLibrary(l.libHandle)
 }
 
 type VM struct {
@@ -149,9 +150,9 @@ func LoadAndConfigure(filename string, config map[string]string) (vm *VM, err er
 	return vm, err
 }
 
-func (vm *VM) Destroy() {
+func (vm *VM) Destroy() error {
 	C.athcon_destroy(vm.handle)
-	vm.Lib.Close()
+	return vm.Lib.Close()
 }
 
 func (vm *VM) Name() string {

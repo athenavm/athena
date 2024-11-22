@@ -6,7 +6,8 @@ extern crate alloc;
 use athena_interface::Address;
 use athena_vm::entrypoint;
 use athena_vm_declare::{callable, template};
-use athena_vm_sdk::{call, spawn, Pubkey, SpendArguments, VerifiableTemplate, WalletProgram};
+use athena_vm_sdk::wallet::{SpendArguments, WalletProgram};
+use athena_vm_sdk::{call, spawn, Pubkey, VerifiableTemplate};
 use parity_scale_codec::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode)]

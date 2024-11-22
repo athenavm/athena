@@ -1,6 +1,8 @@
 extern crate alloc;
 
+#[cfg(target_os = "zkvm")]
 pub mod heap;
+
 pub mod helpers;
 pub mod io;
 pub mod program;
