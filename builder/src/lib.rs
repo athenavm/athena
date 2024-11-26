@@ -211,7 +211,7 @@ fn copy_elf_to_output_dir(
   let target = root_package.unwrap().targets.first().unwrap();
   let artifact_name = if target.is_bin() {
     root_package_name.unwrap()
-  } else if target.kind.iter().any(|k| k == "staticlib") {
+  } else if target.is_staticlib() {
     &format!("lib{}.a", target.name)
   } else {
     panic!("Unsupported target kind");
