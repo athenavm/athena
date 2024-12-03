@@ -80,14 +80,14 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "athcon-sys"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "bindgen",
 ]
 
 [[package]]
 name = "athcon-vm"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "athcon-sys",
  "athena-interface",
@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "athena-builder"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "athena-core"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "athena-helper",
  "athena-interface",
@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "athena-helper"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "athena-builder",
  "cargo_metadata",
@@ -135,7 +135,7 @@ dependencies = [
 
 [[package]]
 name = "athena-interface"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "athena-runner"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "athcon-sys",
  "athcon-vm",
@@ -163,7 +163,7 @@ dependencies = [
 
 [[package]]
 name = "athena-sdk"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "athena-core",
@@ -178,7 +178,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "athena-interface",
  "bincode",
@@ -192,7 +192,7 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-sdk"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "athena-interface",
  "athena-vm",
@@ -290,9 +290,9 @@ checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
 name = "bytemuck"
-version = "1.19.0"
+version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8334215b81e418a0a7bdb8ef0849474f40bb10c8b71f1c4ed315cff49f32494d"
+checksum = "8b37c88a63ffd85d15b406896cc343916d7cf57838a847b3a6f2ca5d39a5695a"
 
 [[package]]
 name = "byteorder"
@@ -320,9 +320,9 @@ dependencies = [
 
 [[package]]
 name = "cargo_metadata"
-version = "0.18.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d886547e41f740c616ae73108f6eb70afe6d940c7bc697cb30f13daec073037"
+checksum = "afc309ed89476c8957c50fb818f56fe894db857866c3e163335faa91dc34eb85"
 dependencies = [
  "camino",
  "cargo-platform",
@@ -371,9 +371,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.20"
+version = "4.5.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b97f376d85a664d5837dbae44bf546e6477a679ff6610010f17276f686d867e8"
+checksum = "fb3b4b9e5a7c7514dfa52869339ee98b3156b0bfb4e8a77c4ff4babb64b1604f"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -381,9 +381,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.20"
+version = "4.5.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19bc80abd44e4bed93ca373a0704ccbd1b710dc5749406201bb018272808dc54"
+checksum = "b17a95aa67cc7b5ebd32aa5370189aa0d79069ef1c64ce893bd30fb24bff20ec"
 dependencies = [
  "anstream",
  "anstyle",
@@ -904,9 +904,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mockall"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4c28b3fb6d753d28c20e826cd46ee611fda1cf3cde03a443a974043247c065a"
+checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
 dependencies = [
  "cfg-if",
  "downcast",
@@ -918,9 +918,9 @@ dependencies = [
 
 [[package]]
 name = "mockall_derive"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "341014e7f530314e9a1fdbc7400b244efea7122662c96bfa248c31da5bfb2020"
+checksum = "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898"
 dependencies = [
  "cfg-if",
  "proc-macro2",
