@@ -16,6 +16,7 @@ struct athcon_tx_context getTxContext(void *ctx);
 athcon_bytes32 getBlockHash(void *ctx, long long int number);
 struct athcon_result call(void *ctx, struct athcon_message *msg);
 athcon_address spawn(void *ctx, uint8_t *blob, size_t len);
+athcon_address deploy(void *ctx, uint8_t *blob, size_t len);
 */
 import "C"
 import (
@@ -189,5 +190,6 @@ func newHostInterface() *C.struct_athcon_host_interface {
 		get_block_hash: (C.athcon_get_block_hash_fn)(C.getBlockHash),
 		call:           (C.athcon_call_fn)(C.call),
 		spawn:          (C.athcon_spawn_fn)(C.spawn),
+		deploy:         (C.athcon_deploy_fn)(C.deploy),
 	}
 }
