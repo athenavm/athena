@@ -21,7 +21,7 @@ use gdbstub::{
 
 use super::{Event, ExecutionError, Register, Runtime};
 
-impl<'h> Target for Runtime<'h> {
+impl Target for Runtime<'_> {
   type Arch = Riscv32e;
 
   type Error = String;
@@ -37,7 +37,7 @@ impl<'h> Target for Runtime<'h> {
   }
 }
 
-impl<'h> Breakpoints for Runtime<'h> {
+impl Breakpoints for Runtime<'_> {
   fn support_sw_breakpoint(
     &mut self,
   ) -> Option<gdbstub::target::ext::breakpoints::SwBreakpointOps<'_, Self>> {
@@ -45,7 +45,7 @@ impl<'h> Breakpoints for Runtime<'h> {
   }
 }
 
-impl<'h> SingleThreadSingleStep for Runtime<'h> {
+impl SingleThreadSingleStep for Runtime<'_> {
   fn step(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
     tracing::trace!("single stepping");
     let _ = self.execute_cycle();
@@ -53,7 +53,7 @@ impl<'h> SingleThreadSingleStep for Runtime<'h> {
   }
 }
 
-impl<'h> SingleThreadResume for Runtime<'h> {
+impl SingleThreadResume for Runtime<'_> {
   fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
     tracing::trace!("resuming");
     Ok(())
@@ -66,7 +66,7 @@ impl<'h> SingleThreadResume for Runtime<'h> {
   }
 }
 
-impl<'h> SwBreakpoint for Runtime<'h> {
+impl SwBreakpoint for Runtime<'_> {
   fn add_sw_breakpoint(
     &mut self,
     addr: <Self::Arch as gdbstub::arch::Arch>::Usize,
@@ -88,7 +88,7 @@ impl<'h> SwBreakpoint for Runtime<'h> {
   }
 }
 
-impl<'h> SingleThreadBase for Runtime<'h> {
+impl SingleThreadBase for Runtime<'_> {
   fn read_registers(
     &mut self,
     regs: &mut <Self::Arch as gdbstub::arch::Arch>::Registers,
@@ -173,7 +173,7 @@ impl<'h> SingleThreadBase for Runtime<'h> {
   }
 }
 
-impl<'h> SingleRegisterAccess<()> for Runtime<'h> {
+impl SingleRegisterAccess<()> for Runtime<'_> {
   fn read_register(
     &mut self,
     _tid: (),
@@ -223,7 +223,7 @@ struct GdbBlockingEventLoop<'h> {
   _h: std::marker::PhantomData<Runtime<'h>>,
 }
 
-impl<'h> GdbBlockingEventLoop<'h> {
+impl GdbBlockingEventLoop<'_> {
   fn execute_with_poll(
     runtime: &mut Runtime,
     mut poll_incoming_data: impl FnMut() -> bool,
