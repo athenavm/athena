@@ -17,7 +17,7 @@ nohash-hasher = "0.2.0"
 rrs-lib = { git = "https://github.com/GregAC/rrs.git" }
 cfg-if = "1.0.0"
 hex = "0.4.3"
-tracing = "0.1.40"
+tracing = "0.1.41"
 strum_macros = "0.26"
 strum = "0.26"
 thiserror = "2.0.3"
