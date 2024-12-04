@@ -15,7 +15,7 @@ athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
 hex = "0.4.3"
-tracing = "0.1.40"
+tracing = "0.1.41"
 
 [dev-dependencies]
 athena-runner = { path = ".", features = ["unittest"] }
