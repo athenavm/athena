@@ -203,10 +203,7 @@ pub(crate) struct SyscallHostSpawn;
 
 impl Syscall for SyscallHostSpawn {
   fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> SyscallResult {
-    // length in words, rounded up if needed
-    let len_words = (len as usize + 3) / 4;
-    let vec_words = ctx.slice(address, len_words);
-    let blob = vec_u32_to_bytes(vec_words, len as usize);
+    let blob = ctx.bytes(address, len as usize);
 
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
     let address = host.spawn(blob);
@@ -229,10 +226,7 @@ pub struct SyscallHostDeploy;
 
 impl Syscall for SyscallHostDeploy {
   fn execute(&self, ctx: &mut SyscallContext, address: u32, len: u32) -> SyscallResult {
-    // length in words, rounded up if needed
-    let len_words = (len as usize + 3) / 4;
-    let vec_words = ctx.slice(address, len_words);
-    let blob = vec_u32_to_bytes(vec_words, len as usize);
+    let blob = ctx.bytes(address, len as usize);
 
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
     let address = match host.deploy(blob) {
@@ -257,14 +251,6 @@ impl Syscall for SyscallHostDeploy {
   }
 }
 
-// Helper function to convert a vector of u32 into a vector of u8
-// with a specified length in bytes.
-fn vec_u32_to_bytes(vec: Vec<u32>, length: usize) -> Vec<u8> {
-  let mut bytes: Vec<u8> = vec.iter().flat_map(|&num| num.to_le_bytes()).collect();
-  bytes.truncate(length);
-  bytes
-}
-
 #[cfg(test)]
 mod tests {
   use athena_interface::{Address, AthenaContext, ExecutionResult, MockHostInterface};
@@ -275,45 +261,6 @@ mod tests {
   };
 
   use super::*;
-
-  #[test]
-  fn test_vec_u32_to_bytes_exact_length() {
-    let expected = vec![
-      1, 0, 0, 0, // 1
-      2, 0, 0, 0, // 2
-      3, 0, 0, 0, // 3
-      4, 0, 0, 0, // 4
-    ];
-    assert_eq!(vec_u32_to_bytes(vec![1, 2, 3, 4], 16), expected);
-  }
-
-  #[test]
-  fn test_vec_u32_to_bytes_truncate() {
-    let expected = vec![
-      1, 0, 0, 0, // 1
-      2, 0, 0, 0, // 2
-      3, 0, // 3
-    ];
-    assert_eq!(vec_u32_to_bytes(vec![1, 2, 3, 4], 10), expected);
-  }
-
-  #[test]
-  fn test_vec_u32_to_bytes_zero_length() {
-    assert!(vec_u32_to_bytes(vec![1, 2, 3, 4], 0).is_empty());
-  }
-
-  #[test]
-  fn test_vec_u32_to_bytes_more_length() {
-    let vec_u32 = vec![1, 2, 3, 4];
-    let length = 20;
-    let expected = vec![
-      1, 0, 0, 0, // 1
-      2, 0, 0, 0, // 2
-      3, 0, 0, 0, // 3
-      4, 0, 0, 0, // 4
-    ];
-    assert_eq!(vec_u32_to_bytes(vec_u32, length), expected);
-  }
 
   #[test]
   fn call_increments_depth() {

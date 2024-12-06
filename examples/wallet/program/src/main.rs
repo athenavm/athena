@@ -33,7 +33,7 @@ impl WalletProgram for Wallet {
   fn spawn(owner: Pubkey) -> Address {
     let wallet = Wallet::new(owner);
     let serialized = wallet.encode();
-    spawn(serialized)
+    spawn(&serialized)
   }
 
   #[callable]
@@ -49,7 +49,7 @@ impl WalletProgram for Wallet {
 
   #[callable]
   fn deploy(&self, code: alloc::vec::Vec<u8>) -> Address {
-    athena_vm_sdk::deploy(code)
+    athena_vm_sdk::deploy(&code)
   }
 
   #[callable]
