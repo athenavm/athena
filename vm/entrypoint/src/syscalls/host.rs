@@ -113,7 +113,7 @@ pub fn get_balance() -> u64 {
 /// variable located on the stack. The host must write the address,
 /// initializing the variable.
 #[cfg(target_os = "zkvm")]
-pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
+pub fn spawn(blob: &[u8]) -> athena_interface::Address {
   let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
 
   unsafe {
@@ -121,7 +121,7 @@ pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
         "ecall",
         in("t0") crate::syscalls::HOST_SPAWN,
         in("a0") blob.as_ptr(),
-        in("a1") bytes_len,
+        in("a1") blob.len(),
         in("a2") result.as_mut_ptr(),
     )
   }
@@ -142,7 +142,7 @@ pub fn spawn(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
 /// variable located on the stack. The host must write the address,
 /// initializing the variable.
 #[cfg(target_os = "zkvm")]
-pub fn deploy(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
+pub fn deploy(blob: &[u8]) -> athena_interface::Address {
   let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
 
   unsafe {
@@ -150,7 +150,7 @@ pub fn deploy(blob: &[u32], bytes_len: usize) -> athena_interface::Address {
         "ecall",
         in("t0") crate::syscalls::HOST_DEPLOY,
         in("a0") blob.as_ptr(),
-        in("a1") bytes_len,
+        in("a1") blob.len(),
         in("a2") result.as_mut_ptr(),
     )
   }
