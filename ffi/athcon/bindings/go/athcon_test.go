@@ -30,7 +30,7 @@ func libPath(tb testing.TB) string {
 	}
 	require.NotEmpty(tb, ext, "OS not supported")
 
-	return filepath.Join(cwd, fmt.Sprintf("libathenavmwrapper.%s", ext))
+	return filepath.Join(cwd, fmt.Sprintf("libathena_vmlib.%s", ext))
 }
 
 func TestLoad(t *testing.T) {
