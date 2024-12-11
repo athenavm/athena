@@ -77,6 +77,7 @@ impl SyscallCode {
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
   Result(Option<u32>),
   Exit(u32),
