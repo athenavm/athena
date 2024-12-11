@@ -39,6 +39,9 @@ impl Write for SyscallWriter {
 pub fn read_vec() -> Vec<u8> {
   // Round up to the nearest multiple of 4 so that the memory allocated is in whole words
   let len = syscall_hint_len();
+  if len == 0 {
+    return vec![];
+  }
   let capacity = (len + 3) / 4 * 4;
 
   // Allocate a buffer of the required length that is 4 byte aligned
