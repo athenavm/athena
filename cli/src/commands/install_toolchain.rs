@@ -91,16 +91,16 @@ impl InstallToolchainCmd {
     let toolchain_dir = root_dir.join(&target);
 
     let toolchain_download_url = get_toolchain_download_url(&client, target.clone());
-
-    if client.head(toolchain_download_url.as_str()).call().is_err() {
-      return Err(anyhow::anyhow!(
-        "Unsupported architecture. Please build the toolchain from source."
-      ));
-    }
+    client
+      .head(&toolchain_download_url)
+      .call()
+      .with_context(|| {
+        format!("checking availability for {target}. Your architecture might be unsupported.")
+      })?;
 
     // Download the toolchain.
     let mut file = fs::File::create(toolchain_archive_path)?;
-    download_file(&client, toolchain_download_url.as_str(), &mut file).unwrap();
+    download_file(&client, &toolchain_download_url, &mut file)?;
 
     // Remove the existing toolchain from rustup, if it exists.
     let mut child = Command::new("rustup")
@@ -189,7 +189,7 @@ pub fn download_file(client: &ureq::Agent, url: &str, file: &mut fs::File) -> an
   pb.set_style(ProgressStyle::default_bar()
       .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})").unwrap()
       .progress_chars("#>-"));
-  println!("Downloading {}", url);
+  println!("Downloading {url}");
 
   let mut stream = res.into_reader();
 
@@ -203,7 +203,6 @@ pub fn download_file(client: &ureq::Agent, url: &str, file: &mut fs::File) -> an
     pb.inc(bytes_read as u64);
   }
 
-  let msg = format!("Downloaded {} to {:?}", url, file);
-  pb.finish_with_message(msg);
+  pb.finish();
   Ok(())
 }
