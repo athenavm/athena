@@ -9,11 +9,11 @@ impl Syscall for SyscallHintLen {
   fn execute(&self, ctx: &mut SyscallContext, _: u32, _: u32) -> SyscallResult {
     if ctx.rt.state.input_stream_ptr >= ctx.rt.state.input_stream.len() {
       tracing::debug!(
-        "failed reading stdin due to insufficient input data: input_stream_ptr={}, input_stream_len={}",
-             ctx.rt.state.input_stream_ptr,
-             ctx.rt.state.input_stream.len(),
-            );
-      return Err(StatusCode::InsufficientInput);
+        "no more data to read in stdin: input_stream_ptr={}, input_stream_len={}",
+        ctx.rt.state.input_stream_ptr,
+        ctx.rt.state.input_stream.len(),
+      );
+      return Ok(Outcome::Result(Some(0)));
     }
     Ok(Outcome::Result(Some(
       ctx.rt.state.input_stream[ctx.rt.state.input_stream_ptr].len() as u32,
@@ -74,5 +74,31 @@ impl Syscall for SyscallHintRead {
         .or_insert(word);
     }
     Ok(Outcome::Result(None))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{
+    runtime::{Outcome, Program, Runtime, Syscall, SyscallContext},
+    utils::AthenaCoreOpts,
+  };
+
+  #[test]
+  fn hint_len_syscall() {
+    let mut rt = Runtime::new(Program::default(), None, AthenaCoreOpts::default(), None);
+    let mut ctx = SyscallContext::new(&mut rt);
+    let syscall = super::SyscallHintLen {};
+
+    // no inputs
+    let result = syscall.execute(&mut ctx, 0, 0).unwrap();
+    assert_eq!(Outcome::Result(Some(0)), result);
+
+    // with inputs
+    let data = [vec![1, 2, 3, 4, 5], vec![6, 7]];
+    ctx.rt.write_vecs(&data);
+
+    let result = syscall.execute(&mut ctx, 0, 0).unwrap();
+    assert_eq!(Outcome::Result(Some(data[0].len() as u32)), result);
   }
 }
