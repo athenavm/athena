@@ -26,7 +26,6 @@ jobs:
       - name: Install Athena CLI & toolchain
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for authorization to have higher rate-limit.
-          RUST_LOG: debug
         run: |
           cargo install --path cli
           cargo athena install-toolchain
