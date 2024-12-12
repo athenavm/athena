@@ -1,12 +1,13 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use dirs::home_dir;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{distributions::Alphanumeric, Rng};
+use reqwest::blocking::{Client, ClientBuilder};
+use reqwest::header;
 use std::fs::{self};
 use std::io::{Read, Write};
 use std::process::Command;
-use ureq::{MiddlewareNext, Request};
 
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
@@ -39,16 +40,15 @@ impl InstallToolchainCmd {
     }
 
     // Setup client with optional token.
-    let mut client_builder = ureq::AgentBuilder::new()
-      .user_agent("Mozilla/5.0")
-      .redirect_auth_headers(ureq::RedirectAuthHeaders::SameHost);
+    let mut client_builder = ClientBuilder::new().user_agent("Mozilla/5.0");
     if let Some(token) = &self.token {
-      let value = format!("token {token}");
-      client_builder = client_builder.middleware(move |req: Request, next: MiddlewareNext| {
-        next.handle(req.set("Authorization", &value))
-      });
+      let mut auth = header::HeaderValue::from_str(&format!("token {token}"))?;
+      auth.set_sensitive(true);
+      let mut headers = header::HeaderMap::new();
+      headers.insert(header::AUTHORIZATION, auth);
+      client_builder = client_builder.default_headers(headers);
     }
-    let client = client_builder.build();
+    let client = client_builder.build()?;
 
     // Setup variables.
     let root_dir = home_dir().unwrap().join(".athena");
@@ -95,7 +95,7 @@ impl InstallToolchainCmd {
     let toolchain_download_url = get_toolchain_download_url(&client, target.clone());
     client
       .head(&toolchain_download_url)
-      .call()
+      .send()
       .with_context(|| {
         format!("checking availability for {target}. Your architecture might be unsupported.")
       })?;
@@ -177,15 +177,12 @@ impl InstallToolchainCmd {
   }
 }
 
-pub fn download_file(client: &ureq::Agent, url: &str, file: &mut fs::File) -> anyhow::Result<()> {
-  let res = client
+pub fn download_file(client: &Client, url: &str, file: &mut fs::File) -> anyhow::Result<()> {
+  let mut res = client
     .get(url)
-    .call()
+    .send()
     .with_context(|| format!("getting '{url}'"))?;
-  let total_size = res
-    .header("Content-Length")
-    .with_context(|| format!("getting content length from '{url}'"))?
-    .parse::<u64>()?;
+  let total_size = res.content_length().ok_or(anyhow!("no content length"))?;
 
   let pb = ProgressBar::new(total_size);
   pb.set_style(ProgressStyle::default_bar()
@@ -193,11 +190,9 @@ pub fn download_file(client: &ureq::Agent, url: &str, file: &mut fs::File) -> an
       .progress_chars("#>-"));
   println!("Downloading {url}");
 
-  let mut stream = res.into_reader();
-
   let mut buffer = vec![0; 8192];
   loop {
-    let bytes_read = stream.read(&mut buffer)?;
+    let bytes_read = res.read(&mut buffer)?;
     if bytes_read == 0 {
       break;
     }
