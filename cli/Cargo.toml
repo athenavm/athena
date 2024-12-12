@@ -8,16 +8,16 @@ license.workspace = true
 edition.workspace = true
 
 [build-dependencies]
-anyhow = { version = "1.0.93", features = ["backtrace"] }
+anyhow = { version = "1.0.94", features = ["backtrace"] }
 vergen-git2 = { version = "1.0.2", default-features = false, features = [
   "build",
 ] }
 
 [dependencies]
-anyhow = { version = "1.0.93", features = ["backtrace"] }
+anyhow = { version = "1.0.94", features = ["backtrace"] }
 athena-sdk = { path = "../sdk" }
 athena-builder = { path = "../builder" }
-cargo_metadata = "0.19.0"
+cargo_metadata = "0.19.1"
 clap = { version = "4.5.21", features = ["derive", "env"] }
 reqwest = { version = "0.12.9", features = [
   "blocking",
