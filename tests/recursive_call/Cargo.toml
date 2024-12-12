@@ -9,6 +9,6 @@ athena-vm = { path = "../../vm/entrypoint"}
 athena-vm-sdk = { path = "../../vm/sdk" }
 
 [dev-dependencies]
-tracing-subscriber = "0.3.18"
+tracing-subscriber = "0.3.19"
 athena-sdk = { path = "../../sdk" }
 athena-runner = { path = "../../runner" }
