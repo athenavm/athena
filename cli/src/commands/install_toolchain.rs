@@ -1,11 +1,10 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use dirs::home_dir;
-use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{distributions::Alphanumeric, Rng};
-use reqwest::Client;
-use std::cmp::min;
+use reqwest::blocking::{Client, ClientBuilder};
+use reqwest::header;
 use std::fs::{self};
 use std::io::{Read, Write};
 use std::process::Command;
@@ -13,9 +12,7 @@ use std::process::Command;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::{
-  get_target, get_toolchain_download_url, is_supported_target, url_exists, RUSTUP_TOOLCHAIN_NAME,
-};
+use crate::{get_toolchain_download_url, is_supported_target, RUSTUP_TOOLCHAIN_NAME};
 
 #[derive(Parser)]
 #[command(
@@ -43,21 +40,15 @@ impl InstallToolchainCmd {
     }
 
     // Setup client with optional token.
-    let client_builder = Client::builder().user_agent("Mozilla/5.0");
-    let client = if let Some(ref token) = self.token {
-      client_builder
-        .default_headers({
-          let mut headers = reqwest::header::HeaderMap::new();
-          headers.insert(
-            reqwest::header::AUTHORIZATION,
-            reqwest::header::HeaderValue::from_str(&format!("token {}", token)).unwrap(),
-          );
-          headers
-        })
-        .build()?
-    } else {
-      client_builder.build()?
-    };
+    let mut client_builder = ClientBuilder::new().user_agent("Mozilla/5.0");
+    if let Some(token) = &self.token {
+      let mut auth = header::HeaderValue::from_str(&format!("token {token}"))?;
+      auth.set_sensitive(true);
+      let mut headers = header::HeaderMap::new();
+      headers.insert(header::AUTHORIZATION, auth);
+      client_builder = client_builder.default_headers(headers);
+    }
+    let client = client_builder.build()?;
 
     // Setup variables.
     let root_dir = home_dir().unwrap().join(".athena");
@@ -96,30 +87,22 @@ impl InstallToolchainCmd {
       is_supported_target(),
       "Unsupported architecture. Please build the toolchain from source."
     );
-    let target = get_target();
-    let toolchain_asset_name = format!("rust-toolchain-{}.tar.gz", target);
+    let target = target_lexicon::HOST.to_string();
+    let toolchain_asset_name = format!("rust-toolchain-{target}.tar.gz");
     let toolchain_archive_path = root_dir.join(toolchain_asset_name.clone());
     let toolchain_dir = root_dir.join(&target);
-    let rt = tokio::runtime::Runtime::new()?;
 
-    let toolchain_download_url =
-      rt.block_on(get_toolchain_download_url(&client, target.to_string()));
-
-    let artifact_exists = rt.block_on(url_exists(&client, toolchain_download_url.as_str()));
-    if !artifact_exists {
-      return Err(anyhow::anyhow!(
-        "Unsupported architecture. Please build the toolchain from source."
-      ));
-    }
+    let toolchain_download_url = get_toolchain_download_url(&client, target.clone());
+    client
+      .head(&toolchain_download_url)
+      .send()
+      .with_context(|| {
+        format!("checking availability for {target}. Your architecture might be unsupported.")
+      })?;
 
     // Download the toolchain.
     let mut file = fs::File::create(toolchain_archive_path)?;
-    rt.block_on(download_file(
-      &client,
-      toolchain_download_url.as_str(),
-      &mut file,
-    ))
-    .unwrap();
+    download_file(&client, &toolchain_download_url, &mut file)?;
 
     // Remove the existing toolchain from rustup, if it exists.
     let mut child = Command::new("rustup")
@@ -179,7 +162,7 @@ impl InstallToolchainCmd {
     #[cfg(target_family = "unix")]
     {
       let bin_dir = new_toolchain_dir.join("bin");
-      let rustlib_bin_dir = new_toolchain_dir.join(format!("lib/rustlib/{}/bin", target));
+      let rustlib_bin_dir = new_toolchain_dir.join(format!("lib/rustlib/{target}/bin"));
       for entry in fs::read_dir(bin_dir)?.chain(fs::read_dir(rustlib_bin_dir)?) {
         let entry = entry?;
         if entry.path().is_file() {
@@ -194,40 +177,29 @@ impl InstallToolchainCmd {
   }
 }
 
-pub async fn download_file(
-  client: &Client,
-  url: &str,
-  file: &mut fs::File,
-) -> std::result::Result<(), String> {
-  let res = client
+pub fn download_file(client: &Client, url: &str, file: &mut fs::File) -> anyhow::Result<()> {
+  let mut res = client
     .get(url)
     .send()
-    .await
-    .or(Err(format!("Failed to GET from '{}'", &url)))?;
-  let total_size = res
-    .content_length()
-    .ok_or(format!("Failed to get content length from '{}'", &url))?;
+    .with_context(|| format!("getting '{url}'"))?;
+  let total_size = res.content_length().ok_or(anyhow!("no content length"))?;
 
   let pb = ProgressBar::new(total_size);
   pb.set_style(ProgressStyle::default_bar()
       .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})").unwrap()
       .progress_chars("#>-"));
-  println!("Downloading {}", url);
+  println!("Downloading {url}");
 
-  let mut downloaded: u64 = 0;
-  let mut stream = res.bytes_stream();
-
-  while let Some(item) = stream.next().await {
-    let chunk = item.or(Err("Error while downloading file"))?;
-    file
-      .write_all(&chunk)
-      .or(Err("Error while writing to file"))?;
-    let new = min(downloaded + (chunk.len() as u64), total_size);
-    downloaded = new;
-    pb.set_position(new);
+  let mut buffer = vec![0; 8192];
+  loop {
+    let bytes_read = res.read(&mut buffer)?;
+    if bytes_read == 0 {
+      break;
+    }
+    file.write_all(&buffer[..bytes_read])?;
+    pb.inc(bytes_read as u64);
   }
 
-  let msg = format!("Downloaded {} to {:?}", url, file);
-  pb.finish_with_message(msg);
+  pb.finish();
   Ok(())
 }
