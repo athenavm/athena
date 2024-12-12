@@ -71,12 +71,6 @@ impl VMName {
     Ident::new(&self.0, Span::call_site())
   }
 
-  /// Get the lowercase name prepended with arbitrary text as an explicit ident.
-  fn get_lowercase_as_ident_prepend(&self, prefix: &str) -> Ident {
-    let concat = format!("{}{}", prefix, self.0.to_lowercase());
-    Ident::new(&concat, Span::call_site())
-  }
-
   /// Get the lowercase name appended with arbitrary text as an explicit ident.
   fn get_caps_as_ident_append(&self, suffix: &str) -> Ident {
     let concat = format!("{}{}", AsShoutySnakeCase(&self.0), suffix);
@@ -271,7 +265,7 @@ fn build_set_option_fn(name: &VMName) -> proc_macro2::TokenStream {
 /// Takes an identifier and struct definition, builds an athcon_create_* function for FFI.
 fn build_create_fn(name: &VMName) -> proc_macro2::TokenStream {
   let type_ident = name.as_type_ident();
-  let fn_ident = name.get_lowercase_as_ident_prepend("athcon_create_");
+  let fn_ident = Ident::new("athcon_create", Span::call_site());
 
   let static_version_ident = name.get_caps_as_ident_append("_VERSION");
   let static_name_ident = name.get_caps_as_ident_append("_NAME");
@@ -385,12 +379,6 @@ fn build_execute_fn(name: &VMName) -> proc_macro2::TokenStream {
 
 #[cfg(test)]
 mod tests {
-  #[test]
-  fn test_vm_name_prepend_lowercase() {
-    let name = super::VMName::new("ExampleVM".to_string());
-    let ident = name.get_lowercase_as_ident_prepend("athcon_");
-    assert_eq!(ident.to_string(), "athcon_examplevm");
-  }
   #[test]
   fn test_vm_name_append_caps() {
     let name = super::VMName::new("ExampleVM".to_string());

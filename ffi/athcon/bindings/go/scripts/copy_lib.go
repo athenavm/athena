@@ -14,13 +14,13 @@ func main() {
 	switch runtime.GOOS {
 	case "linux":
 		srcPath = "../../../../target/release/libathena_vmlib.so"
-		dstPath = "libathenavmwrapper.so"
+		dstPath = "libathena_vmlib.so"
 	case "darwin":
 		srcPath = "../../../../target/release/libathena_vmlib.dylib"
-		dstPath = "libathenavmwrapper.dylib"
+		dstPath = "libathena_vmlib.dylib"
 	case "windows":
 		srcPath = "../../../../target/release/athena_vmlib.dll"
-		dstPath = "libathenavmwrapper.dll"
+		dstPath = "libathena_vmlib.dll"
 	default:
 		fmt.Printf("Unsupported operating system: %s", runtime.GOOS)
 		os.Exit(1)

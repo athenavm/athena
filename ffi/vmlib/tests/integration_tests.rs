@@ -33,7 +33,7 @@ fn get_dummy_host_interface() -> ffi::athcon_host_interface {
 /// is set to null. No host calls are performed by these tests.
 #[test]
 fn test_athcon_create() {
-  let vm_ptr = athena_vmlib::athcon_create_athenavmwrapper();
+  let vm_ptr = athena_vmlib::athcon_create();
   // Ensure the returned pointer is not null
   assert!(!vm_ptr.is_null(), "VM creation returned a null pointer");
   unsafe {

@@ -2,7 +2,7 @@ pub mod commands;
 mod util;
 
 use anyhow::{Context, Result};
-use reqwest::Client;
+use reqwest::blocking::Client;
 use std::process::{Command, Stdio};
 
 pub const RUSTUP_TOOLCHAIN_NAME: &str = "athena";
@@ -41,11 +41,6 @@ impl CommandExecutor for Command {
   }
 }
 
-pub async fn url_exists(client: &Client, url: &str) -> bool {
-  let res = client.head(url).send().await;
-  res.is_ok()
-}
-
 #[allow(unreachable_code)]
 pub fn is_supported_target() -> bool {
   #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
@@ -63,20 +58,14 @@ pub fn is_supported_target() -> bool {
   false
 }
 
-pub fn get_target() -> String {
-  target_lexicon::HOST.to_string()
-}
-
 #[tracing::instrument(skip(client))]
-pub async fn get_toolchain_download_url(client: &Client, target: String) -> String {
+pub fn get_toolchain_download_url(client: &Client, target: String) -> String {
   // Get latest tag and use it to construct the download URL.
   let json = client
     .get("https://api.github.com/repos/athenavm/rustc-rv32e-toolchain/releases/latest")
     .send()
-    .await
     .unwrap()
     .json::<serde_json::Value>()
-    .await
     .unwrap();
   tracing::debug!(%json, "got latest release response");
   let tag = json["tag_name"].as_str().expect(

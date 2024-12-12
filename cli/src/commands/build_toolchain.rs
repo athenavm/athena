@@ -3,7 +3,7 @@ use clap::Parser;
 use core::str;
 use std::{path::PathBuf, process::Command};
 
-use crate::{get_target, CommandExecutor, RUSTUP_TOOLCHAIN_NAME};
+use crate::{CommandExecutor, RUSTUP_TOOLCHAIN_NAME};
 
 #[derive(Parser)]
 #[command(name = "build-toolchain", about = "Build the cargo-athena toolchain.")]
@@ -223,8 +223,7 @@ impl BuildToolchainCmd {
     println!("Successfully linked the toolchain to rustup.");
 
     // Compressing toolchain directory to tar.gz.
-    let target = get_target();
-    let tar_gz_path = format!("rust-toolchain-{}.tar.gz", target);
+    let tar_gz_path = format!("rust-toolchain-{}.tar.gz", target_lexicon::HOST);
     Command::new("tar")
       .args([
         "--exclude",
