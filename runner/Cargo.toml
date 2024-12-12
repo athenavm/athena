@@ -9,8 +9,6 @@ edition.workspace = true
 
 [dependencies]
 bincode = "1.3.3"
-athcon-sys = { path = "../ffi/athcon/bindings/rust/athcon-sys" }
-athcon-vm = { path = "../ffi/athcon/bindings/rust/athcon-vm" }
 athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 athena-sdk = { path = "../sdk" }
