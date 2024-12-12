@@ -39,7 +39,9 @@ impl InstallToolchainCmd {
     }
 
     // Setup client with optional token.
-    let mut client_builder = ureq::AgentBuilder::new().user_agent("Mozilla/5.0");
+    let mut client_builder = ureq::AgentBuilder::new()
+      .user_agent("Mozilla/5.0")
+      .redirect_auth_headers(ureq::RedirectAuthHeaders::SameHost);
     if let Some(token) = &self.token {
       let value = format!("token {token}");
       client_builder = client_builder.middleware(move |req: Request, next: MiddlewareNext| {
