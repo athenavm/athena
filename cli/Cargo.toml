@@ -22,6 +22,7 @@ clap = { version = "4.5.21", features = ["derive", "env"] }
 reqwest = { version = "0.12.9", features = [
   "blocking",
   "json",
+  "rustls-tls",
 ], default-features = false }
 indicatif = "0.17.9"
 dirs = "5.0"
