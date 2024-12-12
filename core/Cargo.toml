@@ -15,7 +15,6 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 elf = "0.7.4"
 nohash-hasher = "0.2.0"
 rrs-lib = { git = "https://github.com/GregAC/rrs.git" }
-cfg-if = "1.0.0"
 hex = "0.4.3"
 tracing = "0.1.41"
 strum_macros = "0.26"
@@ -28,8 +27,6 @@ gdbstub = "0.7.3"
 athena-core = { path = ".", features = ["unittest"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 athena-vm = { path = "../vm/entrypoint" }
-athena-vm-sdk = { path = "../vm/sdk" }
-parity-scale-codec = "3.6.12"
 
 [features]
 debug = []
