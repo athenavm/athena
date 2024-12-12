@@ -13,9 +13,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"runtime/cgo"
-	"strings"
 	"unsafe"
 
 	"github.com/athenavm/athena/ffi/athcon/bindings/go/internal/load"
@@ -88,14 +86,10 @@ func LoadLibrary(path string) (*Library, error) {
 		return nil, fmt.Errorf("loading library: %v", err)
 	}
 
-	filename := filepath.Base(path)
-	filename = strings.TrimSuffix(filename, filepath.Ext(filename))
-	vmName := strings.TrimPrefix(filename, "lib")
-
 	lib := &Library{
 		libHandle: libHandle,
 	}
-	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create_"+vmName)
+	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create")
 	purego.RegisterLibFunc(&lib.encodeTxSpawn, libHandle, "athcon_encode_tx_spawn")
 	purego.RegisterLibFunc(&lib.encodeTxSpend, libHandle, "athcon_encode_tx_spend")
 

@@ -16,7 +16,7 @@ pub struct AthconVm {
 
 impl AthconVm {
   pub fn new() -> Self {
-    let handle = athena_vmlib::athcon_create_athenavmwrapper();
+    let handle = athena_vmlib::athcon_create();
     assert!(!handle.is_null(), "Failed to create athena vm");
 
     AthconVm {
