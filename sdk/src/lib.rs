@@ -54,7 +54,8 @@ impl ExecutionClient {
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
-    let program = Program::from(elf);
+    let program =
+      Program::from(elf).map_err(|e| ExecutionError::ParsingCodeFailed(format!("{e}")))?;
     let opts = match max_gas {
       None => AthenaCoreOpts::default(),
       Some(max_gas) => {
@@ -80,7 +81,8 @@ impl ExecutionClient {
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
-    let program = Program::from(elf);
+    let program =
+      Program::from(elf).map_err(|e| ExecutionError::ParsingCodeFailed(format!("{e}")))?;
     let opts = match max_gas {
       None => AthenaCoreOpts::default(),
       Some(max_gas) => {
@@ -121,7 +123,8 @@ impl ExecutionClient {
     context: Option<AthenaContext>,
     gdb_port: u16,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
-    let program = Program::from(elf);
+    let program =
+      Program::from(elf).map_err(|e| ExecutionError::ParsingCodeFailed(format!("{e}")))?;
     let opts = match max_gas {
       None => AthenaCoreOpts::default(),
       Some(max_gas) => {
@@ -164,7 +167,8 @@ impl ExecutionClient {
     context: Option<AthenaContext>,
     gdb_port: u16,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
-    let program = Program::from(elf);
+    let program =
+      Program::from(elf).map_err(|e| ExecutionError::ParsingCodeFailed(format!("{e}")))?;
     let opts = match max_gas {
       None => AthenaCoreOpts::default(),
       Some(max_gas) => {

@@ -77,7 +77,7 @@ pub mod tests {
   #[test]
   fn test_io_run() {
     setup_logger();
-    let program = Program::from(IO_ELF);
+    let program = Program::from(IO_ELF).unwrap();
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     let points = points();
     runtime.write_stdin(&points.0);

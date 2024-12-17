@@ -91,6 +91,7 @@ dependencies = [
 name = "athena-core"
 version = "0.6.2"
 dependencies = [
+ "anyhow",
  "athena-helper",
  "athena-interface",
  "bincode",

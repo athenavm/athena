@@ -88,6 +88,7 @@ pub enum MemoryAccessPosition {
   A = 3,
 }
 
+#[non_exhaustive]
 #[derive(Error, Debug, PartialEq)]
 pub enum ExecutionError {
   #[error("execution failed with exit code {0}")]
@@ -106,6 +107,8 @@ pub enum ExecutionError {
   Unimplemented(),
   #[error("symbol not found")]
   UnknownSymbol(),
+  #[error("parsing code failed ({0})")]
+  ParsingCodeFailed(String),
 }
 
 fn assert_valid_memory_access(addr: u32, position: MemoryAccessPosition) {
@@ -680,13 +683,19 @@ impl<'host> Runtime<'host> {
     // Gas checking is "lazy" here: it happens _after_ the instruction is executed.
     if let Some(gas_left) = self.gas_left() {
       if !self.unconstrained && gas_left < 0 {
+        tracing::debug!("out of gas");
         return Err(ExecutionError::OutOfGas());
       }
     }
+    if self.state.pc == 0 {
+      tracing::debug!("HALT: zero PC (possibly returned from a function execution");
+      return Ok(Some(Event::Halted));
+    }
 
-    if self.state.pc.wrapping_sub(self.program.pc_base)
-      >= (self.program.instructions.len() * 4) as u32
-    {
+    let relative_pc = self.state.pc.wrapping_sub(self.program.pc_base);
+    let max_pc = self.program.instructions.len() as u32 * 4;
+    if relative_pc >= max_pc {
+      tracing::warn!(relative_pc, max_pc, "HALT: out of instructions");
       return Ok(Some(Event::Halted));
     }
     Ok(None)
@@ -707,8 +716,6 @@ impl<'host> Runtime<'host> {
     for (addr, value) in self.program.memory_image.iter() {
       self.state.memory.insert(*addr, *value);
     }
-
-    tracing::info!("starting execution");
   }
 
   pub(crate) fn jump_to_symbol(&mut self, symbol_name: &str) -> Result<(), ExecutionError> {
@@ -755,6 +762,7 @@ impl<'host> Runtime<'host> {
       self.initialize();
     }
 
+    tracing::info!("starting execution");
     // Loop until program finishes execution or until an error occurs, whichever comes first
     loop {
       if Some(Event::Halted) == self.execute_cycle()? {
@@ -833,7 +841,7 @@ pub mod tests {
   }
 
   pub fn panic_program() -> Program {
-    Program::from(TEST_PANIC_ELF)
+    Program::from(TEST_PANIC_ELF).unwrap()
   }
 
   pub(crate) fn setup_logger() {

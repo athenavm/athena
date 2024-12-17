@@ -304,6 +304,9 @@ impl<'h> run_blocking::BlockingEventLoop for GdbBlockingEventLoop<'h> {
           ExecutionError::Breakpoint() => SingleThreadStopReason::SwBreak(()),
           ExecutionError::Unimplemented() => SingleThreadStopReason::Terminated(Signal::SIGILL),
           ExecutionError::UnknownSymbol() => SingleThreadStopReason::Terminated(Signal::SIGABRT),
+          ExecutionError::ParsingCodeFailed(_) => {
+            SingleThreadStopReason::Terminated(Signal::SIGABRT)
+          }
         };
         Ok(run_blocking::Event::TargetStopped(stop_reason))
       }
