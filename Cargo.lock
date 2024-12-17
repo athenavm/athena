@@ -160,6 +160,7 @@ dependencies = [
 name = "athena-core"
 version = "0.6.2"
 dependencies = [
+ "anyhow",
  "athena-core",
  "athena-helper",
  "athena-interface",
@@ -245,6 +246,15 @@ dependencies = [
 name = "athena-vm-declare"
 version = "0.6.2"
 dependencies = [
+ "athena-interface",
+ "athena-vm-declare-macro",
+]
+
+[[package]]
+name = "athena-vm-declare-macro"
+version = "0.6.2"
+dependencies = [
+ "athena-interface",
  "quote",
  "syn 2.0.90",
 ]

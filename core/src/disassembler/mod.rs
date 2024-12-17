@@ -1,10 +1,10 @@
 mod elf;
 mod instruction;
 
+use anyhow::Context;
+use core::panic;
 pub use elf::*;
 pub use instruction::*;
-
-use core::panic;
 use std::{collections::BTreeMap, fs::File, io::Read};
 
 use crate::runtime::{Instruction, Program};
@@ -25,13 +25,13 @@ impl Program {
   }
 
   /// Disassemble an ELF to a program that be executed by the VM.
-  pub fn from(input: &[u8]) -> Self {
+  pub fn from(input: &[u8]) -> anyhow::Result<Self> {
     // Check the magic number
     if input.len() < 4 {
       panic!("malformed input");
     } else if &input[0..4] == b"\x7fELF" {
       // Decode the bytes as an ELF.
-      let elf = Elf::decode(input);
+      let elf = Elf::decode(input).context("decoding ELF")?;
 
       // Transpile the RV32IM instructions.
       let instructions = transpile(&elf.instructions);
@@ -41,22 +41,23 @@ impl Program {
       for (symbol, address) in &elf.symbol_table {
         let selector = MethodSelector::from(symbol.as_str());
         tracing::info!(
-          "adding selector table entry for symbol {}: 0x{}",
+          "adding selector table entry for symbol {}: 0x{} at address 0x{:x}",
           symbol,
           selector,
+          address,
         );
         selector_table.insert(selector, *address);
       }
 
       // Return the program.
-      Program {
+      Ok(Program {
         instructions,
         symbol_table: elf.symbol_table,
         selector_table,
         pc_start: elf.pc_start,
         pc_base: elf.pc_base,
         memory_image: elf.memory_image,
-      }
+      })
     } else if &input[0..4] == b"\x7fATH" {
       assert_eq!(input.len() % 4, 0, "malformed input");
 
@@ -71,14 +72,14 @@ impl Program {
       let instructions = transpile(&instructions);
 
       // Return the program.
-      Program::new(instructions, 0, 0)
+      Ok(Program::new(instructions, 0, 0))
     } else {
       panic!("unknown executable format");
     }
   }
 
   /// Disassemble a RV32IM ELF to a program that be executed by the VM from a file path.
-  pub fn from_elf(path: &str) -> Self {
+  pub fn from_elf(path: &str) -> anyhow::Result<Self> {
     let mut elf_code = Vec::new();
     File::open(path)
       .expect("failed to open input file")

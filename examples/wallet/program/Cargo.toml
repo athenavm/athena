@@ -9,3 +9,9 @@ athena-vm = { path = "../../../vm/entrypoint" }
 athena-vm-declare = { path = "../../../vm/declare" }
 athena-vm-sdk = { path = "../../../vm/sdk" }
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

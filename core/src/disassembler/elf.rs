@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::BTreeMap;
 
+use anyhow::Context;
 use elf::abi::{EM_RISCV, ET_EXEC, PF_X, PT_LOAD};
 use elf::endian::LittleEndian;
 use elf::file::Class;
@@ -52,9 +53,8 @@ impl Elf {
   /// Parse the ELF file into a vector of 32-bit encoded instructions and the first memory address.
   ///
   /// Reference: https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
-  pub fn decode(input: &[u8]) -> Self {
+  pub fn decode(input: &[u8]) -> anyhow::Result<Self> {
     let mut image: BTreeMap<u32, u32> = BTreeMap::new();
-    let mut symbols: BTreeMap<String, u32> = BTreeMap::new();
 
     // Parse the ELF file assuming that it is little-endian..
     let elf = ElfBytes::<LittleEndian>::minimal_parse(input).expect("failed to parse elf");
@@ -158,29 +158,78 @@ impl Elf {
       }
     }
 
-    // Read the symbol table
-    let (symtab, stringtab) = elf.symbol_table().unwrap().unwrap();
-    symbols.extend(
-      symtab
-        .iter()
-        // we're only interested in global functions
-        .filter(|sym| sym.st_bind() == 1 && sym.st_symtype() == 2)
-        .filter_map(|sym| {
-          // get the name
-          stringtab
-            .get(sym.st_name as usize)
-            .ok()
-            .filter(|name| name.starts_with("athexp_"))
-            .map(|name| {
-              let offset = u32::try_from(sym.st_value).unwrap();
-              if offset % 4 != 0 {
-                panic!("symbol table offset isn't aligned");
-              }
-              (name.to_string(), offset)
-            })
-        }),
-    );
+    let exported_symbols = harvest_exported_symbols(&elf)?;
 
-    Elf::new(instructions, entry, base_address, image, symbols)
+    Ok(Elf::new(
+      instructions,
+      entry,
+      base_address,
+      image,
+      exported_symbols,
+    ))
   }
+}
+
+fn harvest_exported_symbols(elf: &ElfBytes<LittleEndian>) -> anyhow::Result<BTreeMap<String, u32>> {
+  let exported_section_header = elf
+    .section_header_by_name(".note.athena_export")
+    .context("section table should be parseable")?;
+
+  let mut section_data = if let Some(header) = exported_section_header {
+    let (s, _) = elf
+      .section_data(&header)
+      .context("section table should be parseable")?;
+    s
+  } else {
+    return Ok(BTreeMap::default());
+  };
+
+  let mut exported_symbols = BTreeMap::new();
+
+  let segments = elf.segments().expect("failed to get segments");
+  loop {
+    if section_data.is_empty() {
+      break;
+    }
+    let header = unsafe { &*(section_data.as_ptr() as *const ExportMetadata) };
+    tracing::debug!(?header, "parsed export metadata header");
+
+    anyhow::ensure!(header.version == 0);
+    section_data = &section_data[std::mem::size_of::<ExportMetadata>()..];
+
+    let address = header.address;
+    let sym_ptr = header.sym_ptr;
+
+    // Find the segment containing sym_ptr
+    for segment in segments.iter().filter(|x| x.p_type == PT_LOAD) {
+      let vaddr: u32 = segment.p_vaddr.try_into()?;
+      let size: u32 = segment.p_memsz.try_into()?;
+
+      // Check if sym_ptr is in this segment
+      if sym_ptr >= vaddr && sym_ptr < vaddr + size {
+        let str_offset = (sym_ptr - vaddr) as usize;
+        let segment_data = elf.segment_data(&segment)?;
+        // Read until null byte
+        let str_bytes = segment_data[str_offset..]
+          .iter()
+          .copied()
+          .take_while(|&b| b != 0)
+          .collect::<Vec<u8>>();
+
+        let symbol = String::from_utf8(str_bytes)?;
+        tracing::debug!("read exported symbol: {symbol} -> 0x{address:x}");
+        exported_symbols.insert(symbol, address);
+        break;
+      }
+    }
+  }
+  Ok(exported_symbols)
+}
+
+#[repr(C, packed(1))]
+#[derive(Debug)]
+struct ExportMetadata {
+  version: u8,
+  address: u32,
+  sym_ptr: u32,
 }
