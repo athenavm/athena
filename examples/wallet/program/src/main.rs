@@ -23,10 +23,6 @@ impl Wallet {
 
 athena_vm::entrypoint!();
 
-#[cfg(all(
-  any(target_arch = "riscv32", target_arch = "riscv64"),
-  target_feature = "e"
-))]
 #[template]
 impl WalletProgram for Wallet {
   #[callable]
@@ -58,10 +54,6 @@ impl WalletProgram for Wallet {
   }
 }
 
-#[cfg(all(
-  any(target_arch = "riscv32", target_arch = "riscv64"),
-  target_feature = "e"
-))]
 #[template]
 impl VerifiableTemplate for Wallet {
   #[callable]
