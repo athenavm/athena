@@ -1,13 +1,12 @@
+use std::{cmp::min, collections::VecDeque, io::Write};
+
 use crate::utils::Buffer;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Standard input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AthenaStdin {
-  /// Input stored as a vec of vec of bytes. It's stored this way because the read syscall reads
-  /// a vec of bytes at a time.
-  pub buffer: Vec<Vec<u8>>,
-  pub ptr: usize,
+  pub buffer: VecDeque<u8>,
 }
 
 /// Public values for the runner.
@@ -17,49 +16,55 @@ pub struct AthenaPublicValues {
 }
 
 impl AthenaStdin {
-  /// Create a new `AthenaStdin`.
   pub const fn new() -> Self {
     Self {
-      buffer: Vec::new(),
-      ptr: 0,
+      buffer: VecDeque::new(),
     }
   }
 
   /// Create a `AthenaStdin` from a slice of bytes.
   pub fn from(data: &[u8]) -> Self {
-    Self {
-      buffer: vec![data.to_vec()],
-      ptr: 0,
-    }
-  }
-
-  /// Read a value from the buffer.
-  pub fn read<T: DeserializeOwned>(&mut self) -> T {
-    let result: T = bincode::deserialize(&self.buffer[self.ptr]).expect("failed to deserialize");
-    self.ptr += 1;
-    result
+    let mut stdin = Self::new();
+    stdin.write_slice(data);
+    stdin
   }
 
   /// Read a slice of bytes from the buffer.
+  /// Reads up to slice.len() bytes from the beginning of the buffer into the provided slice.
   pub fn read_slice(&mut self, slice: &mut [u8]) {
-    slice.copy_from_slice(&self.buffer[self.ptr]);
-    self.ptr += 1;
+    let bytes_to_read = min(slice.len(), self.buffer.len());
+    if bytes_to_read == 0 {
+      return;
+    }
+
+    // Get the two contiguous slices from the VecDeque
+    let (first, second) = self.buffer.as_slices();
+
+    // Copy from the first slice
+    let first_copy = min(first.len(), bytes_to_read);
+    slice[..first_copy].copy_from_slice(&first[..first_copy]);
+
+    // If we need more bytes and there's a second slice, copy from it
+    if first_copy < bytes_to_read {
+      let second_copy = bytes_to_read - first_copy;
+      slice[first_copy..bytes_to_read].copy_from_slice(&second[..second_copy]);
+    }
+
+    self.buffer.drain(..bytes_to_read);
   }
 
   /// Write a value to the buffer.
   pub fn write<T: Serialize>(&mut self, data: &T) {
-    let mut tmp = Vec::new();
-    bincode::serialize_into(&mut tmp, data).expect("serialization failed");
-    self.buffer.push(tmp);
+    bincode::serialize_into(&mut self.buffer, data).expect("serialization failed");
   }
 
   /// Write a slice of bytes to the buffer.
   pub fn write_slice(&mut self, slice: &[u8]) {
-    self.buffer.push(slice.to_vec());
+    self.buffer.write_all(slice).expect("pushing to buffer");
   }
 
   pub fn write_vec(&mut self, vec: Vec<u8>) {
-    self.buffer.push(vec);
+    self.write_slice(&vec);
   }
 }
 
@@ -69,10 +74,6 @@ impl AthenaPublicValues {
     Self {
       buffer: Buffer::new(),
     }
-  }
-
-  pub fn raw(&self) -> String {
-    format!("0x{}", hex::encode(self.buffer.data.clone()))
   }
 
   /// Create a `AthenaPublicValues` from a slice of bytes.
