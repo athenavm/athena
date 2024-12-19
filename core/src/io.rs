@@ -1,12 +1,10 @@
-use std::{cmp::min, collections::VecDeque, io::Write};
-
 use crate::utils::Buffer;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Standard input.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct AthenaStdin {
-  pub buffer: VecDeque<u8>,
+  buffer: Vec<u8>,
 }
 
 /// Public values for the runner.
@@ -17,40 +15,7 @@ pub struct AthenaPublicValues {
 
 impl AthenaStdin {
   pub const fn new() -> Self {
-    Self {
-      buffer: VecDeque::new(),
-    }
-  }
-
-  /// Create a `AthenaStdin` from a slice of bytes.
-  pub fn from(data: &[u8]) -> Self {
-    let mut stdin = Self::new();
-    stdin.write_slice(data);
-    stdin
-  }
-
-  /// Read a slice of bytes from the buffer.
-  /// Reads up to slice.len() bytes from the beginning of the buffer into the provided slice.
-  pub fn read_slice(&mut self, slice: &mut [u8]) {
-    let bytes_to_read = min(slice.len(), self.buffer.len());
-    if bytes_to_read == 0 {
-      return;
-    }
-
-    // Get the two contiguous slices from the VecDeque
-    let (first, second) = self.buffer.as_slices();
-
-    // Copy from the first slice
-    let first_copy = min(first.len(), bytes_to_read);
-    slice[..first_copy].copy_from_slice(&first[..first_copy]);
-
-    // If we need more bytes and there's a second slice, copy from it
-    if first_copy < bytes_to_read {
-      let second_copy = bytes_to_read - first_copy;
-      slice[first_copy..bytes_to_read].copy_from_slice(&second[..second_copy]);
-    }
-
-    self.buffer.drain(..bytes_to_read);
+    Self { buffer: Vec::new() }
   }
 
   /// Write a value to the buffer.
@@ -60,11 +25,15 @@ impl AthenaStdin {
 
   /// Write a slice of bytes to the buffer.
   pub fn write_slice(&mut self, slice: &[u8]) {
-    self.buffer.write_all(slice).expect("pushing to buffer");
+    self.buffer.extend_from_slice(slice);
   }
 
-  pub fn write_vec(&mut self, vec: Vec<u8>) {
-    self.write_slice(&vec);
+  pub fn write_vec(&mut self, mut vec: Vec<u8>) {
+    self.buffer.append(&mut vec);
+  }
+
+  pub fn to_vec(self) -> Vec<u8> {
+    self.buffer
   }
 }
 
