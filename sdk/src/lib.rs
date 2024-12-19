@@ -63,7 +63,7 @@ impl ExecutionClient {
       }
     };
     let mut runtime = Runtime::new(program, host, opts, context);
-    runtime.write_vecs(&stdin.buffer);
+    runtime.write_from(stdin.to_vec());
     runtime.execute().map(|gas_left| {
       (
         AthenaPublicValues::from(&runtime.state.public_values_stream),
@@ -90,7 +90,7 @@ impl ExecutionClient {
       }
     };
     let mut runtime = Runtime::new(program, host, opts, context);
-    runtime.write_vecs(&stdin.buffer);
+    runtime.write_from(stdin.to_vec());
     runtime
       .execute_function_by_selector(selector)
       .map(|gas_left| {
@@ -133,7 +133,7 @@ impl ExecutionClient {
     };
     let listener = std::net::TcpListener::bind(format!("127.0.0.1:{gdb_port}")).unwrap();
     let mut runtime = Runtime::new(program, host, opts, context);
-    runtime.write_vecs(&stdin.buffer);
+    runtime.write_from(stdin.to_vec());
     runtime.initialize();
     athena_core::runtime::gdbstub::run_under_gdb(&mut runtime, listener, None).map(|gas_left| {
       (
@@ -177,7 +177,7 @@ impl ExecutionClient {
     };
     let listener = std::net::TcpListener::bind(format!("127.0.0.1:{gdb_port}")).unwrap();
     let mut runtime = Runtime::new(program, host, opts, context);
-    runtime.write_vecs(&stdin.buffer);
+    runtime.write_from(stdin.to_vec());
     runtime.initialize();
     athena_core::runtime::gdbstub::run_under_gdb(&mut runtime, listener, Some(function)).map(
       |gas_left| {

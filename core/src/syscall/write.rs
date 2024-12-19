@@ -21,7 +21,7 @@ impl Syscall for SyscallWrite {
     let rt = &mut ctx.rt;
     let nbytes = rt.register(Register::X12);
     // Read nbytes from memory starting at write_buf.
-    let bytes = (0..nbytes)
+    let mut bytes = (0..nbytes)
       .map(|i| rt.byte(write_buf + i))
       .collect::<Vec<u8>>();
     match fd {
@@ -72,7 +72,7 @@ impl Syscall for SyscallWrite {
         rt.state.public_values_stream.extend_from_slice(&bytes);
       }
       4 => {
-        rt.state.input_stream.push(bytes);
+        rt.state.input_stream.append(&mut bytes);
       }
       fd => {
         tracing::debug!("syscall write called with invalid fd: {fd}");

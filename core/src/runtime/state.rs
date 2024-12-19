@@ -23,7 +23,7 @@ pub struct ExecutionState {
   pub uninitialized_memory: HashMap<u32, u32, BuildNoHashHasher<u32>>,
 
   /// A stream of input values (global to the entire program).
-  pub input_stream: Vec<Vec<u8>>,
+  pub input_stream: Vec<u8>,
 
   /// A ptr to the current position in the input stream incremented by HINT_READ opcode.
   pub input_stream_ptr: usize,

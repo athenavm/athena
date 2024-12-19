@@ -2,9 +2,7 @@ use crate::syscalls::syscall_write;
 use crate::syscalls::{syscall_hint_len, syscall_hint_read};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::alloc::Layout;
-use std::io::Result;
-use std::io::Write;
+use std::io::{Result, Write};
 
 /// The file descriptor for public values.
 pub const FD_PUBLIC_VALUES: u32 = 3;
@@ -30,41 +28,6 @@ impl Write for SyscallWriter {
   }
 }
 
-/// Read a buffer from the input stream.
-///
-/// ### Examples
-/// ```ignore
-/// let data: Vec<u8> = athena_vm::io::read_vec();
-/// ```
-pub fn read_vec() -> Vec<u8> {
-  // Round up to the nearest multiple of 4 so that the memory allocated is in whole words
-  let len = syscall_hint_len();
-  if len == 0 {
-    return vec![];
-  }
-  let capacity = (len + 3) / 4 * 4;
-
-  // Allocate a buffer of the required length that is 4 byte aligned
-  let layout = Layout::from_size_align(capacity, 4).expect("vec is too large");
-  let ptr = unsafe { std::alloc::alloc(layout) };
-
-  // SAFETY:
-  // 1. `ptr` was allocated using alloc
-  // 2. We assuume that the VM global allocator doesn't dealloc
-  // 3/6. Size is correct from above
-  // 4/5. Length is 0
-  // 7. Layout::from_size_align already checks this
-  let mut vec = unsafe { Vec::from_raw_parts(ptr, 0, capacity) };
-
-  // Read the vec into uninitialized memory. The syscall assumes the memory is uninitialized,
-  // which should be true because the allocator does not dealloc, so a new alloc should be fresh.
-  unsafe {
-    syscall_hint_read(ptr, len);
-    vec.set_len(len);
-  }
-  vec
-}
-
 /// Read a deserializable object from the input stream.
 ///
 /// ### Examples
@@ -80,8 +43,7 @@ pub fn read_vec() -> Vec<u8> {
 /// let data: MyStruct = athena_vm::io::read();
 /// ```
 pub fn read<T: DeserializeOwned>() -> T {
-  let vec = read_vec();
-  bincode::deserialize(&vec).expect("deserialization failed")
+  bincode::deserialize_from(Io::default()).unwrap()
 }
 
 /// Write a serializable object to the public values stream.
@@ -106,7 +68,7 @@ pub fn write<T: Serialize>(value: &T) {
   let writer = SyscallWriter {
     fd: FD_PUBLIC_VALUES,
   };
-  bincode::serialize_into(writer, value).expect("serialization failed");
+  bincode::serialize_into(writer, value).unwrap();
 }
 
 /// Write bytes to the public values stream.
@@ -143,7 +105,7 @@ pub fn write_slice(buf: &[u8]) {
 /// ```
 pub fn hint<T: Serialize>(value: &T) {
   let writer = SyscallWriter { fd: FD_HINT };
-  bincode::serialize_into(writer, value).expect("serialization failed");
+  bincode::serialize_into(writer, value).unwrap();
 }
 
 /// Hint bytes to the hint stream.
@@ -159,27 +121,23 @@ pub fn hint_slice(buf: &[u8]) {
 }
 
 #[derive(Default)]
-pub struct Io {
-  /// The remaining bytes to be read from the input stream.
-  /// The IO only supports reading whole 'lines' at a time.
-  /// We cache the remaining bytes that `read()` has not consumed yet
-  /// for future reads. This is important for cases when `read()` doesn't
-  /// consume the whole line.
-  read_remainder: std::collections::VecDeque<u8>,
-}
+pub struct Io {}
 
 impl std::io::Read for Io {
   fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-    if self.read_remainder.is_empty() {
-      self.read_remainder.extend(crate::io::read_vec());
+    let len = std::cmp::min(buf.len(), syscall_hint_len());
+    if len == 0 {
+      return Ok(0);
     }
-    self.read_remainder.read(buf)
+
+    syscall_hint_read(buf.as_mut_ptr(), len);
+    Ok(len)
   }
 }
 
 impl std::io::Write for Io {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-    crate::io::write_slice(buf);
+    write_slice(buf);
     Ok(buf.len())
   }
 

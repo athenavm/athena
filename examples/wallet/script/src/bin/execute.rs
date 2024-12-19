@@ -44,10 +44,11 @@ fn spawn(host: &mut MockHost, owner: &Pubkey) -> Result<Address, Box<dyn Error>>
 
   let method_selector = MethodSelector::from("athexp_spawn");
 
+  let max = 10_000;
   let client = ExecutionClient::new();
-  let (mut result, _) =
-    client.execute_function(ELF, &method_selector, stdin, Some(host), None, None)?;
-
+  let (mut result, gas) =
+    client.execute_function(ELF, &method_selector, stdin, Some(host), Some(max), None)?;
+  dbg!(max - gas.unwrap());
   Ok(result.read())
 }
 
@@ -81,7 +82,7 @@ fn main() {
     amount: 120,
   };
 
-  stdin.write_vec(wallet.clone());
+  stdin.write_slice(wallet);
   stdin.write_vec(args.encode());
 
   let alice_balance = host.get_balance(&ADDRESS_ALICE);
