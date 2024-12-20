@@ -198,7 +198,6 @@ dependencies = [
  "hex",
  "mockall",
  "parity-scale-codec",
- "serde",
  "tracing",
 ]
 
@@ -246,7 +245,6 @@ dependencies = [
 name = "athena-vm-declare"
 version = "0.6.2"
 dependencies = [
- "athena-interface",
  "athena-vm-declare-macro",
 ]
 
@@ -254,7 +252,6 @@ dependencies = [
 name = "athena-vm-declare-macro"
 version = "0.6.2"
 dependencies = [
- "athena-interface",
  "quote",
  "syn 2.0.90",
 ]

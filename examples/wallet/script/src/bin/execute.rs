@@ -48,7 +48,7 @@ fn spawn(host: &mut MockHost, owner: &Pubkey) -> Result<Address, Box<dyn Error>>
   let (mut result, _) =
     client.execute_function(ELF, &method_selector, stdin, Some(host), None, None)?;
 
-  Ok(result.read())
+  Ok(Address::from(result.read::<[u8; 24]>()))
 }
 
 fn main() {

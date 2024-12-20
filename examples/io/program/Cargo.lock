@@ -29,7 +29,6 @@ dependencies = [
  "hex",
  "mockall",
  "parity-scale-codec",
- "serde",
  "tracing",
 ]
 
