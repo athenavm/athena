@@ -169,7 +169,7 @@ mod tests {
     let (mut result, gas_cost) = result.unwrap();
     assert!(gas_cost.is_some());
 
-    let address: Address = result.read();
+    let address = result.read::<[u8; 24]>().into();
     let template = host.template(&address);
     assert_eq!(*template.unwrap(), code);
   }
