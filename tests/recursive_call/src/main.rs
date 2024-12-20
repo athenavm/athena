@@ -21,12 +21,13 @@ fn main() {
   // Read an input to the program.
   //
   // Behind the scenes, this compiles down to a custom system call which handles reading inputs.
-  let (address, n) = athena_vm::io::read::<(Address, u32)>();
+  let (address, n) = athena_vm::io::read::<([u8; 24], u32)>();
   // Base case
   if n <= 1 {
     return_value(n);
     return;
   }
+  let address = Address::from(address);
 
   // Recursive case
   let a = recursive_call(address, n - 1);

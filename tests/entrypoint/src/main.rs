@@ -1,5 +1,5 @@
 #![no_main]
-use athena_vm::entrypoint;
+use athena_vm::{entrypoint, types::Address};
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::call;
 
@@ -15,10 +15,8 @@ athena_vm::entrypoint!();
 impl EntrypointTest {
   #[callable]
   fn test1() {
-    let input = athena_vm::io::read_vec();
-    let address =
-      bincode::deserialize(&input).expect("input address malformed, failed to deserialize");
-
+    let address = athena_vm::io::read::<[u8; 24]>();
+    let address = Address::from(address);
     // recursive call to self
     call(address, None, Some("athexp_test2"), 0);
   }
