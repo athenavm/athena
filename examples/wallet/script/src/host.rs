@@ -3,9 +3,10 @@
 use std::{collections::BTreeMap, error::Error};
 
 use athena_interface::{
-  payload::ExecutionPayload, Address, AthenaMessage, AthenaRevision, Balance, Bytes32,
-  ExecutionResult, HostInterface, StatusCode, StorageStatus, VmInterface,
+  payload::ExecutionPayload, Address, AthenaMessage, Balance, Bytes32, ExecutionResult,
+  HostInterface, StatusCode, StorageStatus,
 };
+use athena_runner::{vm::AthenaRevision, AthenaVm};
 
 // Stores some of the context that a running host would store to keep
 // track of what's going on in the VM execution
@@ -58,10 +59,7 @@ impl HostDynamicContext {
 // also useful for filling in the missing generic type
 // when running the VM in standalone mode, without a bound host interface
 #[derive(Default)]
-pub struct MockHost<'a> {
-  // VM instance
-  vm: Option<&'a dyn VmInterface<MockHost<'a>>>,
-
+pub struct MockHost {
   // stores state keyed by address and key
   storage: BTreeMap<(Address, Bytes32), Bytes32>,
 
@@ -79,7 +77,7 @@ pub struct MockHost<'a> {
   dynamic_context: Option<HostDynamicContext>,
 }
 
-impl MockHost<'_> {
+impl MockHost {
   pub fn new(static_context: HostStaticContext, dynamic_context: HostDynamicContext) -> Self {
     MockHost {
       dynamic_context: Some(dynamic_context),
@@ -133,7 +131,7 @@ impl MockHost<'_> {
   }
 }
 
-impl HostInterface for MockHost<'_> {
+impl HostInterface for MockHost {
   fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
     self
       .storage
@@ -189,9 +187,6 @@ impl HostInterface for MockHost<'_> {
 
     // check programs list first
     let res = if let Some(code) = self.templates.get(&msg.recipient).cloned() {
-      // create an owned copy of VM before taking the host from self
-      let vm = self.vm;
-
       // The optional msg.input_data must be enriched with optional account state
       // and then passed to the VM.
       let msg = match msg.input_data {
@@ -206,8 +201,7 @@ impl HostInterface for MockHost<'_> {
         None => msg,
       };
 
-      vm.expect("missing VM instance")
-        .execute(self, AthenaRevision::AthenaFrontier, msg, &code)
+      AthenaVm::new().execute(self, AthenaRevision::AthenaFrontier, msg, &code)
     } else {
       let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
       ExecutionResult::new(StatusCode::Success, gas_left, None)

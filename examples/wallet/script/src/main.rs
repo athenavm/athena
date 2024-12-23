@@ -104,9 +104,10 @@ fn main() {
 mod tests {
   use athena_interface::MockHostInterface;
   use athena_interface::{
-    payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, AthenaRevision,
-    Balance, Encode, MessageKind, MethodSelector, StatusCode, VmInterface,
+    payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, Balance, Encode,
+    MessageKind, MethodSelector, StatusCode,
   };
+  use athena_runner::vm::AthenaRevision;
   use athena_runner::AthenaVm;
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
