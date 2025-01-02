@@ -1,6 +1,7 @@
-pub use athena_builder::BuildArgs;
 use cargo_metadata::Metadata;
 use std::path::Path;
+
+use crate::BuildArgs;
 
 /// Re-run the cargo command if the Cargo.toml or Cargo.lock file changes.
 fn cargo_rerun_if_changed(metadata: &Metadata, program_dir: &Path) {
@@ -51,7 +52,7 @@ fn execute_build_cmd(program_dir: &impl AsRef<std::path::Path>, args: Option<Bui
     return;
   }
 
-  athena_builder::build_program(
+  crate::build_program(
     &args.unwrap_or_default(),
     Some(program_dir.as_ref().to_path_buf()),
   )

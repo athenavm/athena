@@ -1,5 +1,3 @@
-use athena_helper::build_program;
-
 fn main() {
-  build_program("../program")
+  athena_builder::build::build_program("../program")
 }

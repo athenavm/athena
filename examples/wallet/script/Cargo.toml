@@ -22,4 +22,4 @@ ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
 rand = "0.8.5"
 
 [build-dependencies]
-athena-helper = { path = "../../../helper" }
+athena-builder = { path = "../../../builder" }

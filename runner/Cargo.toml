@@ -20,7 +20,7 @@ athena-runner = { path = ".", features = ["unittest"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [build-dependencies]
-athena-helper = { path = "../helper" }
+athena-builder = { path = "../builder" }
 
 [features]
 unittest = []

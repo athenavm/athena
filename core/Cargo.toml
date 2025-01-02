@@ -34,4 +34,4 @@ debug = []
 unittest = []
 
 [build-dependencies]
-athena-helper = { path = "../helper" }
+athena-builder = { path = "../builder/" }

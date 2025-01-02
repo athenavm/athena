@@ -161,8 +161,8 @@ name = "athena-core"
 version = "0.6.2"
 dependencies = [
  "anyhow",
+ "athena-builder",
  "athena-core",
- "athena-helper",
  "athena-interface",
  "athena-vm",
  "bincode",
@@ -182,14 +182,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "athena-helper"
-version = "0.6.2"
-dependencies = [
- "athena-builder",
- "cargo_metadata",
-]
-
-[[package]]
 name = "athena-interface"
 version = "0.6.2"
 dependencies = [
@@ -205,8 +197,8 @@ dependencies = [
 name = "athena-runner"
 version = "0.6.2"
 dependencies = [
+ "athena-builder",
  "athena-core",
- "athena-helper",
  "athena-interface",
  "athena-runner",
  "athena-sdk",

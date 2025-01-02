@@ -9,4 +9,4 @@ athena-sdk = { path = "../../../sdk" }
 tracing-subscriber = "0.3.18"
 
 [build-dependencies]
-athena-helper = { path = "../../../helper" }
+athena-builder = { path = "../../../builder" }
