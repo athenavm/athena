@@ -1,9 +1,6 @@
 use athena_interface::StatusCode;
 
-use crate::{
-  runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult},
-  utils::num_to_comma_separated,
-};
+use crate::runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult};
 
 /// Write bytes to selected file descriptor.
 /// Supported FDs:
@@ -24,38 +21,9 @@ impl Syscall for SyscallWrite {
     match fd {
       1 => {
         let s = core::str::from_utf8(&bytes).or(Err(StatusCode::InvalidSyscallArgument))?;
-        if s.contains("cycle-tracker-start:") {
-          let fn_name = s
-            .split("cycle-tracker-start:")
-            .last()
-            .ok_or(StatusCode::InvalidSyscallArgument)?
-            .trim_end()
-            .trim_start();
-          let depth = rt.cycle_tracker.len() as u32;
-          rt.cycle_tracker
-            .insert(fn_name.to_string(), (rt.state.global_clk, depth));
-          let padding = (0..depth).map(|_| "│ ").collect::<String>();
-          tracing::debug!("{}┌╴{}", padding, fn_name);
-        } else if s.contains("cycle-tracker-end:") {
-          let fn_name = s
-            .split("cycle-tracker-end:")
-            .last()
-            .ok_or(StatusCode::InvalidSyscallArgument)?
-            .trim_end()
-            .trim_start();
-          let (start, depth) = rt.cycle_tracker.remove(fn_name).unwrap_or((0, 0));
-          // Leftpad by 2 spaces for each depth.
-          let padding = (0..depth).map(|_| "│ ").collect::<String>();
-          tracing::info!(
-            "{}└╴{} cycles",
-            padding,
-            num_to_comma_separated(rt.state.global_clk - start as u64)
-          );
-        } else {
-          let flush_s = update_io_buf(ctx, fd, s);
-          for line in flush_s {
-            println!("stdout: {line}",);
-          }
+        let flush_s = update_io_buf(ctx, fd, s);
+        for line in flush_s {
+          println!("stdout: {line}",);
         }
       }
       2 => {

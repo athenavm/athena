@@ -113,22 +113,6 @@ pub fn bytes_to_words_le_vec(bytes: &[u8]) -> Vec<u32> {
     .collect::<Vec<_>>()
 }
 
-/// Converts a num to a string with commas every 3 digits.
-pub fn num_to_comma_separated<T: ToString>(value: T) -> String {
-  value
-    .to_string()
-    .chars()
-    .rev()
-    .collect::<Vec<_>>()
-    .chunks(3)
-    .map(|chunk| chunk.iter().collect::<String>())
-    .collect::<Vec<_>>()
-    .join(",")
-    .chars()
-    .rev()
-    .collect()
-}
-
 pub fn chunk_vec<T>(mut vec: Vec<T>, chunk_size: usize) -> Vec<Vec<T>> {
   let mut result = Vec::new();
   while !vec.is_empty() {
