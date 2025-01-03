@@ -92,7 +92,7 @@ name = "athena-core"
 version = "0.6.2"
 dependencies = [
  "anyhow",
- "athena-helper",
+ "athena-builder",
  "athena-interface",
  "bincode",
  "bytemuck",
@@ -111,14 +111,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "athena-helper"
-version = "0.6.2"
-dependencies = [
- "athena-builder",
- "cargo_metadata",
-]
-
-[[package]]
 name = "athena-interface"
 version = "0.6.2"
 dependencies = [
@@ -132,8 +124,8 @@ dependencies = [
 name = "athena-runner"
 version = "0.6.2"
 dependencies = [
+ "athena-builder",
  "athena-core",
- "athena-helper",
  "athena-interface",
  "athena-sdk",
  "bincode",
@@ -573,7 +565,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 name = "fibonacci-script"
 version = "0.1.0"
 dependencies = [
- "athena-helper",
+ "athena-builder",
  "athena-sdk",
  "tracing-subscriber",
 ]
@@ -669,7 +661,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello_world-script"
 version = "0.1.0"
 dependencies = [
- "athena-helper",
+ "athena-builder",
  "athena-sdk",
  "tracing-subscriber",
 ]
@@ -850,7 +842,7 @@ dependencies = [
 name = "io-script"
 version = "0.1.0"
 dependencies = [
- "athena-helper",
+ "athena-builder",
  "athena-sdk",
  "serde",
  "tracing-subscriber",
@@ -1732,7 +1724,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "wallet-script"
 version = "0.1.0"
 dependencies = [
- "athena-helper",
+ "athena-builder",
  "athena-interface",
  "athena-runner",
  "athena-sdk",

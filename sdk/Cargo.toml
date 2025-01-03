@@ -13,10 +13,14 @@ athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 
 [build-dependencies]
-anyhow = "1.0.95"
+athena-builder = { path = "../builder" }
 vergen-git2 = { version = "1.0.2", default-features = false, features = [
     "build",
 ] }
 
 [dev-dependencies]
+athena-sdk = { path = ".", features = ["unittest"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[features]
+unittest = []

@@ -1,7 +1,6 @@
 # athena-builder
 
-Lightweight crate used to build Athena programs. Internal crate that is exposed to users via `athena-cli` and
-`athena-helper`.
+A crate used to build Athena programs. It can be used directly or via the `athena-cli`.
 
 Exposes `build_program`, which builds an Athena program in the local environment or in a docker container with the
 specified parameters from `BuildArgs`.
