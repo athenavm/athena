@@ -13,7 +13,7 @@ athena-sdk = { path = "../../sdk" }
 tracing-subscriber = "0.3.19"
 
 [build-dependencies]
-athena-helper = { path = "../../helper" }
+athena-builder = { path = "../../builder" }
 
 [features]
 unittest = []

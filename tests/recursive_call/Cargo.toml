@@ -15,7 +15,7 @@ athena-sdk = { path = "../../sdk" }
 athena-runner = { path = "../../runner" }
 
 [build-dependencies]
-athena-helper = { path = "../../helper" }
+athena-builder = { path = "../../builder" }
 
 [features]
 unittest = []

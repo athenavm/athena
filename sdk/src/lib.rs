@@ -215,8 +215,10 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../examples/fibonacci/program/elf/fibonacci-program");
     let mut stdin = AthenaStdin::new();
-    stdin.write(&10usize);
-    client.execute(elf, stdin, None, None, None).unwrap();
+    stdin.write(&6u32);
+    let (mut result, _) = client.execute(elf, stdin, None, None, None).unwrap();
+    assert_eq!(6, result.read::<u32>());
+    assert_eq!(8, result.read::<u32>());
   }
 
   #[test]
@@ -231,14 +233,13 @@ mod tests {
   }
 
   #[test]
-  #[should_panic]
   fn test_execute_panic() {
     setup_logger();
 
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/panic/elf/panic-test");
-    let mut stdin = AthenaStdin::new();
-    stdin.write(&10usize);
-    client.execute(elf, stdin, None, None, None).unwrap();
+    let stdin = AthenaStdin::new();
+    let result = client.execute(elf, stdin, None, None, None);
+    assert!(result.is_err());
   }
 }

@@ -1,4 +1,4 @@
 fn main() {
   #[cfg(feature = "unittest")]
-  athena_helper::build_program(".");
+  athena_builder::build::build_program(".");
 }

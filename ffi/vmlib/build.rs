@@ -7,4 +7,7 @@ fn main() {
     println!("cargo:rustc-link-arg=-undefined");
     println!("cargo:rustc-link-arg=dynamic_lookup");
   }
+
+  #[cfg(feature = "unittest")]
+  athena_builder::build::build_program("../../examples/hello_world/program");
 }

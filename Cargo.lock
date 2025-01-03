@@ -212,8 +212,10 @@ name = "athena-sdk"
 version = "0.6.2"
 dependencies = [
  "anyhow",
+ "athena-builder",
  "athena-core",
  "athena-interface",
+ "athena-sdk",
  "tracing-subscriber",
  "vergen-git2",
 ]
@@ -265,8 +267,10 @@ dependencies = [
  "athcon-declare",
  "athcon-sys",
  "athcon-vm",
+ "athena-builder",
  "athena-interface",
  "athena-runner",
+ "athena-vmlib",
  "tracing-subscriber",
 ]
 
@@ -948,7 +952,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 name = "host-test"
 version = "0.1.0"
 dependencies = [
- "athena-helper",
+ "athena-builder",
  "athena-interface",
  "athena-sdk",
  "athena-vm",
@@ -1780,7 +1784,7 @@ dependencies = [
 name = "recursive-call-test"
 version = "0.1.0"
 dependencies = [
- "athena-helper",
+ "athena-builder",
  "athena-interface",
  "athena-runner",
  "athena-sdk",
