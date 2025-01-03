@@ -163,7 +163,7 @@ mod tests {
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
-    let input = bincode::serialize(&ADDRESS_ALICE).unwrap();
+    let input = bincode::serialize(ADDRESS_ALICE.as_ref()).unwrap();
 
     // this will execute from the default entry point
     let result = AthenaVm::new().execute(
@@ -266,7 +266,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
-    stdin.write(&(ADDRESS_ALICE, 7));
+    stdin.write(&(ADDRESS_ALICE.as_ref(), 7));
     let vm = AthenaVm::new();
     let mut host = MockHost::new_with_vm(&vm);
     host.deploy_code(ADDRESS_ALICE, elf.to_vec());
@@ -326,7 +326,7 @@ mod tests {
     );
     let payload = Payload {
       selector: None,
-      input: (bincode::serialize(&(ADDRESS_ALICE, 7)).unwrap()),
+      input: (bincode::serialize(&(ADDRESS_ALICE.as_ref(), 7)).unwrap()),
     };
 
     let msg = AthenaMessage::new(
@@ -360,7 +360,7 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
     let mut stdin = AthenaStdin::new();
-    stdin.write(&(ADDRESS_ALICE, 7));
+    stdin.write(&(ADDRESS_ALICE.as_ref(), 7));
     let mut host = MockHostInterface::new();
     host
       .expect_call()

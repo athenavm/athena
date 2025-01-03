@@ -49,7 +49,7 @@ fn spawn(host: &mut MockHost, owner: &Pubkey) -> Result<Address, Box<dyn Error>>
   let (mut result, gas) =
     client.execute_function(ELF, &method_selector, stdin, Some(host), Some(max), None)?;
   dbg!(max - gas.unwrap());
-  Ok(result.read())
+  Ok(Address::from(result.read::<[u8; 24]>()))
 }
 
 fn main() {
@@ -170,7 +170,7 @@ mod tests {
     let (mut result, gas_cost) = result.unwrap();
     assert!(gas_cost.is_some());
 
-    let address: Address = result.read();
+    let address = result.read::<[u8; 24]>().into();
     let template = host.template(&address);
     assert_eq!(*template.unwrap(), code);
   }

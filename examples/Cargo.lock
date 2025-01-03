@@ -126,7 +126,6 @@ dependencies = [
  "hex",
  "mockall",
  "parity-scale-codec",
- "serde",
  "tracing",
 ]
 
@@ -1742,7 +1741,6 @@ dependencies = [
  "clap",
  "ed25519-dalek",
  "hex",
- "parity-scale-codec",
  "rand",
  "tracing-subscriber",
 ]

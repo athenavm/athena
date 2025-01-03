@@ -9,9 +9,8 @@ edition.workspace = true
 
 [dependencies]
 blake3 = "1.5.5"
-bytemuck = "1.20.0"
+bytemuck = "1.21.0"
 hex = "0.4.3"
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
-serde = { version = "1.0.215", features = ["derive"] }
 tracing = "0.1.41"
 mockall = "0.13.1"

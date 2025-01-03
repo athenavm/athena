@@ -9,4 +9,3 @@ edition.workspace = true
 
 [dependencies]
 athena-vm-declare-macro = { path = "../declare-macro" }
-athena-interface = { path = "../../interface" }

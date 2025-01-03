@@ -9,7 +9,6 @@ pub use context::*;
 use blake3::Hasher;
 pub use parity_scale_codec::{Decode, Encode};
 use payload::ExecutionPayload;
-use serde::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, convert::TryFrom, error::Error, fmt};
 
@@ -40,20 +39,7 @@ impl std::fmt::Display for MethodSelector {
   }
 }
 
-#[derive(
-  Debug,
-  Default,
-  Copy,
-  Clone,
-  PartialOrd,
-  Ord,
-  PartialEq,
-  Eq,
-  Decode,
-  Encode,
-  Deserialize,
-  Serialize,
-)]
+#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Decode, Encode)]
 pub struct Address([u8; ADDRESS_LENGTH]);
 
 impl From<&Address> for [u8; ADDRESS_LENGTH] {
