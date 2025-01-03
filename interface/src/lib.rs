@@ -70,38 +70,6 @@ impl std::fmt::Display for Address {
   }
 }
 
-pub struct Bytes32Wrapper(Bytes32);
-
-impl Bytes32Wrapper {
-  pub fn new(bytes: Bytes32) -> Self {
-    Bytes32Wrapper(bytes)
-  }
-}
-
-impl From<Vec<u32>> for Bytes32Wrapper {
-  fn from(value: Vec<u32>) -> Self {
-    assert!(value.len() == 8, "Invalid address length");
-    let mut bytes = [0u8; 32];
-    for (i, word) in value.iter().enumerate() {
-      let value_bytes = word.to_le_bytes();
-      bytes[i * 4..(i + 1) * 4].copy_from_slice(&value_bytes);
-    }
-    Bytes32Wrapper(bytes)
-  }
-}
-
-impl From<Bytes32Wrapper> for Vec<u32> {
-  fn from(value: Bytes32Wrapper) -> Vec<u32> {
-    bytemuck::cast::<[u8; 32], [u32; 8]>(value.0).to_vec()
-  }
-}
-
-impl From<Bytes32Wrapper> for Bytes32 {
-  fn from(value: Bytes32Wrapper) -> Bytes32 {
-    value.0
-  }
-}
-
 // This is based on EIP-2200.
 // See https://evmc.ethereum.org/storagestatus.html.
 #[derive(Debug, PartialEq)]
