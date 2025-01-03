@@ -2,10 +2,11 @@
 //!
 //! A library for interacting with the Athena RISC-V VM.
 
+pub use athena_core::host;
 pub use athena_core::io::{AthenaPublicValues, AthenaStdin};
 use athena_core::runtime::{ExecutionError, Program, Runtime};
 use athena_core::utils::AthenaCoreOpts;
-use athena_interface::{AthenaContext, HostInterface, MethodSelector};
+use athena_interface::{AthenaContext, MethodSelector};
 
 /// A client for interacting with Athena.
 pub struct ExecutionClient;
@@ -50,7 +51,7 @@ impl ExecutionClient {
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<&mut dyn HostInterface>,
+    host: Option<&mut dyn host::HostInterface>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
@@ -77,7 +78,7 @@ impl ExecutionClient {
     elf: &[u8],
     selector: &MethodSelector,
     stdin: AthenaStdin,
-    host: Option<&mut dyn HostInterface>,
+    host: Option<&mut dyn host::HostInterface>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
   ) -> Result<(AthenaPublicValues, Option<u32>), ExecutionError> {
@@ -118,7 +119,7 @@ impl ExecutionClient {
     &self,
     elf: &[u8],
     stdin: AthenaStdin,
-    host: Option<&mut dyn HostInterface>,
+    host: Option<&mut dyn host::HostInterface>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
     gdb_port: u16,
@@ -162,7 +163,7 @@ impl ExecutionClient {
     elf: &[u8],
     function: &str,
     stdin: AthenaStdin,
-    host: Option<&mut dyn HostInterface>,
+    host: Option<&mut dyn host::HostInterface>,
     max_gas: Option<u32>,
     context: Option<AthenaContext>,
     gdb_port: u16,

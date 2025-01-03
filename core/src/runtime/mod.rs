@@ -29,9 +29,10 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
+use crate::host::HostInterface;
 use crate::utils::AthenaCoreOpts;
 
-use athena_interface::{AthenaContext, HostInterface, StatusCode};
+use athena_interface::{AthenaContext, StatusCode};
 
 /// An implementation of a runtime for the Athena RISC-V VM.
 ///
@@ -833,10 +834,8 @@ impl<'host> Runtime<'host> {
 #[cfg(test)]
 pub mod tests {
 
-  use crate::{runtime::ExecutionError, utils::with_max_gas};
-  use athena_interface::{
-    Address, AthenaContext, ExecutionResult, MockHostInterface, StatusCode, ADDRESS_LENGTH,
-  };
+  use crate::{host::MockHostInterface, runtime::ExecutionError, utils::with_max_gas};
+  use athena_interface::{Address, AthenaContext, ExecutionResult, StatusCode, ADDRESS_LENGTH};
 
   use crate::{
     runtime::Register,

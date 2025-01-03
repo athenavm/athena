@@ -1,10 +1,9 @@
 use std::{collections::BTreeMap, error::Error};
 
 use athena_interface::{
-  Address, AthenaContext, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface,
-  StorageStatus,
+  Address, AthenaContext, AthenaMessage, Balance, Bytes32, ExecutionResult, StorageStatus,
 };
-use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 
 #[derive(Default)]
 struct Host {

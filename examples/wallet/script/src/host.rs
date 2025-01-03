@@ -3,10 +3,10 @@
 use std::{collections::BTreeMap, error::Error};
 
 use athena_interface::{
-  payload::ExecutionPayload, Address, AthenaMessage, Balance, Bytes32, ExecutionResult,
-  HostInterface, StatusCode, StorageStatus,
+  payload::ExecutionPayload, Address, AthenaMessage, Balance, Bytes32, ExecutionResult, StatusCode,
+  StorageStatus,
 };
-use athena_runner::{vm::AthenaRevision, AthenaVm};
+use athena_runner::{host::HostInterface, vm::AthenaRevision, AthenaVm};
 
 // Stores some of the context that a running host would store to keep
 // track of what's going on in the VM execution
