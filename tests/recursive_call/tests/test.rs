@@ -1,10 +1,10 @@
 use std::error::Error;
 
 use athena_interface::{
-  payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, AthenaRevision, Balance,
-  Bytes32, ExecutionResult, HostInterface, StorageStatus, VmInterface,
+  payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, Balance, Bytes32,
+  ExecutionResult, HostInterface, StorageStatus,
 };
-use athena_runner::AthenaVm;
+use athena_runner::{vm::AthenaRevision, AthenaVm};
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
 struct Host {

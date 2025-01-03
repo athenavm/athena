@@ -297,37 +297,6 @@ pub trait HostInterface {
   fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>>;
 }
 
-// currently unused
-#[derive(Debug, Clone, Copy)]
-pub enum AthenaCapability {}
-
-// currently unused
-#[derive(Debug, Clone)]
-pub enum AthenaOption {}
-
-#[derive(Debug)]
-pub enum SetOptionError {
-  InvalidKey,
-  InvalidValue,
-}
-
-#[derive(Debug)]
-pub enum AthenaRevision {
-  AthenaFrontier,
-}
-
-pub trait VmInterface<T: HostInterface> {
-  fn get_capabilities(&self) -> Vec<AthenaCapability>;
-  fn set_option(&self, option: AthenaOption, value: &str) -> Result<(), SetOptionError>;
-  fn execute(
-    &self,
-    host: &mut T,
-    rev: AthenaRevision,
-    msg: AthenaMessage,
-    code: &[u8],
-  ) -> ExecutionResult;
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;

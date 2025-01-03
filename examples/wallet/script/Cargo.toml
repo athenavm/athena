@@ -7,6 +7,8 @@ edition = "2021"
 athena-interface = { path = "../../../interface" }
 athena-sdk = { path = "../../../sdk" }
 athena-vm-sdk = { path = "../../../vm/sdk" }
+athena-runner = { path = "../../../runner" }
+
 hex = "0.4.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing = "0.1.41"
