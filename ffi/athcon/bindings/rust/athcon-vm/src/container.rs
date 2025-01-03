@@ -111,8 +111,6 @@ mod tests {
       set_option: None,
     };
 
-    let code = [0u8; 0];
-
     let message = &::athcon_sys::athcon_message {
       kind: ::athcon_sys::athcon_call_kind::ATHCON_CALL,
       depth: 0,
@@ -122,8 +120,6 @@ mod tests {
       input_data: std::ptr::null(),
       input_size: 0,
       value: 0,
-      code: std::ptr::null(),
-      code_size: 0,
     };
     let message: ExecutionMessage = message.try_into().unwrap();
 
@@ -145,7 +141,7 @@ mod tests {
       container
         .execute(
           athcon_sys::athcon_revision::ATHCON_FRONTIER,
-          &code,
+          &[],
           &message,
           &host,
           host_context,
@@ -161,7 +157,7 @@ mod tests {
       container
         .execute(
           athcon_sys::athcon_revision::ATHCON_FRONTIER,
-          &code,
+          &[],
           &message,
           &host,
           host_context,

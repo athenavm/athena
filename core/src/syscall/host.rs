@@ -103,7 +103,6 @@ impl Syscall for SyscallHostCall {
       *athena_ctx.address(),
       input,
       amount,
-      Vec::new(),
     );
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
     let res = host.call(msg);
