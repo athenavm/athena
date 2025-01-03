@@ -14,19 +14,15 @@ impl Read for Runtime<'_> {
 
 impl Runtime<'_> {
   pub fn write_stdin<U: Serialize>(&mut self, input: &U) {
-    let mut buf = Vec::new();
-    bincode::serialize_into(&mut buf, input).expect("serialization failed");
-    self.state.input_stream.push(buf);
+    bincode::serialize_into(&mut self.state.input_stream, input).expect("serialization failed");
   }
 
   pub fn write_stdin_slice(&mut self, input: &[u8]) {
-    self.state.input_stream.push(input.to_vec());
+    self.write_from(input.iter().copied());
   }
 
-  pub fn write_vecs(&mut self, inputs: &[Vec<u8>]) {
-    for input in inputs {
-      self.state.input_stream.push(input.clone());
-    }
+  pub fn write_from<T: IntoIterator<Item = u8>>(&mut self, input: T) {
+    self.state.input_stream.extend(input);
   }
 
   pub fn read_public_values<U: DeserializeOwned>(&mut self) -> U {

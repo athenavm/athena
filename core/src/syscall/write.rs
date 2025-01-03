@@ -34,16 +34,16 @@ impl Syscall for SyscallWrite {
         }
       }
       3 => {
-        rt.state.public_values_stream.extend_from_slice(&bytes);
+        rt.state.public_values_stream.extend(bytes);
       }
       4 => {
-        rt.state.input_stream.push(bytes);
+        rt.state.input_stream.extend(bytes);
       }
       fd => {
         tracing::debug!(fd, "executing hook");
         match rt.execute_hook(fd, &bytes) {
           Ok(result) => {
-            rt.state.input_stream.push(result);
+            rt.state.input_stream.extend(result);
           }
           Err(err) => {
             tracing::debug!(fd, ?err, "hook failed");
@@ -115,7 +115,6 @@ mod tests {
 
     let result = SyscallWrite {}.execute(&mut SyscallContext { rt: &mut runtime }, 7, 0);
     result.unwrap();
-    let result = runtime.state.input_stream.pop().unwrap();
-    assert_eq!(vec![1, 2, 3, 4, 5], result);
+    assert_eq!(vec![1, 2, 3, 4, 5], runtime.state.input_stream);
   }
 }
