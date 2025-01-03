@@ -138,6 +138,7 @@ name = "athena-sdk"
 version = "0.6.2"
 dependencies = [
  "anyhow",
+ "athena-builder",
  "athena-core",
  "athena-interface",
  "vergen-git2",
