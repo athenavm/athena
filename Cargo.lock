@@ -166,6 +166,7 @@ dependencies = [
  "athena-interface",
  "athena-vm",
  "bincode",
+ "bytemuck",
  "ed25519-dalek",
  "elf",
  "gdbstub",
@@ -194,7 +195,6 @@ name = "athena-interface"
 version = "0.6.2"
 dependencies = [
  "blake3",
- "bytemuck",
  "hex",
  "mockall",
  "parity-scale-codec",
