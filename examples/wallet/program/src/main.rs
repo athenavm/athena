@@ -6,7 +6,7 @@ extern crate alloc;
 use athena_interface::Address;
 use athena_vm::entrypoint;
 use athena_vm_declare::{callable, template};
-use athena_vm_sdk::wallet::{SpendArguments, WalletProgram};
+use athena_vm_sdk::wallet::{ProxyArguments, SpendArguments, WalletProgram};
 use athena_vm_sdk::{call, spawn, Pubkey, VerifiableTemplate};
 use parity_scale_codec::{Decode, Encode};
 
@@ -39,8 +39,9 @@ impl WalletProgram for Wallet {
     call(args.recipient, None, None, args.amount);
   }
 
-  fn proxy(&self, _destination: Address, _args: &[u8]) {
-    unimplemented!();
+  #[callable]
+  fn proxy(&self, args: ProxyArguments) -> alloc::vec::Vec<u8> {
+    call(args.destination, args.args, args.method, args.amount)
   }
 
   #[callable]
