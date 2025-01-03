@@ -1,22 +1,32 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   payload::{ExecutionPayload, Payload},
-  AthenaCapability, AthenaContext, AthenaMessage, AthenaOption, AthenaRevision, Decode,
-  ExecutionResult, HostInterface, SetOptionError, StatusCode, VmInterface,
+  AthenaContext, AthenaMessage, Decode, ExecutionResult, HostInterface, StatusCode,
 };
 
 use athena_sdk::{AthenaStdin, ExecutionClient};
 
-pub struct AthenaVm {
-  client: ExecutionClient,
+// currently unused
+#[derive(Debug, Clone, Copy)]
+pub enum AthenaCapability {}
+
+// currently unused
+#[derive(Debug, Clone)]
+pub enum AthenaOption {}
+
+#[derive(Debug)]
+pub enum SetOptionError {
+  InvalidKey,
+  InvalidValue,
 }
 
-impl AthenaVm {
-  pub fn new() -> Self {
-    AthenaVm {
-      client: ExecutionClient,
-    }
-  }
+#[derive(Debug)]
+pub enum AthenaRevision {
+  AthenaFrontier,
+}
+
+pub struct AthenaVm {
+  client: ExecutionClient,
 }
 
 impl Default for AthenaVm {
@@ -25,19 +35,22 @@ impl Default for AthenaVm {
   }
 }
 
-impl<T> VmInterface<T> for AthenaVm
-where
-  T: HostInterface,
-{
-  fn get_capabilities(&self) -> Vec<AthenaCapability> {
+impl AthenaVm {
+  pub fn new() -> Self {
+    AthenaVm {
+      client: ExecutionClient,
+    }
+  }
+
+  pub fn get_capabilities(&self) -> Vec<AthenaCapability> {
     vec![]
   }
 
-  fn set_option(&self, _option: AthenaOption, _value: &str) -> Result<(), SetOptionError> {
+  pub fn set_option(&self, _option: AthenaOption, _value: &str) -> Result<(), SetOptionError> {
     Err(SetOptionError::InvalidKey)
   }
 
-  fn execute(
+  pub fn execute<T: HostInterface>(
     &self,
     host: &mut T,
     _rev: AthenaRevision,
@@ -122,8 +135,7 @@ mod tests {
   use super::*;
   use athena_interface::{
     payload::{ExecutionPayloadBuilder, Payload},
-    Address, AthenaMessage, AthenaRevision, Balance, Encode, MessageKind, MethodSelector,
-    MockHostInterface,
+    Address, AthenaMessage, Balance, Encode, MessageKind, MethodSelector, MockHostInterface,
   };
   const ADDRESS_ALICE: Address = Address([1u8; 24]);
 

@@ -8,10 +8,10 @@ use athcon_vm::{
   SetOptionError,
 };
 use athena_interface::{
-  Address, AthenaMessage, AthenaRevision, Balance, Bytes32, ExecutionResult, HostInterface,
-  MessageKind, StatusCode, StorageStatus, TransactionContext, VmInterface,
+  Address, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface, MessageKind,
+  StatusCode, StorageStatus, TransactionContext,
 };
-use athena_runner::AthenaVm;
+use athena_runner::{vm::AthenaRevision, AthenaVm};
 
 #[athcon_declare_vm("Athena", "athena1", "0.1.0")]
 pub struct AthenaVMWrapper {
