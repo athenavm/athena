@@ -8,7 +8,7 @@ pub use context::*;
 
 pub use parity_scale_codec::{Decode, Encode};
 
-use std::{convert::TryFrom, error::Error, fmt};
+use std::{convert::TryFrom, fmt};
 
 pub const ADDRESS_LENGTH: usize = 24;
 pub const BYTES32_LENGTH: usize = 32;
@@ -285,16 +285,6 @@ impl ExecutionResult {
   pub fn failed(gas_left: u32) -> Self {
     ExecutionResult::new(StatusCode::Failure, gas_left, None)
   }
-}
-
-#[mockall::automock]
-pub trait HostInterface {
-  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32;
-  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus;
-  fn get_balance(&self, addr: &Address) -> Balance;
-  fn call(&mut self, msg: AthenaMessage) -> ExecutionResult;
-  fn spawn(&mut self, blob: Vec<u8>) -> Address;
-  fn deploy(&mut self, code: Vec<u8>) -> Result<Address, Box<dyn Error>>;
 }
 
 #[cfg(test)]

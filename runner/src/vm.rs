@@ -1,10 +1,10 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   payload::{ExecutionPayload, Payload},
-  AthenaContext, AthenaMessage, Decode, ExecutionResult, HostInterface, StatusCode,
+  AthenaContext, AthenaMessage, Decode, ExecutionResult, StatusCode,
 };
 
-use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 
 // currently unused
 #[derive(Debug, Clone, Copy)]
@@ -135,8 +135,9 @@ mod tests {
   use super::*;
   use athena_interface::{
     payload::{ExecutionPayloadBuilder, Payload},
-    Address, AthenaMessage, Balance, Encode, MessageKind, MethodSelector, MockHostInterface,
+    Address, AthenaMessage, Balance, Encode, MessageKind, MethodSelector,
   };
+  use athena_sdk::host::MockHostInterface;
   const ADDRESS_ALICE: Address = Address([1u8; 24]);
 
   fn setup_logger() {

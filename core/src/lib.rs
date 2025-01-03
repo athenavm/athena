@@ -14,6 +14,7 @@
 #![warn(unused_extern_crates)]
 
 pub mod disassembler;
+pub mod host;
 pub mod io;
 pub mod runtime;
 pub mod syscall;

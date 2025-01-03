@@ -2,10 +2,10 @@ use std::error::Error;
 
 use athena_interface::{
   payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, Balance, Bytes32,
-  ExecutionResult, HostInterface, StorageStatus,
+  ExecutionResult, StorageStatus,
 };
 use athena_runner::{vm::AthenaRevision, AthenaVm};
-use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 
 struct Host {
   code: Vec<u8>,

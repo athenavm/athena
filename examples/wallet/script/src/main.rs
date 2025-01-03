@@ -9,8 +9,8 @@ use host::*;
 
 use std::error::Error;
 
-use athena_interface::{Address, AthenaContext, Encode, HostInterface, MethodSelector};
-use athena_sdk::{AthenaStdin, ExecutionClient};
+use athena_interface::{Address, AthenaContext, Encode, MethodSelector};
+use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{wallet::SpendArguments, Pubkey};
 
 /// The ELF (executable and linkable format) file for the Athena RISC-V VM.
@@ -103,13 +103,13 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::MockHostInterface;
   use athena_interface::{
     payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, Balance, Encode,
     MessageKind, MethodSelector, StatusCode,
   };
   use athena_runner::vm::AthenaRevision;
   use athena_runner::AthenaVm;
+  use athena_sdk::host::MockHostInterface;
   use athena_sdk::{AthenaStdin, ExecutionClient};
   use athena_vm_sdk::Pubkey;
   use ed25519_dalek::ed25519::signature::Signer;

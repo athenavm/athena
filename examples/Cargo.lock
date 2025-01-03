@@ -116,7 +116,6 @@ version = "0.6.2"
 dependencies = [
  "blake3",
  "hex",
- "mockall",
  "parity-scale-codec",
 ]
 
@@ -138,6 +137,7 @@ name = "athena-sdk"
 version = "0.6.2"
 dependencies = [
  "anyhow",
+ "athena-builder",
  "athena-core",
  "athena-interface",
  "vergen-git2",

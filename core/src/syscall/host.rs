@@ -245,9 +245,10 @@ impl Syscall for SyscallHostDeploy {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{Address, AthenaContext, ExecutionResult, MockHostInterface};
+  use athena_interface::{Address, AthenaContext, ExecutionResult};
 
   use crate::{
+    host::MockHostInterface,
     runtime::{self, Program},
     utils::{with_max_gas, AthenaCoreOpts},
   };
