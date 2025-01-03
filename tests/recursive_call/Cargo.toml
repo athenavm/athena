@@ -4,11 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-athena-interface = {path = "../../interface"}
-athena-vm = { path = "../../vm/entrypoint"}
+athena-interface = { path = "../../interface" }
+athena-vm = { path = "../../vm/entrypoint" }
 athena-vm-sdk = { path = "../../vm/sdk" }
 
 [dev-dependencies]
-tracing-subscriber = "0.3.19"
+recursive-call-test = { path = ".", features = ["unittest"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 athena-sdk = { path = "../../sdk" }
 athena-runner = { path = "../../runner" }
+
+[build-dependencies]
+athena-helper = { path = "../../helper" }
+
+[features]
+unittest = []

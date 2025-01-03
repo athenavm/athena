@@ -95,6 +95,7 @@ dependencies = [
  "athena-builder",
  "athena-interface",
  "bincode",
+ "bytemuck",
  "ed25519-dalek",
  "elf",
  "gdbstub",
@@ -114,11 +115,9 @@ name = "athena-interface"
 version = "0.6.2"
 dependencies = [
  "blake3",
- "bytemuck",
  "hex",
  "mockall",
  "parity-scale-codec",
- "tracing",
 ]
 
 [[package]]
@@ -1730,10 +1729,11 @@ dependencies = [
  "athena-runner",
  "athena-sdk",
  "athena-vm-sdk",
- "clap",
+ "blake3",
  "ed25519-dalek",
  "hex",
  "rand",
+ "tracing",
  "tracing-subscriber",
 ]
 

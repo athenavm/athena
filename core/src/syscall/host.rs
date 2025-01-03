@@ -1,9 +1,7 @@
 use std::cmp::min;
 
 use crate::runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult};
-use athena_interface::{
-  Address, AthenaMessage, Bytes32Wrapper, MessageKind, StatusCode, BYTES32_LENGTH,
-};
+use athena_interface::{Address, AthenaMessage, MessageKind, StatusCode};
 
 pub(crate) struct SyscallHostRead;
 
@@ -15,16 +13,14 @@ impl Syscall for SyscallHostRead {
       .as_ref()
       .expect("Missing Athena runtime context");
 
-    // marshal inputs
-    let key = ctx.slice(arg1, BYTES32_LENGTH / 4);
+    let key: [u8; 32] = ctx.array(arg1);
 
     // read value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    let value = host.get_storage(athena_ctx.address(), &Bytes32Wrapper::from(key).into());
+    let value = host.get_storage(athena_ctx.address(), &key);
 
     // set return value
-    let value_vec: Vec<u32> = Bytes32Wrapper::new(value).into();
-    ctx.mw_slice(arg1, value_vec.as_slice());
+    ctx.mw_slice(arg1, &bytemuck::cast::<_, [u32; 8]>(value));
     Ok(Outcome::Result(None))
   }
 }
@@ -40,16 +36,12 @@ impl Syscall for SyscallHostWrite {
       .expect("Missing Athena runtime context");
 
     // marshal inputs
-    let key = ctx.slice(arg1, BYTES32_LENGTH / 4);
-    let value = ctx.slice(arg2, BYTES32_LENGTH / 4);
+    let key = ctx.array(arg1);
+    let value = ctx.array(arg2);
 
     // write value to host
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
-    let status_code = host.set_storage(
-      athena_ctx.address(),
-      &Bytes32Wrapper::from(key).into(),
-      &Bytes32Wrapper::from(value).into(),
-    );
+    let status_code = host.set_storage(athena_ctx.address(), &key, &value);
 
     Ok(Outcome::Result(Some(status_code as u32)))
   }

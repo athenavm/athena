@@ -10,7 +10,7 @@ use std::{
   thread,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use cargo_metadata::camino::Utf8PathBuf;
 
 const BUILD_TARGET: &str = "riscv32em-athena-zkvm-elf";
@@ -201,26 +201,29 @@ fn copy_elf_to_output_dir(
   args: &BuildArgs,
   program_metadata: &cargo_metadata::Metadata,
 ) -> Result<Utf8PathBuf> {
-  let root_package = program_metadata.root_package();
-  let root_package_name = root_package.as_ref().map(|p| &p.name);
-  println!("Root package name: {:?}", root_package_name.unwrap());
+  let root_package = program_metadata
+    .root_package()
+    .ok_or(anyhow!("root package not found"))?;
+  println!("Root package name: {}", root_package.name);
 
   // Determine which target to use, and choose the artifact name based on the target type.
-  // For simplicity, we only consider the first target, and expect either bin or staticlib.
+  // For simplicity, we only consider the first bin or staticlib target.
   // Our target does not support dylib.
   // TODO: make this Mac and Windows-compatible.
-  let target = root_package.unwrap().targets.first().unwrap();
-  let artifact_name = if target.is_bin() {
-    root_package_name.unwrap()
-  } else if target.is_staticlib() {
-    &format!("lib{}.a", target.name)
-  } else {
-    panic!("Unsupported target kind");
-  };
-  println!(
-    "Target {:?} artifact path: {:?}",
-    target.name, artifact_name
-  );
+  let (target, artifact_name) = root_package
+    .targets
+    .iter()
+    .find_map(|t| {
+      if t.is_bin() {
+        Some((t, root_package.name.clone()))
+      } else if t.is_staticlib() {
+        Some((t, format!("lib{}.a", t.name)))
+      } else {
+        None
+      }
+    })
+    .ok_or(anyhow!("neither bin nor staticlib target found"))?;
+  println!("Target {} artifact path: {}", target.name, artifact_name);
 
   // The ELF is written to a target folder specified by the program's package.
   let original_elf_path = program_metadata
@@ -238,24 +241,20 @@ fn copy_elf_to_output_dir(
   } else if !args.binary.is_empty() {
     args.binary.clone()
   } else {
-    root_package_name.unwrap().to_string()
+    root_package.name.clone()
   };
 
   let elf_dir = root_package
-    .unwrap()
     .manifest_path
     .parent()
-    .unwrap()
+    .ok_or(anyhow!("couldn't find manifest path"))?
     .join(&args.output_directory);
   println!("Creating output dir {:?}", elf_dir);
   fs::create_dir_all(&elf_dir)?;
   let result_elf_path = elf_dir.join(elf_name);
 
   // Copy the ELF to the specified output directory.
-  println!(
-    "Copying original artifact {:?} to final path: {:?}",
-    original_elf_path, result_elf_path
-  );
+  println!("Copying original artifact {original_elf_path} to final path: {result_elf_path}");
   fs::copy(original_elf_path, &result_elf_path)?;
 
   Ok(result_elf_path)

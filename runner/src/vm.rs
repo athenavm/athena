@@ -122,9 +122,10 @@ mod tests {
   use super::*;
   use athena_interface::{
     payload::{ExecutionPayloadBuilder, Payload},
-    Address, AthenaMessage, AthenaRevision, Balance, Encode, MessageKind, MethodSelector, MockHost,
-    MockHostInterface, ADDRESS_ALICE, STORAGE_KEY, STORAGE_VALUE,
+    Address, AthenaMessage, AthenaRevision, Balance, Encode, MessageKind, MethodSelector,
+    MockHostInterface,
   };
+  const ADDRESS_ALICE: Address = Address([1u8; 24]);
 
   fn setup_logger() {
     let _ = tracing_subscriber::fmt()
@@ -134,11 +135,10 @@ mod tests {
   }
 
   #[test]
-  #[should_panic]
   fn test_empty_code() {
     // construct a vm
-    AthenaVm::new().execute(
-      &mut MockHost::new(),
+    let result = AthenaVm::new().execute(
+      &mut MockHostInterface::new(),
       AthenaRevision::AthenaFrontier,
       AthenaMessage::new(
         MessageKind::Call,
@@ -152,6 +152,7 @@ mod tests {
       ),
       &[],
     );
+    assert_eq!(StatusCode::Failure, result.status_code);
   }
 
   #[test]
@@ -159,10 +160,10 @@ mod tests {
     setup_logger();
     let elf = include_bytes!("../../tests/entrypoint/elf/entrypoint-test");
 
-    // deploy the contract to ADDRESS_ALICE and pass in the address so it can call itself recursively
-    let vm = AthenaVm::new();
-    let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
+    let mut host = MockHostInterface::new();
+    host
+      .expect_call()
+      .returning(|_| ExecutionResult::new(StatusCode::Success, 1000, None));
     let input = bincode::serialize(ADDRESS_ALICE.as_ref()).unwrap();
 
     // this will execute from the default entry point
@@ -257,35 +258,6 @@ mod tests {
     assert_eq!(result.status_code, StatusCode::Failure);
   }
 
-  // Note: we run this test here, as opposed to at a lower level (inside the SDK), since recursive host calls
-  // require access to an actual VM instance.
-  #[test]
-  fn test_recursive_call() {
-    setup_logger();
-
-    let client = ExecutionClient::new();
-    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
-    let mut stdin = AthenaStdin::new();
-    stdin.write(&(ADDRESS_ALICE.as_ref(), 7));
-    let vm = AthenaVm::new();
-    let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
-    host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
-    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
-
-    let (mut output, _) = client
-      .execute(
-        elf,
-        stdin,
-        Some(&mut host),
-        Some(2_000_000),
-        Some(ctx.clone()),
-      )
-      .unwrap();
-    let result = output.read::<u32>();
-    assert_eq!(result, 13, "got wrong fibonacci value");
-  }
-
   #[test]
   fn test_minimal() {
     setup_logger();
@@ -293,64 +265,14 @@ mod tests {
     let client = ExecutionClient::new();
     let elf = include_bytes!("../../tests/minimal/getbalance.bin");
     let stdin = AthenaStdin::new();
-    let vm = AthenaVm::new();
-    let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
-    host.set_balance(&ADDRESS_ALICE, 9999);
+    let mut host = MockHostInterface::new();
+    host.expect_get_balance().return_const(9999u64);
     let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
     let (mut output, _) = client
-      .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx.clone()))
+      .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx))
       .unwrap();
     let result = output.read::<Balance>();
     assert_eq!(result, 9999, "got wrong output value");
-  }
-
-  #[test]
-  fn test_recursive_call_fail() {
-    setup_logger();
-
-    let elf = include_bytes!("../../tests/recursive_call/elf/recursive-call-test");
-    let vm = AthenaVm::new();
-
-    // if we go any higher than in the previous test, we should run out of gas.
-    // run the program entirely through the host this time. that will allow us to check storage reversion.
-    // when the program fails (runs out of gas), the storage changes should be reverted.
-
-    // trying to go any higher should result in an out-of-gas error
-    let mut host = MockHost::new_with_vm(&vm);
-    host.deploy_code(ADDRESS_ALICE, elf.to_vec());
-    host.set_storage(&ADDRESS_ALICE, &STORAGE_KEY, &STORAGE_VALUE);
-    assert_eq!(
-      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
-      STORAGE_VALUE
-    );
-    let payload = Payload {
-      selector: None,
-      input: (bincode::serialize(&(ADDRESS_ALICE.as_ref(), 7)).unwrap()),
-    };
-
-    let msg = AthenaMessage::new(
-      MessageKind::Call,
-      0,
-      150_000,
-      ADDRESS_ALICE,
-      ADDRESS_ALICE,
-      Some(payload.into()),
-      0,
-      vec![],
-    );
-    let res = host.call(msg);
-    assert_eq!(
-      res.status_code,
-      StatusCode::OutOfGas,
-      "expected out of gas error"
-    );
-
-    // expect storage value changes to have been reverted
-    assert_eq!(
-      host.get_storage(&ADDRESS_ALICE, &STORAGE_KEY),
-      STORAGE_VALUE
-    );
   }
 
   #[test]

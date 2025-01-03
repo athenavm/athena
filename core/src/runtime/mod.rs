@@ -1,4 +1,5 @@
 pub mod gdbstub;
+pub mod hooks;
 mod instruction;
 mod io;
 mod opcode;
@@ -8,6 +9,7 @@ mod state;
 mod syscall;
 mod utils;
 
+use anyhow::anyhow;
 use athena_interface::MethodSelector;
 pub use instruction::*;
 pub use opcode::*;
@@ -50,9 +52,6 @@ pub struct Runtime<'host> {
   /// The host interface for host calls.
   pub host: Option<&'host mut dyn HostInterface>,
 
-  /// A counter for the number of cycles that have been executed in certain functions.
-  pub cycle_tracker: HashMap<String, (u64, u32)>,
-
   /// A buffer for stdout and stderr IO.
   pub io_buf: HashMap<u32, String>,
 
@@ -75,6 +74,8 @@ pub struct Runtime<'host> {
   pub max_syscall_cycles: u32,
 
   breakpoints: BTreeSet<u32>,
+
+  hook_registry: hooks::HookRegistry,
 }
 
 /// An record of a write to a memory address.
@@ -157,7 +158,6 @@ impl<'host> Runtime<'host> {
       state: ExecutionState::new(program.pc_start),
       program,
       host,
-      cycle_tracker: HashMap::new(),
       io_buf: HashMap::new(),
       trace_buf,
       unconstrained: false,
@@ -165,6 +165,7 @@ impl<'host> Runtime<'host> {
       syscall_map,
       max_syscall_cycles,
       breakpoints: BTreeSet::new(),
+      hook_registry: Default::default(),
     }
   }
 
@@ -813,6 +814,20 @@ impl<'host> Runtime<'host> {
   fn get_syscall(&mut self, code: SyscallCode) -> Option<&Arc<dyn Syscall>> {
     self.syscall_map.get(&code)
   }
+
+  /// Register a new hook.
+  /// Will fail if a hook is already registered on a given FD
+  /// or a FD is <= 4.
+  pub fn register_hook(&mut self, fd: u32, hook: Box<dyn hooks::Hook>) -> anyhow::Result<()> {
+    self.hook_registry.register(fd, hook)
+  }
+  pub(crate) fn execute_hook(&self, fd: u32, data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let hook = self
+      .hook_registry
+      .get(fd)
+      .ok_or_else(|| anyhow!("no hook registered for FD {fd}"))?;
+    hook.execute(hooks::HookEnv { runtime: self }, data)
+  }
 }
 
 #[cfg(test)]
@@ -828,7 +843,10 @@ pub mod tests {
     utils::{tests::TEST_PANIC_ELF, AthenaCoreOpts},
   };
 
-  use super::syscall::SyscallCode;
+  use super::{
+    hooks::{self, MockHook},
+    syscall::SyscallCode,
+  };
   use super::{Instruction, Opcode, Program, Runtime};
 
   pub fn simple_program() -> Program {
@@ -1738,6 +1756,53 @@ pub mod tests {
     // Assert SH cases
     assert_eq!(runtime.register(Register::X12), 0x12346525);
     assert_eq!(runtime.register(Register::X11), 0x65256525);
+  }
+
+  #[test]
+  fn registering_hook() {
+    let mut runtime = Runtime::new(
+      Program::new(vec![], 0, 0),
+      None,
+      AthenaCoreOpts::default(),
+      None,
+    );
+
+    // can't register on FD <= 4
+    for fd in 0..=4 {
+      runtime
+        .register_hook(fd, Box::new(hooks::MockHook::new()))
+        .unwrap_err();
+    }
+
+    // register on 5
+    runtime
+      .register_hook(5, Box::new(hooks::MockHook::new()))
+      .unwrap();
+
+    // can't register another hook on occupied FD
+    runtime
+      .register_hook(5, Box::new(hooks::MockHook::new()))
+      .unwrap_err();
+  }
+
+  #[test]
+  fn executing_hook() {
+    let mut runtime = Runtime::new(
+      Program::new(vec![], 0, 0),
+      None,
+      AthenaCoreOpts::default(),
+      None,
+    );
+
+    let mut hook = Box::new(MockHook::new());
+    hook.expect_execute().returning(|_, data| {
+      assert_eq!(&[1, 2, 3, 4], data);
+      Ok(vec![5, 6, 7])
+    });
+    runtime.register_hook(5, hook).unwrap();
+
+    let result = runtime.execute_hook(5, &[1, 2, 3, 4]).unwrap();
+    assert_eq!(vec![5, 6, 7], result);
   }
 }
 

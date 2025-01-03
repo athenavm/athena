@@ -1,26 +1,61 @@
+use std::{collections::BTreeMap, error::Error};
+
 use athena_interface::{
-  Address, AthenaContext, HostInterface, MockHost, ADDRESS_CHARLIE, STORAGE_KEY, STORAGE_VALUE,
+  Address, AthenaContext, AthenaMessage, Balance, Bytes32, ExecutionResult, HostInterface,
+  StorageStatus,
 };
 use athena_sdk::{AthenaStdin, ExecutionClient};
+
+#[derive(Default)]
+struct Host {
+  storage: BTreeMap<(Address, [u8; 32]), [u8; 32]>,
+}
+
+impl HostInterface for Host {
+  fn get_storage(&self, addr: &Address, key: &Bytes32) -> Bytes32 {
+    self
+      .storage
+      .get(&(*addr, *key))
+      .copied()
+      .unwrap_or_default()
+  }
+
+  fn set_storage(&mut self, addr: &Address, key: &Bytes32, value: &Bytes32) -> StorageStatus {
+    match self.storage.insert((*addr, *key), *value) {
+      None => StorageStatus::StorageAdded,
+      Some(_) => StorageStatus::StorageModified,
+    }
+  }
+
+  fn get_balance(&self, _: &Address) -> Balance {
+    unimplemented!()
+  }
+
+  fn call(&mut self, _: AthenaMessage) -> ExecutionResult {
+    unimplemented!()
+  }
+
+  fn spawn(&mut self, _: Vec<u8>) -> Address {
+    unimplemented!()
+  }
+
+  fn deploy(&mut self, _: Vec<u8>) -> Result<Address, Box<dyn Error>> {
+    unimplemented!()
+  }
+}
 
 #[test]
 fn test() {
   tracing_subscriber::fmt::init();
 
-  let caller = ADDRESS_CHARLIE;
-  // host-test binary is precompiled and kept in git
   let elf = include_bytes!("../elf/host-test");
+  let mut host = Host::default();
   let stdin = AthenaStdin::new();
-  let mut host = MockHost::new();
-  host.set_balance(&caller, 10000);
-  host.set_storage(&caller, &STORAGE_KEY, &STORAGE_VALUE);
-
-  let context = AthenaContext::new(caller, Address::default(), 0);
+  let context = AthenaContext::new(Address::from([0xCC; 24]), Address::default(), 0);
   let result =
-    ExecutionClient::new().execute(elf, stdin, Some(&mut host), Some(100000), Some(context));
+    ExecutionClient::new().execute(elf, stdin, Some(&mut host), Some(100_000), Some(context));
   // result will be Err if asserts in the test failed
   let (_, gas_left) = result.unwrap();
 
-  // don't bother checking exact gas value, that's checked in the following test
-  assert!(gas_left.is_some());
+  assert!(gas_left.unwrap() < 100_000);
 }
