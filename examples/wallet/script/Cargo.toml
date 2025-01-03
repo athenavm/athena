@@ -2,19 +2,15 @@
 version = "0.1.0"
 name = "wallet-script"
 edition = "2021"
-default-run = "execute"
-
-[[bin]]
-name = "execute"
-path = "src/bin/execute.rs"
 
 [dependencies]
 athena-interface = { path = "../../../interface" }
 athena-sdk = { path = "../../../sdk" }
 athena-vm-sdk = { path = "../../../vm/sdk" }
-clap = { version = "4.0", features = ["derive", "env"] }
 hex = "0.4.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing = "0.1.41"
+blake3 = "1.5.5"
 
 [dev-dependencies]
 athena-runner = { path = "../../../runner" }

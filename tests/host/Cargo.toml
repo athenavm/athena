@@ -4,9 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-athena-vm = { path = "../../vm/entrypoint"}
+athena-vm = { path = "../../vm/entrypoint" }
 athena-interface = { path = "../../interface" }
 
 [dev-dependencies]
+host-test = { path = ".", features = ["unittest"] }
 athena-sdk = { path = "../../sdk" }
 tracing-subscriber = "0.3.19"
+
+[build-dependencies]
+athena-helper = { path = "../../helper" }
+
+[features]
+unittest = []

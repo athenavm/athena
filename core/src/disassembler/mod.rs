@@ -27,9 +27,8 @@ impl Program {
   /// Disassemble an ELF to a program that be executed by the VM.
   pub fn from(input: &[u8]) -> anyhow::Result<Self> {
     // Check the magic number
-    if input.len() < 4 {
-      panic!("malformed input");
-    } else if &input[0..4] == b"\x7fELF" {
+    anyhow::ensure!(input.len() >= 4);
+    if &input[0..4] == b"\x7fELF" {
       // Decode the bytes as an ELF.
       let elf = Elf::decode(input).context("decoding ELF")?;
 

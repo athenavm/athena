@@ -126,7 +126,6 @@ dependencies = [
  "hex",
  "mockall",
  "parity-scale-codec",
- "tracing",
 ]
 
 [[package]]
@@ -1738,10 +1737,11 @@ dependencies = [
  "athena-runner",
  "athena-sdk",
  "athena-vm-sdk",
- "clap",
+ "blake3",
  "ed25519-dalek",
  "hex",
  "rand",
+ "tracing",
  "tracing-subscriber",
 ]
 
