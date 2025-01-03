@@ -158,15 +158,19 @@ impl<'a, 'h> SyscallContext<'a, 'h> {
   #[tracing::instrument(skip(self))]
   pub fn bytes(&self, mut addr: u32, len: usize) -> Vec<u8> {
     let mut bytes = Vec::new();
+    let mut bytes_to_read = len;
+
     // handle case when addr is not aligned to 4B
-    let addr_offset = (addr % 4) as usize;
+    let addr_offset = addr % 4;
     if addr_offset != 0 {
-      let word = self.word(addr - addr_offset as u32).to_le_bytes();
-      bytes.extend_from_slice(&word[addr_offset..]);
+      tracing::debug!(addr, len, addr_offset, "addr not aligned");
+      let word = self.word(addr - addr_offset).to_le_bytes();
+      bytes.extend_from_slice(&word[addr_offset as usize..]);
       addr += bytes.len() as u32;
+      bytes_to_read = bytes_to_read.saturating_sub(bytes.len());
     }
 
-    for addr in (addr..addr + (len - bytes.len()) as u32).step_by(4) {
+    for addr in (addr..addr + bytes_to_read as u32).step_by(4) {
       bytes.extend_from_slice(&self.word(addr).to_le_bytes());
     }
     bytes.truncate(len); // handle case when len is not a multiple of 4
@@ -290,5 +294,8 @@ mod tests {
     // address not aligned and length not a multiple of 4
     let read = ctx.bytes(0x103, 59);
     assert_eq!(read, memory[3..3 + 59]);
+
+    let read = ctx.bytes(0x1, 2);
+    assert_eq!(read, memory[1..1 + 2]);
   }
 }
