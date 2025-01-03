@@ -52,9 +52,6 @@ pub struct Runtime<'host> {
   /// The host interface for host calls.
   pub host: Option<&'host mut dyn HostInterface>,
 
-  /// A counter for the number of cycles that have been executed in certain functions.
-  pub cycle_tracker: HashMap<String, (u64, u32)>,
-
   /// A buffer for stdout and stderr IO.
   pub io_buf: HashMap<u32, String>,
 
@@ -161,7 +158,6 @@ impl<'host> Runtime<'host> {
       state: ExecutionState::new(program.pc_start),
       program,
       host,
-      cycle_tracker: HashMap::new(),
       io_buf: HashMap::new(),
       trace_buf,
       unconstrained: false,
