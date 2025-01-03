@@ -55,10 +55,8 @@ impl AthenaVm {
     host: &mut T,
     _rev: AthenaRevision,
     msg: AthenaMessage,
-    // note: ignore msg.code, should only be used on deploy
     code: &[u8],
   ) -> ExecutionResult {
-    // construct context object
     let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
 
     let mut stdin = AthenaStdin::new();
@@ -161,7 +159,6 @@ mod tests {
         Address::default(),
         None,
         Balance::default(),
-        vec![],
       ),
       &[],
     );
@@ -191,7 +188,6 @@ mod tests {
         Address::default(),
         None,
         Balance::default(),
-        vec![],
       ),
       elf,
     );
@@ -215,7 +211,6 @@ mod tests {
         Address::default(),
         Some(payload.encode()),
         Balance::default(),
-        vec![],
       ),
       elf,
     );
@@ -239,7 +234,6 @@ mod tests {
         Address::default(),
         Some(payload.encode()),
         Balance::default(),
-        vec![],
       ),
       elf,
     );
@@ -263,7 +257,6 @@ mod tests {
         Address::default(),
         Some(payload.encode()),
         Balance::default(),
-        vec![],
       ),
       elf,
     );

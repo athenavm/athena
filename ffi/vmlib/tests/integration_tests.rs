@@ -75,8 +75,6 @@ fn test_athcon_create() {
       input_data: std::ptr::null(),
       input_size: 0,
       value: 0,
-      code: code.as_ptr(),
-      code_size: code.len(),
     };
 
     // note: we cannot check for a null instance or message pointer here, as the VM wrapper code

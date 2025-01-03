@@ -119,13 +119,6 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       None
     };
 
-    // Convert code pointer and size to Vec<u8>
-    let code = if !item.code.is_null() && item.code_size > 0 {
-      unsafe { std::slice::from_raw_parts(item.code, item.code_size) }.to_vec()
-    } else {
-      Vec::new()
-    };
-
     let kind: MessageKindWrapper = item.kind.into();
     AthenaMessageWrapper(AthenaMessage {
       kind: kind.0,
@@ -135,7 +128,6 @@ impl From<ffi::athcon_message> for AthenaMessageWrapper {
       sender: Address::from(item.sender.bytes),
       input_data,
       value: item.value,
-      code,
     })
   }
 }
@@ -144,11 +136,6 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
   fn from(item: AthenaMessageWrapper) -> Self {
     let kind = match item.0.kind {
       MessageKind::Call => ffi::athcon_call_kind::ATHCON_CALL,
-    };
-    let code = if !item.0.code.is_empty() {
-      Some(item.0.code.as_slice())
-    } else {
-      None
     };
     AthconExecutionMessage::new(
       kind,
@@ -162,7 +149,6 @@ impl From<AthenaMessageWrapper> for AthconExecutionMessage {
       },
       item.0.input_data.as_deref(),
       item.0.value,
-      code,
     )
   }
 }
@@ -178,7 +164,6 @@ impl From<&AthconExecutionMessage> for AthenaMessageWrapper {
       sender: Address::from(item.sender().bytes),
       input_data: item.input().cloned(),
       value: item.value(),
-      code: item.code().cloned().unwrap_or_default(),
     })
   }
 }

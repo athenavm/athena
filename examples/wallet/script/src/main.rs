@@ -235,7 +235,6 @@ mod tests {
           Address::default(),
           Some(payload.into()),
           Balance::default(),
-          vec![],
         ),
         super::ELF,
       );
@@ -269,7 +268,6 @@ mod tests {
         Address::default(),
         Some(payload.into()),
         Balance::default(),
-        vec![],
       ),
       super::ELF,
     );

@@ -118,16 +118,6 @@ extern "C"
      * This is transferred value for ::ATHCON_CALL or apparent value for ::ATHCON_DELEGATECALL.
      */
     uint64_t value;
-
-    /**
-     * The code to be executed.
-     */
-    const uint8_t *code;
-
-    /**
-     * The length of the code to be executed.
-     */
-    size_t code_size;
   };
 
   /** The transaction and block data for execution. */

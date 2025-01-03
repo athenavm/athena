@@ -59,7 +59,6 @@ pub struct ExecutionMessage {
   sender: Address,
   input: Option<Vec<u8>>,
   value: u64,
-  code: Option<Vec<u8>>,
 }
 
 /// ATHCON transaction context structure.
@@ -123,7 +122,6 @@ impl ExecutionMessage {
     sender: Address,
     input: Option<&[u8]>,
     value: u64,
-    code: Option<&[u8]>,
   ) -> Self {
     ExecutionMessage {
       kind,
@@ -133,7 +131,6 @@ impl ExecutionMessage {
       sender,
       input: input.map(|s| s.to_vec()),
       value,
-      code: code.map(|s| s.to_vec()),
     }
   }
 
@@ -170,11 +167,6 @@ impl ExecutionMessage {
   /// Read the value of the message.
   pub fn value(&self) -> u64 {
     self.value
-  }
-
-  /// Read the optional init code.
-  pub fn code(&self) -> Option<&Vec<u8>> {
-    self.code.as_ref()
   }
 }
 
@@ -246,13 +238,6 @@ impl<'a> ExecutionContext<'a> {
     } else {
       (null(), 0)
     };
-    let code = message.code();
-    let code_size = if let Some(code) = code { code.len() } else { 0 };
-    let code_data = if let Some(code) = code {
-      code.as_ptr()
-    } else {
-      null()
-    };
     // Cannot use a nice from trait here because that complicates memory management,
     // athcon_message doesn't have a release() method we could abstract it with.
     let message = ffi::athcon_message {
@@ -264,8 +249,6 @@ impl<'a> ExecutionContext<'a> {
       input_data,
       input_size,
       value: message.value,
-      code: code_data,
-      code_size,
     };
     unsafe {
       assert!(self.host.call.is_some());
@@ -380,16 +363,6 @@ impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
         Some(unsafe { slice::from_raw_parts(message.input_data, message.input_size).to_vec() })
       },
       value: message.value,
-      code: if message.code.is_null() {
-        if message.code_size != 0 {
-          return Err("msg.code is null but msg.code_size is not 0".to_string());
-        }
-        None
-      } else if message.code_size == 0 {
-        None
-      } else {
-        Some(unsafe { slice::from_raw_parts(message.code, message.code_size).to_vec() })
-      },
     })
   }
 }
@@ -536,7 +509,6 @@ mod tests {
       sender,
       Some(&input),
       value,
-      None,
     );
 
     assert_eq!(ret.kind(), MessageKind::ATHCON_CALL);
@@ -554,7 +526,6 @@ mod tests {
     let recipient = Address { bytes: [32u8; 24] };
     let sender = Address { bytes: [128u8; 24] };
     let value = 0;
-    let code = vec![0x5f, 0x5f, 0xfd];
 
     let ret = ExecutionMessage::new(
       MessageKind::ATHCON_CALL,
@@ -564,7 +535,6 @@ mod tests {
       sender,
       None,
       value,
-      Some(&code),
     );
 
     assert_eq!(ret.kind(), MessageKind::ATHCON_CALL);
@@ -573,8 +543,6 @@ mod tests {
     assert_eq!(*ret.recipient(), recipient);
     assert_eq!(*ret.sender(), sender);
     assert_eq!(ret.value, value);
-    assert!(ret.code().is_some());
-    assert_eq!(*ret.code().unwrap(), code);
   }
 
   fn valid_athcon_message() -> ffi::athcon_message {
@@ -591,8 +559,6 @@ mod tests {
       input_data: std::ptr::null(),
       input_size: 0,
       value,
-      code: std::ptr::null(),
-      code_size: 0,
     }
   }
 
@@ -608,7 +574,6 @@ mod tests {
     assert_eq!(*ret.sender(), msg.sender);
     assert!(ret.input().is_none());
     assert_eq!(ret.value, msg.value);
-    assert!(ret.code().is_none());
   }
 
   #[test]
@@ -631,41 +596,6 @@ mod tests {
     assert!(ret.input().is_some());
     assert_eq!(*ret.input().unwrap(), input);
     assert_eq!(ret.value, msg.value);
-    assert!(ret.code().is_none());
-  }
-
-  #[test]
-  fn message_from_ffi_with_code() {
-    let code = vec![0x5f, 0x5f, 0xfd];
-
-    let msg = &ffi::athcon_message {
-      code: code.as_ptr(),
-      code_size: code.len(),
-      ..valid_athcon_message()
-    };
-
-    let ret: ExecutionMessage = msg.try_into().unwrap();
-
-    assert_eq!(ret.kind(), msg.kind);
-    assert_eq!(ret.depth(), msg.depth);
-    assert_eq!(ret.gas(), msg.gas);
-    assert_eq!(*ret.recipient(), msg.recipient);
-    assert_eq!(*ret.sender(), msg.sender);
-    assert!(ret.input().is_none());
-    assert_eq!(ret.value, msg.value);
-    assert!(ret.code().is_some());
-    assert_eq!(*ret.code().unwrap(), code);
-  }
-
-  #[test]
-  fn message_from_ffi_code_size_must_be_0_when_no_code() {
-    let msg = &ffi::athcon_message {
-      code: std::ptr::null(),
-      code_size: 10,
-      ..valid_athcon_message()
-    };
-    let ret: Result<ExecutionMessage, _> = msg.try_into();
-    assert!(ret.is_err());
   }
 
   #[test]
@@ -762,7 +692,6 @@ mod tests {
       test_addr,
       None,
       0,
-      None,
     );
 
     let b = exe_context.call(&message);
@@ -790,7 +719,6 @@ mod tests {
       test_addr,
       Some(&data),
       0,
-      None,
     );
 
     let b = exe_context.call(&message);

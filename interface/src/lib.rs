@@ -144,13 +144,8 @@ pub struct AthenaMessage {
   pub sender: Address,
   pub input_data: Option<Vec<u8>>,
   pub value: Balance,
-  // code is currently unused, and it seems redundant.
-  // it's not in the yellow paper.
-  // TODO: remove me?
-  pub code: Vec<u8>,
 }
 
-#[allow(clippy::too_many_arguments)]
 impl AthenaMessage {
   pub fn new(
     kind: MessageKind,
@@ -160,7 +155,6 @@ impl AthenaMessage {
     sender: Address,
     input_data: Option<Vec<u8>>,
     value: Balance,
-    code: Vec<u8>,
   ) -> Self {
     AthenaMessage {
       kind,
@@ -170,7 +164,6 @@ impl AthenaMessage {
       sender,
       input_data,
       value,
-      code,
     }
   }
 }
