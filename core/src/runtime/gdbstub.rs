@@ -105,7 +105,7 @@ impl SingleThreadBase for Runtime<'_> {
   ) -> gdbstub::target::TargetResult<(), Self> {
     tracing::trace!("writing registers: {regs:?}");
     for (reg, value) in regs.x.iter().enumerate() {
-      self.rw(Register::from_u32(reg as u32), *value)
+      self.rw(Register::try_from(reg as u32).unwrap(), *value)
     }
 
     Ok(())
@@ -182,7 +182,7 @@ impl SingleRegisterAccess<()> for Runtime<'_> {
   ) -> gdbstub::target::TargetResult<usize, Self> {
     match reg_id {
       RiscvRegId::Gpr(id) => {
-        let value = self.registers()[id as usize];
+        let value = self.state.regs.read(Register::try_from(id as u32).unwrap());
         buf.copy_from_slice(&value.to_le_bytes());
         Ok(4)
       }
@@ -202,7 +202,7 @@ impl SingleRegisterAccess<()> for Runtime<'_> {
     match reg_id {
       RiscvRegId::Gpr(id) => {
         let value = u32::from_le_bytes(val.try_into().unwrap());
-        self.rw(Register::from_u32(id as u32), value);
+        self.rw(Register::try_from(id as u32).unwrap(), value);
       }
       RiscvRegId::Pc => {
         let value = u32::from_le_bytes(val.try_into().unwrap());
@@ -295,7 +295,7 @@ impl<'h> run_blocking::BlockingEventLoop for GdbBlockingEventLoop<'h> {
           ExecutionError::HaltWithNonZeroExitCode(code) => {
             SingleThreadStopReason::Exited(code as u8)
           }
-          ExecutionError::InvalidMemoryAccess(_, _) => {
+          ExecutionError::InvalidMemoryAccess(_, _, _) => {
             SingleThreadStopReason::Terminated(Signal::EXC_BAD_ACCESS)
           }
           ExecutionError::UnsupportedSyscall(_) => {
@@ -355,6 +355,7 @@ pub fn gdb_event_loop_thread<'h>(
             return Err(ExecutionError::InvalidMemoryAccess(
               crate::runtime::Opcode::UNIMP,
               0,
+              crate::runtime::MemoryErr::Unaligned,
             ))
           }
           Signal::SIGSYS => return Err(ExecutionError::UnsupportedSyscall(0)),

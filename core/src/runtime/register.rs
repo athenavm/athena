@@ -1,3 +1,5 @@
+use super::Base;
+
 /// A register stores a 32-bit value used by operations.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Register {
@@ -17,61 +19,97 @@ pub enum Register {
   X13 = 13,
   X14 = 14,
   X15 = 15,
-  X16 = 16,
-  X17 = 17,
-  X18 = 18,
-  X19 = 19,
-  X20 = 20,
-  X21 = 21,
-  X22 = 22,
-  X23 = 23,
-  X24 = 24,
-  X25 = 25,
-  X26 = 26,
-  X27 = 27,
-  X28 = 28,
-  X29 = 29,
-  X30 = 30,
-  X31 = 31,
+}
+impl Register {
+  // FIXME: remove all uses
+  pub(crate) fn from_u32(value: u32) -> Self {
+    Self::try_from(value).unwrap()
+  }
 }
 
-impl Register {
-  #[inline(always)]
-  pub fn from_u32(value: u32) -> Self {
+impl TryFrom<u32> for Register {
+  type Error = &'static str;
+  fn try_from(value: u32) -> Result<Self, Self::Error> {
     match value {
-      0 => Register::X0,
-      1 => Register::X1,
-      2 => Register::X2,
-      3 => Register::X3,
-      4 => Register::X4,
-      5 => Register::X5,
-      6 => Register::X6,
-      7 => Register::X7,
-      8 => Register::X8,
-      9 => Register::X9,
-      10 => Register::X10,
-      11 => Register::X11,
-      12 => Register::X12,
-      13 => Register::X13,
-      14 => Register::X14,
-      15 => Register::X15,
-      16 => Register::X16,
-      17 => Register::X17,
-      18 => Register::X18,
-      19 => Register::X19,
-      20 => Register::X20,
-      21 => Register::X21,
-      22 => Register::X22,
-      23 => Register::X23,
-      24 => Register::X24,
-      25 => Register::X25,
-      26 => Register::X26,
-      27 => Register::X27,
-      28 => Register::X28,
-      29 => Register::X29,
-      30 => Register::X30,
-      31 => Register::X31,
-      _ => panic!("invalid register {}", value),
+      0 => Ok(Register::X0),
+      1 => Ok(Register::X1),
+      2 => Ok(Register::X2),
+      3 => Ok(Register::X3),
+      4 => Ok(Register::X4),
+      5 => Ok(Register::X5),
+      6 => Ok(Register::X6),
+      7 => Ok(Register::X7),
+      8 => Ok(Register::X8),
+      9 => Ok(Register::X9),
+      10 => Ok(Register::X10),
+      11 => Ok(Register::X11),
+      12 => Ok(Register::X12),
+      13 => Ok(Register::X13),
+      14 => Ok(Register::X14),
+      15 => Ok(Register::X15),
+      _ => Err("register out of bounds"),
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Registers {
+  register_space: Vec<u32>,
+}
+
+impl Registers {
+  pub(crate) fn new(base: Base) -> Self {
+    let reg_count = match base {
+      Base::RV32E => 16,
+    };
+    Self {
+      register_space: (0..reg_count).map(|_| 0).collect(),
+    }
+  }
+
+  pub(crate) fn write(&mut self, reg: Register, value: u32) {
+    if reg == Register::X0 {
+      return;
+    }
+    self.register_space[reg as usize] = value;
+  }
+
+  pub(crate) fn read(&self, reg: Register) -> u32 {
+    self.register_space[reg as usize]
+  }
+
+  pub(crate) fn all(&self) -> &[u32] {
+    &self.register_space
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::runtime::{Base, Register, Registers};
+
+  #[test]
+  fn cannot_overwrite_x0() {
+    let mut regs = Registers::new(Base::RV32E);
+    assert_eq!(0, regs.read(Register::X0));
+
+    regs.write(Register::X0, 1234);
+    assert_eq!(0, regs.read(Register::X0));
+  }
+
+  #[test]
+  fn regs_start_zeroed() {
+    let regs = Registers::new(Base::RV32E);
+    assert_eq!([0; 16].as_slice(), regs.all());
+  }
+
+  #[test]
+  fn write_read() {
+    let mut regs = Registers::new(Base::RV32E);
+    for reg in 1..16 {
+      let value = reg + 100;
+      let reg = Register::try_from(reg).unwrap();
+      regs.write(reg, value);
+      assert_eq!(value, regs.read(reg));
     }
   }
 }
