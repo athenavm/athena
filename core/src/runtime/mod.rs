@@ -273,12 +273,14 @@ impl<'host> Runtime<'host> {
     match instruction {
       // Load upper immediate
       Instruction::Lui(rd, imm) => {
-        self.rw(rd, imm << 12);
+        // NOTE: the immediate is already shifted left by 12
+        self.rw(rd, imm);
       }
 
       // Add upper immediate to PC
       Instruction::Auipc(rd, imm) => {
-        let value = self.state.pc.wrapping_add_signed(imm << 12);
+        // NOTE: the immediate is already shifted left by 12
+        let value = self.state.pc.wrapping_add_signed(imm);
         self.rw(rd, value);
       }
 
@@ -1044,7 +1046,7 @@ pub mod tests {
 
   #[test]
   fn test_lui() {
-    let instructions = vec![Instruction::Lui(Register::X15, 123)];
+    let instructions = vec![Instruction::Lui(Register::X15, 123 << 12)];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
     runtime.execute().unwrap();
@@ -1058,11 +1060,11 @@ pub mod tests {
 
     let instructions = vec![
       // Add small positive immediate
-      Instruction::Auipc(Register::X5, 1), // 1 << 12 = 4096
+      Instruction::Auipc(Register::X5, 1 << 12), // 1 << 12 = 4096
       // Add larger positive immediate
-      Instruction::Auipc(Register::X6, 0x7FF), // 0x7FF << 12 = 0x7FF000
+      Instruction::Auipc(Register::X6, 0x7FF << 12), // 0x7FF << 12 = 0x7FF000
       // Add maximum positive immediate
-      Instruction::Auipc(Register::X7, 0xFFFFF), // 0xFFFFF << 12 = 0xFFFFF000
+      Instruction::Auipc(Register::X7, 0xFFFFF << 12), // 0xFFFFF << 12 = 0xFFFFF000
     ];
 
     let program = Program::new(instructions, 0, 0);
