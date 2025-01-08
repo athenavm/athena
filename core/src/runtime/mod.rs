@@ -1,17 +1,14 @@
 pub mod gdbstub;
 pub mod hooks;
-mod instruction;
 mod io;
 mod opcode;
 mod program;
 mod register;
 mod state;
 mod syscall;
-mod utils;
 
 use anyhow::anyhow;
 use athena_interface::MethodSelector;
-pub use instruction::*;
 pub use opcode::*;
 pub use program::*;
 pub use register::*;
@@ -29,6 +26,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::host::HostInterface;
+use crate::instruction::Instruction;
 use crate::utils::AthenaCoreOpts;
 
 use athena_interface::{AthenaContext, StatusCode};
@@ -95,8 +93,8 @@ pub enum ExecutionError {
   HaltWithNonZeroExitCode(u32),
   #[error("syscall failed with status code {0}")]
   SyscallFailed(StatusCode),
-  #[error("invalid memory access {2} for opcode {0} at address {1}")]
-  InvalidMemoryAccess(Opcode, u32, MemoryErr),
+  #[error("invalid memory access {2} at address {1} for instruction {0:?}")]
+  InvalidMemoryAccess(Instruction, u32, MemoryErr),
   #[error("unimplemented syscall {0}")]
   UnsupportedSyscall(u32),
   #[error("out of gas")]
@@ -109,6 +107,8 @@ pub enum ExecutionError {
   UnknownSymbol(),
   #[error("parsing code failed ({0})")]
   ParsingCodeFailed(String),
+  #[error("failed to fetch instruction at PC: {pc}")]
+  InstructionFetchFailed { pc: u32 },
 }
 
 #[non_exhaustive]
@@ -173,13 +173,6 @@ impl<'host> Runtime<'host> {
     }
   }
 
-  /// Recover runtime state from a program and existing execution state.
-  pub fn recover(program: Program, state: ExecutionState, opts: AthenaCoreOpts) -> Self {
-    let mut runtime = Self::new(program, None, opts, None);
-    runtime.state = state;
-    runtime
-  }
-
   fn registers(&self) -> &[u32] {
     self.state.regs.all()
   }
@@ -199,7 +192,7 @@ impl<'host> Runtime<'host> {
 
   /// Get the current value of a byte.
   pub fn byte(&self, addr: u32) -> u8 {
-    let word = self.word(addr - addr % 4);
+    let word = self.word(align(addr));
     (word >> ((addr % 4) * 8)) as u8
   }
 
@@ -236,11 +229,21 @@ impl<'host> Runtime<'host> {
     };
   }
 
-  /// Read from memory, address must be aligned.
-  pub fn mr_cpu(&mut self, addr: u32) -> Result<u32, MemoryErr> {
-    check_memory_access(addr)?;
-
+  // read a u32 from memory, addr must be aligned to 4.
+  fn read_memory_u32(&mut self, addr: u32) -> Result<u32, MemoryErr> {
+    if addr % 4 != 0 {
+      return Err(MemoryErr::Unaligned);
+    }
     Ok(self.mr(addr))
+  }
+
+  // read a u16 from memory, addr must be aligned to 2.
+  fn read_memory_u16(&mut self, addr: u32) -> Result<u16, MemoryErr> {
+    match addr % 4 {
+      0 => Ok(self.mr(align(addr)) as u16),
+      2 => Ok((self.mr(align(addr)) >> 16) as u16),
+      _ => Err(MemoryErr::Unaligned),
+    }
   }
 
   /// Write to memory.
@@ -261,212 +264,147 @@ impl<'host> Runtime<'host> {
     self.state.regs.write(register, value)
   }
 
-  /// Fetch the destination register and input operand values for an ALU instruction.
-  fn alu_rr(&self, instruction: Instruction) -> (Register, u32, u32) {
-    if !instruction.imm_c {
-      let (rd, rs1, rs2) = instruction.r_type();
-      let c = self.rr(rs2);
-      let b = self.rr(rs1);
-      (rd, b, c)
-    } else if !instruction.imm_b && instruction.imm_c {
-      let (rd, rs1, imm) = instruction.i_type();
-      let (rd, b, c) = (rd, self.rr(rs1), imm);
-      (rd, b, c)
-    } else {
-      assert!(instruction.imm_b && instruction.imm_c);
-      let (rd, b, c) = (
-        Register::from_u32(instruction.op_a),
-        instruction.op_b,
-        instruction.op_c,
-      );
-      (rd, b, c)
-    }
-  }
+  /// Execute the instruction and return the new PC
+  fn execute_instruction(&mut self, instruction: Instruction) -> Result<u32, ExecutionError> {
+    self.trace_execution(instruction);
 
-  /// Set the destination register with the result and emit an ALU event.
-  fn alu_rw(&mut self, _instruction: Instruction, rd: Register, a: u32, _b: u32, _c: u32) {
-    self.rw(rd, a);
-  }
-
-  /// Fetch the input operand values for a load instruction.
-  fn load_rr(
-    &mut self,
-    instruction: Instruction,
-  ) -> Result<(Register, u32, u32, u32, u32), ExecutionError> {
-    let (rd, rs1, imm) = instruction.i_type();
-    let (b, c) = (self.rr(rs1), imm);
-    let addr = b.wrapping_add(c);
-    let aligned_addr = align(addr);
-    let memory_value = self
-      .mr_cpu(aligned_addr)
-      .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction.opcode, aligned_addr, e))?;
-    Ok((rd, b, c, addr, memory_value))
-  }
-
-  /// Fetch the input operand values for a store instruction.
-  fn store_rr(&mut self, instruction: Instruction) -> (u32, u32, u32, u32, u32) {
-    let (rs1, rs2, imm) = instruction.s_type();
-    let c = imm;
-    let b = self.rr(rs2);
-    let a = self.rr(rs1);
-    let addr = b.wrapping_add(c);
-    let memory_value = self.word(align(addr));
-    (a, b, c, addr, memory_value)
-  }
-
-  /// Fetch the input operand values for a branch instruction.
-  fn branch_rr(&mut self, instruction: Instruction) -> (u32, u32, u32) {
-    let (rs1, rs2, imm) = instruction.b_type();
-    let c = imm;
-    let b = self.rr(rs2);
-    let a = self.rr(rs1);
-    (a, b, c)
-  }
-
-  /// Fetch the instruction at the current program counter.
-  fn fetch(&self) -> Instruction {
-    let idx = ((self.state.pc - self.program.pc_base) / 4) as usize;
-    self.program.instructions[idx]
-  }
-
-  /// Execute the given instruction over the current state of the runtime.
-  fn execute_instruction(&mut self, instruction: Instruction) -> Result<(), ExecutionError> {
     let mut next_pc = self.state.pc.wrapping_add(4);
 
-    let opcode = instruction.opcode;
-    match opcode {
-      // Arithmetic instructions.
-      Opcode::ADD => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b.wrapping_add(c);
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::SUB => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b.wrapping_sub(c);
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::XOR => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b ^ c;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::OR => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b | c;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::AND => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b & c;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::SLL => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b.wrapping_shl(c);
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::SRL => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b.wrapping_shr(c);
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::SRA => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = (b as i32).wrapping_shr(c) as u32;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::SLT => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = if (b as i32) < (c as i32) { 1 } else { 0 };
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::SLTU => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = if b < c { 1 } else { 0 };
-        self.alu_rw(instruction, rd, value, b, c);
+    match instruction {
+      // Load upper immediate
+      Instruction::Lui(rd, imm) => {
+        self.rw(rd, imm << 12);
       }
 
-      // Load instructions.
-      Opcode::LB => {
-        let (rd, _, _, addr, memory_read_value) = self.load_rr(instruction)?;
+      // Add upper immediate to PC
+      Instruction::Auipc(rd, imm) => {
+        let value = self.state.pc.wrapping_add_signed(imm << 12);
+        self.rw(rd, value);
+      }
+
+      // Jump and link
+      Instruction::Jal(rd, imm) => {
+        let value = self.state.pc + 4;
+        self.rw(rd, value);
+        next_pc = self.state.pc.wrapping_add_signed(imm);
+      }
+
+      // Jump and link register
+      Instruction::Jalr(rd, rs1, imm) => {
+        let value = self.state.pc + 4;
+        next_pc = self.rr(rs1).wrapping_add_signed(imm);
+        self.rw(rd, value);
+      }
+
+      // Load instructions
+      Instruction::Lb(rd, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let memory_read_value = self.mr(align(addr));
         let value = memory_read_value.to_le_bytes()[(addr % 4) as usize] as i8;
-        // sign-extend
-        let value = value as i32;
-        self.rw(rd, value as u32);
+        self.rw(rd, value as i32 as u32);
       }
-      Opcode::LH => {
-        let (rd, _, _, addr, memory_read_value) = self.load_rr(instruction)?;
-        let value = match addr % 4 {
-          0 => memory_read_value & 0x0000FFFF,
-          2 => (memory_read_value & 0xFFFF0000) >> 16,
-          _ => {
-            return Err(ExecutionError::InvalidMemoryAccess(
-              opcode,
-              addr,
-              MemoryErr::Unaligned,
-            ))
-          }
-        } as i16;
-        // sign-extend
-        let value = value as i32;
-        self.rw(rd, value as u32);
+
+      Instruction::Lh(rd, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self
+          .read_memory_u16(addr)
+          .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction, addr, e))?
+          as i16;
+        self.rw(rd, value as i32 as u32);
       }
-      Opcode::LW => {
-        let (rd, _, _, addr, memory_read_value) = self.load_rr(instruction)?;
-        if addr % 4 != 0 {
-          return Err(ExecutionError::InvalidMemoryAccess(
-            opcode,
-            addr,
-            MemoryErr::Unaligned,
-          ));
-        }
-        self.rw(rd, memory_read_value);
+
+      Instruction::Lw(rd, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self
+          .read_memory_u32(addr)
+          .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction, addr, e))?;
+        self.rw(rd, value);
       }
-      Opcode::LBU => {
-        let (rd, _, _, addr, memory_read_value) = self.load_rr(instruction)?;
-        let value = memory_read_value.to_le_bytes()[(addr % 4) as usize];
-        self.rw(rd, value as u32);
-      }
-      Opcode::LHU => {
-        let (rd, _, _, addr, memory_read_value) = self.load_rr(instruction)?;
-        let value = match addr % 4 {
-          0 => memory_read_value & 0x0000FFFF,
-          2 => (memory_read_value & 0xFFFF0000) >> 16,
-          _ => {
-            return Err(ExecutionError::InvalidMemoryAccess(
-              opcode,
-              addr,
-              MemoryErr::Unaligned,
-            ))
-          }
-        } as u16;
+
+      Instruction::Lbu(rd, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self.byte(addr);
         self.rw(rd, value as u32);
       }
 
-      // Store instructions.
-      Opcode::SB => {
-        let (value, _, _, addr, memory_read_value) = self.store_rr(instruction);
+      Instruction::Lhu(rd, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self
+          .read_memory_u16(addr)
+          .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction, addr, e))?;
+        self.rw(rd, value as u32);
+      }
+
+      // Immediate arithmetic
+      Instruction::Addi(rd, rs1, imm) => {
+        self.rw(rd, self.rr(rs1).wrapping_add_signed(imm));
+      }
+      // SLTI (set less than immediate) places the value 1 in register rd
+      // if register rs1 is less than the sign-extended immediate when both are treated as signed numbers,
+      // else 0 is written to rd.
+      Instruction::Slti(rd, rs1, imm) => {
+        self.rw(rd, if (self.rr(rs1) as i32) < imm { 1 } else { 0 });
+      }
+
+      // SLTIU is compares the values as unsigned numbers
+      // (i.e., the immediate is first sign-extended to XLEN bits then treated as an unsigned number).
+      // Note, SLTIU rd, rs1, 1 sets rd to 1 if rs1 equals zero, otherwise sets rd to 0.
+      Instruction::Sltiu(rd, rs1, imm) => {
+        self.rw(rd, if self.rr(rs1) < imm as u32 { 1 } else { 0 });
+      }
+
+      Instruction::Xori(rd, rs1, imm) => {
+        self.rw(rd, self.rr(rs1) ^ imm as u32);
+      }
+
+      Instruction::Ori(rd, rs1, imm) => {
+        self.rw(rd, self.rr(rs1) | imm as u32);
+      }
+
+      Instruction::Andi(rd, rs1, imm) => {
+        self.rw(rd, self.rr(rs1) & imm as u32);
+      }
+
+      Instruction::Slli(rd, rs1, imm) => {
+        self.rw(rd, self.rr(rs1).wrapping_shl(imm));
+      }
+
+      Instruction::Srli(rd, rs1, imm) => {
+        self.rw(rd, self.rr(rs1).wrapping_shr(imm));
+      }
+
+      Instruction::Srai(rd, rs1, imm) => {
+        self.rw(rd, ((self.rr(rs1) as i32).wrapping_shr(imm)) as u32);
+      }
+
+      // Store instructions
+      Instruction::Sb(rs2, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self.rr(rs2) & 0xFF;
+        let memory_read_value = self.mr(align(addr));
         let value = match addr % 4 {
-          0 => (value & 0x000000FF) + (memory_read_value & 0xFFFFFF00),
-          1 => ((value & 0x000000FF) << 8) + (memory_read_value & 0xFFFF00FF),
-          2 => ((value & 0x000000FF) << 16) + (memory_read_value & 0xFF00FFFF),
-          3 => ((value & 0x000000FF) << 24) + (memory_read_value & 0x00FFFFFF),
+          0 => value + (memory_read_value & 0xFFFFFF00),
+          1 => (value << 8) + (memory_read_value & 0xFFFF00FF),
+          2 => (value << 16) + (memory_read_value & 0xFF00FFFF),
+          3 => (value << 24) + (memory_read_value & 0x00FFFFFF),
           _ => unreachable!(),
         };
         let addr = align(addr);
         self
           .mw_cpu(addr, value)
-          .map_err(|e| ExecutionError::InvalidMemoryAccess(opcode, addr, e))?;
+          .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction, addr, e))?;
       }
-      Opcode::SH => {
-        let (value, _, _, addr, memory_read_value) = self.store_rr(instruction);
+
+      Instruction::Sh(rs2, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self.rr(rs2) & 0xFFFF;
+        let memory_read_value = self.mr(align(addr));
         let value = match addr % 4 {
-          0 => (value & 0x0000FFFF) + (memory_read_value & 0xFFFF0000),
-          2 => ((value & 0x0000FFFF) << 16) + (memory_read_value & 0x0000FFFF),
+          0 => value + (memory_read_value & 0xFFFF0000),
+          2 => (value << 16) + (memory_read_value & 0x0000FFFF),
           _ => {
             return Err(ExecutionError::InvalidMemoryAccess(
-              Opcode::SH,
+              instruction,
               addr,
               MemoryErr::Unaligned,
             ))
@@ -474,80 +412,153 @@ impl<'host> Runtime<'host> {
         };
         let addr = align(addr);
         self
-          .mw_cpu(align(addr), value)
-          .map_err(|e| ExecutionError::InvalidMemoryAccess(opcode, addr, e))?;
+          .mw_cpu(addr, value)
+          .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction, addr, e))?;
       }
-      Opcode::SW => {
-        let (value, _, _, addr, _) = self.store_rr(instruction);
+
+      Instruction::Sw(rs2, rs1, imm) => {
+        let addr = self.rr(rs1).wrapping_add_signed(imm);
+        let value = self.rr(rs2);
         self
           .mw_cpu(addr, value)
-          .map_err(|e| ExecutionError::InvalidMemoryAccess(opcode, addr, e))?;
+          .map_err(|e| ExecutionError::InvalidMemoryAccess(instruction, addr, e))?;
       }
 
-      // B-type instructions.
-      Opcode::BEQ => {
-        let (value, b, c) = self.branch_rr(instruction);
-        if value == b {
-          next_pc = self.state.pc.wrapping_add(c);
-        }
+      // Register arithmetic
+      Instruction::Add(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1).wrapping_add(self.rr(rs2)));
       }
-      Opcode::BNE => {
-        let (value, b, c) = self.branch_rr(instruction);
-        if value != b {
-          next_pc = self.state.pc.wrapping_add(c);
-        }
+
+      Instruction::Sub(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1).wrapping_sub(self.rr(rs2)));
       }
-      Opcode::BLT => {
-        let (value, b, c) = self.branch_rr(instruction);
-        if (value as i32) < (b as i32) {
-          next_pc = self.state.pc.wrapping_add(c);
-        }
+
+      Instruction::Sll(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1).wrapping_shl(self.rr(rs2)));
       }
-      Opcode::BGE => {
-        let (value, b, c) = self.branch_rr(instruction);
-        if (value as i32) >= (b as i32) {
-          next_pc = self.state.pc.wrapping_add(c);
-        }
+
+      Instruction::Slt(rd, rs1, rs2) => {
+        self.rw(
+          rd,
+          if (self.rr(rs1) as i32) < (self.rr(rs2) as i32) {
+            1
+          } else {
+            0
+          },
+        );
       }
-      Opcode::BLTU => {
-        let (value, b, c) = self.branch_rr(instruction);
-        if value < b {
-          next_pc = self.state.pc.wrapping_add(c);
-        }
+
+      Instruction::Sltu(rd, rs1, rs2) => {
+        self.rw(rd, if self.rr(rs1) < self.rr(rs2) { 1 } else { 0 });
       }
-      Opcode::BGEU => {
-        let (value, b, c) = self.branch_rr(instruction);
-        if value >= b {
-          next_pc = self.state.pc.wrapping_add(c);
+
+      Instruction::Xor(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1) ^ self.rr(rs2));
+      }
+
+      Instruction::Srl(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1).wrapping_shr(self.rr(rs2)));
+      }
+
+      Instruction::Sra(rd, rs1, rs2) => {
+        self.rw(
+          rd,
+          ((self.rr(rs1) as i32).wrapping_shr(self.rr(rs2))) as u32,
+        );
+      }
+
+      Instruction::Or(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1) | self.rr(rs2));
+      }
+
+      Instruction::And(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1) & self.rr(rs2));
+      }
+
+      // Branch instructions
+      Instruction::Beq(rs1, rs2, imm) => {
+        if self.rr(rs1) == self.rr(rs2) {
+          next_pc = self.state.pc.wrapping_add_signed(imm);
         }
       }
 
-      // Jump instructions.
-      Opcode::JAL => {
-        let (rd, imm) = instruction.j_type();
-        let value = self.state.pc + 4;
+      Instruction::Bne(rs1, rs2, imm) => {
+        if self.rr(rs1) != self.rr(rs2) {
+          next_pc = self.state.pc.wrapping_add_signed(imm);
+        }
+      }
+
+      Instruction::Blt(rs1, rs2, imm) => {
+        if (self.rr(rs1) as i32) < (self.rr(rs2) as i32) {
+          next_pc = self.state.pc.wrapping_add_signed(imm);
+        }
+      }
+
+      Instruction::Bge(rs1, rs2, imm) => {
+        if (self.rr(rs1) as i32) >= (self.rr(rs2) as i32) {
+          next_pc = self.state.pc.wrapping_add_signed(imm);
+        }
+      }
+
+      Instruction::Bltu(rs1, rs2, imm) => {
+        if self.rr(rs1) < self.rr(rs2) {
+          next_pc = self.state.pc.wrapping_add_signed(imm);
+        }
+      }
+
+      Instruction::Bgeu(rs1, rs2, imm) => {
+        if self.rr(rs1) >= self.rr(rs2) {
+          next_pc = self.state.pc.wrapping_add_signed(imm);
+        }
+      }
+
+      // Multiply instructions
+      Instruction::Mul(rd, rs1, rs2) => {
+        self.rw(rd, self.rr(rs1).wrapping_mul(self.rr(rs2)));
+      }
+
+      Instruction::Mulh(rd, rs1, rs2) => {
+        let value =
+          (((self.rr(rs1) as i32) as i64).wrapping_mul((self.rr(rs2) as i32) as i64) >> 32) as u32;
         self.rw(rd, value);
-        next_pc = self.state.pc.wrapping_add(imm);
       }
-      Opcode::JALR => {
-        let (rd, rs1, imm) = instruction.i_type();
-        let (b, c) = (self.rr(rs1), imm);
-        let value = self.state.pc + 4;
-        self.rw(rd, value);
-        next_pc = b.wrapping_add(c);
-      }
-
-      // Upper immediate instructions.
-      Opcode::AUIPC => {
-        let (rd, imm) = instruction.u_type();
-        let value = self.state.pc.wrapping_add(imm);
+      Instruction::Mulhsu(rd, rs1, rs2) => {
+        let value = (((self.rr(rs1) as i32) as i64).wrapping_mul(self.rr(rs2) as i64) >> 32) as u32;
         self.rw(rd, value);
       }
-
-      // System instructions.
-      Opcode::ECALL => {
-        // We peek at register x5 to get the syscall id. The reason we don't `self.rr` this
-        // register is that we write to it later.
+      Instruction::Mulhu(rd, rs1, rs2) => {
+        let value = ((self.rr(rs1) as u64).wrapping_mul(self.rr(rs2) as u64) >> 32) as u32;
+        self.rw(rd, value);
+      }
+      Instruction::Div(rd, rs1, rs2) => {
+        let rhs = self.rr(rs2);
+        let value = if rhs == 0 {
+          u32::MAX
+        } else {
+          (self.rr(rs1) as i32).wrapping_div(rhs as i32) as u32
+        };
+        self.rw(rd, value);
+      }
+      Instruction::Divu(rd, rs1, rs2) => {
+        let rhs = self.rr(rs2);
+        let value = if rhs == 0 {
+          u32::MAX
+        } else {
+          self.rr(rs1).wrapping_div(rhs)
+        };
+        self.rw(rd, value);
+      }
+      Instruction::Rem(rd, rs1, rs2) => {
+        let (lhs, rhs) = (self.rr(rs1) as i32, self.rr(rs2) as i32);
+        let value = if rhs == 0 { lhs } else { lhs.wrapping_rem(rhs) };
+        self.rw(rd, value as u32);
+      }
+      Instruction::Remu(rd, rs1, rs2) => {
+        let (lhs, rhs) = (self.rr(rs1), self.rr(rs2));
+        let value = if rhs == 0 { lhs } else { lhs.wrapping_rem(rhs) };
+        self.rw(rd, value);
+      }
+      Instruction::Ecall => {
         let t0 = Register::X5;
         let syscall_id = self.register(t0);
         let c = self.rr(Register::X11);
@@ -560,8 +571,6 @@ impl<'host> Runtime<'host> {
           .clone();
         let mut ctx = SyscallContext::new(self);
 
-        // Executing a syscall optionally returns a value to write to the t0 register.
-        // If it returns None, we just keep the syscall_id in t0.
         let result = syscall_impl
           .execute(&mut ctx, b, c)
           .map_err(ExecutionError::SyscallFailed)?;
@@ -581,97 +590,31 @@ impl<'host> Runtime<'host> {
           }
         };
 
-        // Allow the syscall impl to modify state.clk/pc (exit unconstrained does this)
-        self.state.clk += syscall_impl.num_extra_cycles();
+        self.state.gas += syscall_impl.num_extra_cycles();
       }
-      Opcode::EBREAK => {
+      Instruction::Ebreak => {
         return Err(ExecutionError::Breakpoint());
       }
-
-      // Multiply instructions.
-      Opcode::MUL => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = b.wrapping_mul(c);
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::MULH => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = (((b as i32) as i64).wrapping_mul((c as i32) as i64) >> 32) as u32;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::MULHU => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = ((b as u64).wrapping_mul(c as u64) >> 32) as u32;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::MULHSU => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = (((b as i32) as i64).wrapping_mul(c as i64) >> 32) as u32;
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::DIV => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = if c == 0 {
-          u32::MAX
-        } else {
-          (b as i32).wrapping_div(c as i32) as u32
-        };
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::DIVU => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = if c == 0 {
-          // TODO:(poszu): check if it should error -out (division by zero)
-          u32::MAX
-        } else {
-          b.wrapping_div(c)
-        };
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::REM => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = if c == 0 {
-          b
-        } else {
-          (b as i32).wrapping_rem(c as i32) as u32
-        };
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-      Opcode::REMU => {
-        let (rd, b, c) = self.alu_rr(instruction);
-        let value = if c == 0 { b } else { b.wrapping_rem(c) };
-        self.alu_rw(instruction, rd, value, b, c);
-      }
-
-      // See https://github.com/riscv-non-isa/riscv-asm-manual/blob/master/riscv-asm.md#instruction-aliases
-      Opcode::UNIMP => {
+      Instruction::NotImplemented { opcode } => {
+        tracing::error!(opcode, "found unimplemented opcode");
         return Err(ExecutionError::Unimplemented());
       }
     }
-
-    // Update the program counter.
     self.state.pc = next_pc;
+    self.state.gas += 4;
+    self.state.global_clk += 1;
 
-    // Update the clk to the next cycle.
-    self.state.clk += 4;
-
-    Ok(())
+    Ok(next_pc)
   }
 
-  /// Executes one cycle of the program, returning whether the program has finished.
   #[inline]
   fn execute_cycle(&mut self) -> Result<Option<Event>, ExecutionError> {
-    // Fetch the instruction at the current program counter.
-    let instruction = self.fetch();
+    let instruction = self
+      .program
+      .instruction(self.state.pc)
+      .ok_or(ExecutionError::InstructionFetchFailed { pc: self.state.pc })?;
 
-    // Log the current state of the runtime.
-    self.log(&instruction);
-
-    // Execute the instruction.
     self.execute_instruction(instruction)?;
-
-    // Increment the clock.
-    self.state.global_clk += 1;
 
     if self.breakpoints.contains(&self.state.pc) {
       return Ok(Some(Event::Break));
@@ -703,11 +646,11 @@ impl<'host> Runtime<'host> {
     // gas left can be negative, if we spent too much on the last instruction
     self
       .max_gas
-      .map(|max_gas| max_gas as i64 - self.state.clk as i64)
+      .map(|max_gas| max_gas as i64 - self.state.gas as i64)
   }
 
   pub fn initialize(&mut self) {
-    self.state.clk = 0;
+    self.state.gas = 0;
 
     // TODO: do we want to load all of the memory when executing a particular function?
     tracing::info!("loading memory image");
@@ -783,7 +726,7 @@ impl<'host> Runtime<'host> {
   fn postprocess(&mut self) {
     tracing::info!(
       "finished execution clk = {} global_clk = {} pc = 0x{:x?}",
-      self.state.clk,
+      self.state.gas,
       self.state.global_clk,
       self.state.pc
     );
@@ -818,6 +761,7 @@ impl<'host> Runtime<'host> {
   pub fn register_hook(&mut self, fd: u32, hook: Box<dyn hooks::Hook>) -> anyhow::Result<()> {
     self.hook_registry.register(fd, hook)
   }
+
   pub(crate) fn execute_hook(&self, fd: u32, data: &[u8]) -> anyhow::Result<Vec<u8>> {
     let hook = self
       .hook_registry
@@ -825,12 +769,30 @@ impl<'host> Runtime<'host> {
       .ok_or_else(|| anyhow!("no hook registered for FD {fd}"))?;
     hook.execute(hooks::HookEnv { runtime: self }, data)
   }
+
+  fn trace_execution(&mut self, instruction: Instruction) {
+    // Write the current program counter to the trace buffer for the cycle tracer.
+    if let Some(ref mut buf) = self.trace_buf {
+      if !self.unconstrained {
+        buf.write_all(&u32::to_be_bytes(self.state.pc)).unwrap();
+      }
+    }
+
+    tracing::trace!(
+      clk = self.state.gas,
+      global_clk = self.state.global_clk,
+      pc = format_args!("0x{:x}", self.state.pc),
+      instruction = ?instruction,
+      registers = ?self.state.regs,
+    );
+  }
 }
 
 #[cfg(test)]
 pub mod tests {
-
-  use crate::{host::MockHostInterface, runtime::ExecutionError, utils::with_max_gas};
+  use crate::{
+    host::MockHostInterface, instruction::Instruction, runtime::ExecutionError, utils::with_max_gas,
+  };
   use athena_interface::{Address, AthenaContext, ExecutionResult, StatusCode, ADDRESS_LENGTH};
 
   use crate::{
@@ -842,7 +804,7 @@ pub mod tests {
     hooks::{self, MockHook},
     syscall::SyscallCode,
   };
-  use super::{Instruction, Opcode, Program, Runtime};
+  use super::{Program, Runtime};
 
   pub(crate) fn setup_logger() {
     let _ = tracing_subscriber::fmt()
@@ -861,9 +823,9 @@ pub mod tests {
   #[test]
   fn test_gas() {
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::ADD, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Add(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
     let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
@@ -915,93 +877,63 @@ pub mod tests {
 
     // write address to memory
     for (i, word) in address.as_ref().chunks_exact(4).enumerate() {
-      instructions.push(Instruction::new(
-        Opcode::ADD,
-        Register::X14 as u32,
-        0,
-        u32::from_le_bytes(word.try_into().unwrap()),
-        false,
-        true,
+      instructions.push(Instruction::Addi(
+        Register::X14,
+        Register::X0,
+        u32::from_le_bytes(word.try_into().unwrap()) as i32,
       ));
-      instructions.push(Instruction::new(
-        Opcode::SW,
-        Register::X14 as u32,
-        0,
-        memloc + i as u32 * 4,
-        false,
-        true,
+      instructions.push(Instruction::Sw(
+        Register::X14,
+        Register::X0,
+        (memloc + i as u32 * 4) as i32,
       ));
     }
 
     // write value to memory
-    instructions.push(Instruction::new(
-      Opcode::ADD,
-      Register::X14 as u32,
-      0,
-      amount_to_send,
-      false,
-      true,
+    instructions.push(Instruction::Addi(
+      Register::X14,
+      Register::X0,
+      amount_to_send as i32,
     ));
-    instructions.push(Instruction::new(
-      Opcode::SW,
-      Register::X14 as u32,
-      0,
-      memloc2,
-      false,
-      true,
-    ));
-    instructions.push(Instruction::new(
-      Opcode::ADD,
-      Register::X14 as u32,
-      0,
-      0,
-      false,
-      true,
-    ));
-    instructions.push(Instruction::new(
-      Opcode::SW,
-      Register::X14 as u32,
-      0,
-      memloc2 + 4,
-      false,
-      true,
+    instructions.push(Instruction::Sw(Register::X14, Register::X0, memloc2 as i32));
+
+    instructions.push(Instruction::Addi(Register::X14, Register::X0, 0));
+    instructions.push(Instruction::Sw(
+      Register::X14,
+      Register::X0,
+      (memloc2 + 4) as i32,
     ));
 
     // X10 is arg1 (ptr to address)
-    instructions.push(Instruction::new(
-      Opcode::ADD,
-      Register::X10 as u32,
-      0,
-      memloc,
-      false,
-      true,
+    instructions.push(Instruction::Addi(
+      Register::X10,
+      Register::X0,
+      memloc as i32,
     ));
-    instructions.push(
-      // X11 is arg2 (ptr to input)
-      // zero pointer
-      Instruction::new(Opcode::ADD, Register::X11 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X12 is arg3 (input len)
-      // no input
-      Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
-    );
-    instructions.push(
-      // X13 is arg4 (value ptr)
-      Instruction::new(Opcode::ADD, Register::X13 as u32, 0, memloc2, false, true),
-    );
-    instructions.push(
-      // X5 is syscall ID
-      Instruction::new(
-        Opcode::ADD,
-        Register::X5 as u32,
-        0,
-        SyscallCode::HOST_CALL as u32,
-        false,
-        true,
-      ),
-    );
-    instructions.push(Instruction::new(Opcode::ECALL, 0, 0, 0, false, false));
+
+    // X11 is arg2 (ptr to input)
+    // zero pointer
+    instructions.push(Instruction::Addi(Register::X11, Register::X0, 0));
+
+    // X12 is arg3 (input len)
+    // no input
+    instructions.push(Instruction::Addi(Register::X12, Register::X0, 0));
+
+    // X13 is arg4 (value ptr)
+    instructions.push(Instruction::Addi(
+      Register::X13,
+      Register::X0,
+      memloc2 as i32,
+    ));
+
+    // X5 is syscall ID
+    instructions.push(Instruction::Addi(
+      Register::X5,
+      Register::X0,
+      SyscallCode::HOST_CALL as i32,
+    ));
+
+    instructions.push(Instruction::Ecall);
     let program = Program::new(instructions, 0, 0);
 
     let mut host = MockHostInterface::new();
@@ -1024,32 +956,18 @@ pub mod tests {
     let instructions = vec![
       // X10 is arg1 (ptr to address)
       // memory location to store an address
-      Instruction::new(
-        Opcode::ADD,
-        Register::X10 as u32,
-        0,
-        0x12345678,
-        false,
-        true,
-      ),
+      Instruction::Addi(Register::X10, Register::X0, 0x12345678),
       // store arbitrary address here
-      Instruction::new(Opcode::SW, Register::X10 as u32, 0, 0x12345678, false, true),
+      Instruction::Sw(Register::X10, Register::X0, 0x12345678),
       // X11 is arg2 (ptr to input)
       // zero pointer
-      Instruction::new(Opcode::ADD, Register::X11 as u32, 0, 0, false, true),
+      Instruction::Addi(Register::X11, Register::X0, 0),
       // X12 is arg3 (input len)
       // no input
-      Instruction::new(Opcode::ADD, Register::X12 as u32, 0, 0, false, true),
+      Instruction::Addi(Register::X12, Register::X0, 0),
       // X5 is syscall ID
-      Instruction::new(
-        Opcode::ADD,
-        Register::X5 as u32,
-        0,
-        SyscallCode::HOST_CALL as u32,
-        false,
-        true,
-      ),
-      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+      Instruction::Addi(Register::X5, Register::X0, SyscallCode::HOST_CALL as i32),
+      Instruction::Ecall,
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1077,17 +995,14 @@ pub mod tests {
     let instructions = vec![
       // X10 is arg1 (ptr to address)
       // store result here
-      Instruction::new(Opcode::ADD, Register::X10 as u32, 0, memloc, false, true),
+      Instruction::Addi(Register::X10, Register::X0, memloc as i32),
       // X5 is syscall ID
-      Instruction::new(
-        Opcode::ADD,
-        Register::X5 as u32,
-        0,
-        SyscallCode::HOST_GETBALANCE as u32,
-        false,
-        true,
+      Instruction::Addi(
+        Register::X5,
+        Register::X0,
+        SyscallCode::HOST_GETBALANCE as i32,
       ),
-      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+      Instruction::Ecall,
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1109,15 +1024,8 @@ pub mod tests {
   #[test]
   fn test_syscall_fail() {
     let instructions = vec![
-      Instruction::new(
-        Opcode::ADD,
-        Register::X5 as u32,
-        0,
-        SyscallCode::WRITE as u32,
-        false,
-        true,
-      ),
-      Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+      Instruction::Addi(Register::X5, Register::X0, SyscallCode::WRITE as i32),
+      Instruction::Ecall,
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, Default::default(), None);
@@ -1135,15 +1043,55 @@ pub mod tests {
   }
 
   #[test]
+  fn test_lui() {
+    let instructions = vec![Instruction::Lui(Register::X15, 123)];
+    let program = Program::new(instructions, 0, 0);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
+    runtime.execute().unwrap();
+    assert_eq!(runtime.register(Register::X15), 123 << 12);
+  }
+
+  #[test]
+  fn test_auipc() {
+    // Test adding different immediate values to PC
+    // PC starts at 0, so we can easily calculate expected results
+
+    let instructions = vec![
+      // Add small positive immediate
+      Instruction::Auipc(Register::X5, 1), // 1 << 12 = 4096
+      // Add larger positive immediate
+      Instruction::Auipc(Register::X6, 0x7FF), // 0x7FF << 12 = 0x7FF000
+      // Add maximum positive immediate
+      Instruction::Auipc(Register::X7, 0xFFFFF), // 0xFFFFF << 12 = 0xFFFFF000
+    ];
+
+    let program = Program::new(instructions, 0, 0);
+    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
+    runtime.execute().unwrap();
+
+    // First AUIPC: PC = 0, imm = 1
+    // Expected: 0 + (1 << 12) = 4096
+    assert_eq!(runtime.register(Register::X5), 4096);
+
+    // Second AUIPC: PC = 4, imm = 0x7FF
+    // Expected: 4 + (0x7FF << 12) = 0x7FF004
+    assert_eq!(runtime.register(Register::X6), 0x7FF004);
+
+    // Third AUIPC: PC = 8, imm = 0xFFFFF
+    // Expected: 8 + (0xFFFFF << 12) = 0xFFFFF008
+    assert_eq!(runtime.register(Register::X7), 0xFFFFF008);
+  }
+
+  #[test]
   fn test_add() {
     // main:
     //     addi x29, x0, 5
     //     addi x30, x0, 37
     //     add x31, x30, x29
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::ADD, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Add(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1157,9 +1105,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     sub x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::SUB, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Sub(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1174,9 +1122,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     xor x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::XOR, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Xor(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1191,9 +1139,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     or x15, x14 x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::OR, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Or(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1209,9 +1157,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     and x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::AND, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::And(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1226,9 +1174,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     sll x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::SLL, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Sll(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1243,9 +1191,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     srl x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::SRL, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Srl(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1260,9 +1208,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     sra x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::SRA, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Sra(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1277,9 +1225,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     slt x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::SLT, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Slt(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1294,9 +1242,9 @@ pub mod tests {
     //     addi x14, x0, 37
     //     sltu x15, x14, x13
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 0, 37, false, true),
-      Instruction::new(Opcode::SLTU, 15, 14, 13, false, false),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X0, 37),
+      Instruction::Sltu(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1311,9 +1259,9 @@ pub mod tests {
     //     addi x14, x13, 37
     //     addi x15, x14, 42
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 13, 37, false, true),
-      Instruction::new(Opcode::ADD, 15, 14, 42, false, true),
+      crate::instruction::Instruction::Addi(Register::X13, Register::X0, 5),
+      crate::instruction::Instruction::Addi(Register::X14, Register::X13, 37),
+      crate::instruction::Instruction::Addi(Register::X15, Register::X14, 42),
     ];
     let program = Program::new(instructions, 0, 0);
 
@@ -1328,9 +1276,9 @@ pub mod tests {
     //     addi x14, x13, -1
     //     addi x15, x14, 4
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::ADD, 14, 13, 0xffffffff, false, true),
-      Instruction::new(Opcode::ADD, 15, 14, 4, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Addi(Register::X14, Register::X13, -1),
+      Instruction::Addi(Register::X15, Register::X14, 4),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1344,9 +1292,9 @@ pub mod tests {
     //     xori x14, x13, 37
     //     xori x15, x14, 42
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::XOR, 14, 13, 37, false, true),
-      Instruction::new(Opcode::XOR, 15, 14, 42, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Xori(Register::X14, Register::X13, 37),
+      Instruction::Xori(Register::X15, Register::X14, 42),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1360,9 +1308,9 @@ pub mod tests {
     //     ori x14, x13, 37
     //     ori x15, x14, 42
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::OR, 14, 13, 37, false, true),
-      Instruction::new(Opcode::OR, 15, 14, 42, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Ori(Register::X14, Register::X13, 37),
+      Instruction::Ori(Register::X15, Register::X14, 42),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1376,9 +1324,9 @@ pub mod tests {
     //     andi x14, x13, 37
     //     andi x15, x14, 42
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::AND, 14, 13, 37, false, true),
-      Instruction::new(Opcode::AND, 15, 13, 42, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Andi(Register::X14, Register::X13, 37),
+      Instruction::Andi(Register::X15, Register::X13, 42),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1391,8 +1339,8 @@ pub mod tests {
     //     addi x13, x0, 5
     //     slli x15, x13, 4
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 5, false, true),
-      Instruction::new(Opcode::SLL, 15, 13, 4, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 5),
+      Instruction::Slli(Register::X15, Register::X13, 4),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1405,8 +1353,8 @@ pub mod tests {
     //    addi x13, x0, 42
     //    srli x15, x13, 4
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 42, false, true),
-      Instruction::new(Opcode::SRL, 15, 13, 4, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 42),
+      Instruction::Srli(Register::X15, Register::X13, 4),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1419,8 +1367,8 @@ pub mod tests {
     //   addi x13, x0, 42
     //   srai x15, x13, 4
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 42, false, true),
-      Instruction::new(Opcode::SRA, 15, 13, 4, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 42),
+      Instruction::Srai(Register::X15, Register::X13, 4),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1433,8 +1381,8 @@ pub mod tests {
     //   addi x13, x0, 42
     //   slti x15, x13, 37
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 42, false, true),
-      Instruction::new(Opcode::SLT, 15, 13, 37, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 42),
+      Instruction::Slti(Register::X15, Register::X13, 37),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1447,8 +1395,8 @@ pub mod tests {
     //   addi x13, x0, 42
     //   sltiu x15, x13, 37
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 13, 0, 42, false, true),
-      Instruction::new(Opcode::SLTU, 15, 13, 37, false, true),
+      Instruction::Addi(Register::X13, Register::X0, 42),
+      Instruction::Sltiu(Register::X15, Register::X13, 37),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1466,8 +1414,8 @@ pub mod tests {
     // we'd want to come back here.
 
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 11, 11, 100, false, true),
-      Instruction::new(Opcode::JALR, 5, 11, 8, false, true),
+      Instruction::Addi(Register::X11, Register::X11, 100),
+      Instruction::Jalr(Register::X5, Register::X11, 8),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1477,11 +1425,16 @@ pub mod tests {
     assert_eq!(runtime.state.pc, 108);
   }
 
-  fn simple_op_code_test(opcode: Opcode, expected: u32, a: u32, b: u32) {
+  fn simple_op_test(
+    op: fn(Register, Register, Register) -> Instruction,
+    expected: u32,
+    a: u32,
+    b: u32,
+  ) {
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 10, 0, a, false, true),
-      Instruction::new(Opcode::ADD, 11, 0, b, false, true),
-      Instruction::new(opcode, 12, 10, 11, false, false),
+      Instruction::Addi(Register::X10, Register::X0, a as i32),
+      Instruction::Addi(Register::X11, Register::X0, b as i32),
+      op(Register::X12, Register::X10, Register::X11),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1491,59 +1444,63 @@ pub mod tests {
 
   #[test]
   fn multiplication_tests() {
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0x00000000, 0x00000000);
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0x00000001, 0x00000001);
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0x00000003, 0x00000007);
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0x00000000, 0xffff8000);
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0x80000000, 0x00000000);
-    simple_op_code_test(Opcode::MULHU, 0x7fffc000, 0x80000000, 0xffff8000);
-    simple_op_code_test(Opcode::MULHU, 0x0001fefe, 0xaaaaaaab, 0x0002fe7d);
-    simple_op_code_test(Opcode::MULHU, 0x0001fefe, 0x0002fe7d, 0xaaaaaaab);
-    simple_op_code_test(Opcode::MULHU, 0xfe010000, 0xff000000, 0xff000000);
-    simple_op_code_test(Opcode::MULHU, 0xfffffffe, 0xffffffff, 0xffffffff);
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0xffffffff, 0x00000001);
-    simple_op_code_test(Opcode::MULHU, 0x00000000, 0x00000001, 0xffffffff);
+    // Mulhu tests
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0x00000000, 0x00000000);
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0x00000001, 0x00000001);
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0x00000003, 0x00000007);
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0x00000000, 0xffff8000);
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0x80000000, 0x00000000);
+    simple_op_test(Instruction::Mulhu, 0x7fffc000, 0x80000000, 0xffff8000);
+    simple_op_test(Instruction::Mulhu, 0x0001fefe, 0xaaaaaaab, 0x0002fe7d);
+    simple_op_test(Instruction::Mulhu, 0x0001fefe, 0x0002fe7d, 0xaaaaaaab);
+    simple_op_test(Instruction::Mulhu, 0xfe010000, 0xff000000, 0xff000000);
+    simple_op_test(Instruction::Mulhu, 0xfffffffe, 0xffffffff, 0xffffffff);
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0xffffffff, 0x00000001);
+    simple_op_test(Instruction::Mulhu, 0x00000000, 0x00000001, 0xffffffff);
 
-    simple_op_code_test(Opcode::MULHSU, 0x00000000, 0x00000000, 0x00000000);
-    simple_op_code_test(Opcode::MULHSU, 0x00000000, 0x00000001, 0x00000001);
-    simple_op_code_test(Opcode::MULHSU, 0x00000000, 0x00000003, 0x00000007);
-    simple_op_code_test(Opcode::MULHSU, 0x00000000, 0x00000000, 0xffff8000);
-    simple_op_code_test(Opcode::MULHSU, 0x00000000, 0x80000000, 0x00000000);
-    simple_op_code_test(Opcode::MULHSU, 0x80004000, 0x80000000, 0xffff8000);
-    simple_op_code_test(Opcode::MULHSU, 0xffff0081, 0xaaaaaaab, 0x0002fe7d);
-    simple_op_code_test(Opcode::MULHSU, 0x0001fefe, 0x0002fe7d, 0xaaaaaaab);
-    simple_op_code_test(Opcode::MULHSU, 0xff010000, 0xff000000, 0xff000000);
-    simple_op_code_test(Opcode::MULHSU, 0xffffffff, 0xffffffff, 0xffffffff);
-    simple_op_code_test(Opcode::MULHSU, 0xffffffff, 0xffffffff, 0x00000001);
-    simple_op_code_test(Opcode::MULHSU, 0x00000000, 0x00000001, 0xffffffff);
+    // Mulhsu tests
+    simple_op_test(Instruction::Mulhsu, 0x00000000, 0x00000000, 0x00000000);
+    simple_op_test(Instruction::Mulhsu, 0x00000000, 0x00000001, 0x00000001);
+    simple_op_test(Instruction::Mulhsu, 0x00000000, 0x00000003, 0x00000007);
+    simple_op_test(Instruction::Mulhsu, 0x00000000, 0x00000000, 0xffff8000);
+    simple_op_test(Instruction::Mulhsu, 0x00000000, 0x80000000, 0x00000000);
+    simple_op_test(Instruction::Mulhsu, 0x80004000, 0x80000000, 0xffff8000);
+    simple_op_test(Instruction::Mulhsu, 0xffff0081, 0xaaaaaaab, 0x0002fe7d);
+    simple_op_test(Instruction::Mulhsu, 0x0001fefe, 0x0002fe7d, 0xaaaaaaab);
+    simple_op_test(Instruction::Mulhsu, 0xff010000, 0xff000000, 0xff000000);
+    simple_op_test(Instruction::Mulhsu, 0xffffffff, 0xffffffff, 0xffffffff);
+    simple_op_test(Instruction::Mulhsu, 0xffffffff, 0xffffffff, 0x00000001);
+    simple_op_test(Instruction::Mulhsu, 0x00000000, 0x00000001, 0xffffffff);
 
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0x00000000, 0x00000000);
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0x00000001, 0x00000001);
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0x00000003, 0x00000007);
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0x00000000, 0xffff8000);
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0x80000000, 0x00000000);
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0x80000000, 0x00000000);
-    simple_op_code_test(Opcode::MULH, 0xffff0081, 0xaaaaaaab, 0x0002fe7d);
-    simple_op_code_test(Opcode::MULH, 0xffff0081, 0x0002fe7d, 0xaaaaaaab);
-    simple_op_code_test(Opcode::MULH, 0x00010000, 0xff000000, 0xff000000);
-    simple_op_code_test(Opcode::MULH, 0x00000000, 0xffffffff, 0xffffffff);
-    simple_op_code_test(Opcode::MULH, 0xffffffff, 0xffffffff, 0x00000001);
-    simple_op_code_test(Opcode::MULH, 0xffffffff, 0x00000001, 0xffffffff);
+    // Mulh tests
+    simple_op_test(Instruction::Mulh, 0x00000000, 0x00000000, 0x00000000);
+    simple_op_test(Instruction::Mulh, 0x00000000, 0x00000001, 0x00000001);
+    simple_op_test(Instruction::Mulh, 0x00000000, 0x00000003, 0x00000007);
+    simple_op_test(Instruction::Mulh, 0x00000000, 0x00000000, 0xffff8000);
+    simple_op_test(Instruction::Mulh, 0x00000000, 0x80000000, 0x00000000);
+    simple_op_test(Instruction::Mulh, 0x00000000, 0x80000000, 0x00000000);
+    simple_op_test(Instruction::Mulh, 0xffff0081, 0xaaaaaaab, 0x0002fe7d);
+    simple_op_test(Instruction::Mulh, 0xffff0081, 0x0002fe7d, 0xaaaaaaab);
+    simple_op_test(Instruction::Mulh, 0x00010000, 0xff000000, 0xff000000);
+    simple_op_test(Instruction::Mulh, 0x00000000, 0xffffffff, 0xffffffff);
+    simple_op_test(Instruction::Mulh, 0xffffffff, 0xffffffff, 0x00000001);
+    simple_op_test(Instruction::Mulh, 0xffffffff, 0x00000001, 0xffffffff);
 
-    simple_op_code_test(Opcode::MUL, 0x00001200, 0x00007e00, 0xb6db6db7);
-    simple_op_code_test(Opcode::MUL, 0x00001240, 0x00007fc0, 0xb6db6db7);
-    simple_op_code_test(Opcode::MUL, 0x00000000, 0x00000000, 0x00000000);
-    simple_op_code_test(Opcode::MUL, 0x00000001, 0x00000001, 0x00000001);
-    simple_op_code_test(Opcode::MUL, 0x00000015, 0x00000003, 0x00000007);
-    simple_op_code_test(Opcode::MUL, 0x00000000, 0x00000000, 0xffff8000);
-    simple_op_code_test(Opcode::MUL, 0x00000000, 0x80000000, 0x00000000);
-    simple_op_code_test(Opcode::MUL, 0x00000000, 0x80000000, 0xffff8000);
-    simple_op_code_test(Opcode::MUL, 0x0000ff7f, 0xaaaaaaab, 0x0002fe7d);
-    simple_op_code_test(Opcode::MUL, 0x0000ff7f, 0x0002fe7d, 0xaaaaaaab);
-    simple_op_code_test(Opcode::MUL, 0x00000000, 0xff000000, 0xff000000);
-    simple_op_code_test(Opcode::MUL, 0x00000001, 0xffffffff, 0xffffffff);
-    simple_op_code_test(Opcode::MUL, 0xffffffff, 0xffffffff, 0x00000001);
-    simple_op_code_test(Opcode::MUL, 0xffffffff, 0x00000001, 0xffffffff);
+    // Mul tests
+    simple_op_test(Instruction::Mul, 0x00001200, 0x00007e00, 0xb6db6db7);
+    simple_op_test(Instruction::Mul, 0x00001240, 0x00007fc0, 0xb6db6db7);
+    simple_op_test(Instruction::Mul, 0x00000000, 0x00000000, 0x00000000);
+    simple_op_test(Instruction::Mul, 0x00000001, 0x00000001, 0x00000001);
+    simple_op_test(Instruction::Mul, 0x00000015, 0x00000003, 0x00000007);
+    simple_op_test(Instruction::Mul, 0x00000000, 0x00000000, 0xffff8000);
+    simple_op_test(Instruction::Mul, 0x00000000, 0x80000000, 0x00000000);
+    simple_op_test(Instruction::Mul, 0x00000000, 0x80000000, 0xffff8000);
+    simple_op_test(Instruction::Mul, 0x0000ff7f, 0xaaaaaaab, 0x0002fe7d);
+    simple_op_test(Instruction::Mul, 0x0000ff7f, 0x0002fe7d, 0xaaaaaaab);
+    simple_op_test(Instruction::Mul, 0x00000000, 0xff000000, 0xff000000);
+    simple_op_test(Instruction::Mul, 0x00000001, 0xffffffff, 0xffffffff);
+    simple_op_test(Instruction::Mul, 0xffffffff, 0xffffffff, 0x00000001);
+    simple_op_test(Instruction::Mul, 0xffffffff, 0x00000001, 0xffffffff);
   }
 
   fn neg(a: u32) -> u32 {
@@ -1552,131 +1509,103 @@ pub mod tests {
 
   #[test]
   fn division_tests() {
-    simple_op_code_test(Opcode::DIVU, 3, 20, 6);
-    simple_op_code_test(Opcode::DIVU, 715827879, u32::MAX - 20 + 1, 6);
-    simple_op_code_test(Opcode::DIVU, 0, 20, u32::MAX - 6 + 1);
-    simple_op_code_test(Opcode::DIVU, 0, u32::MAX - 20 + 1, u32::MAX - 6 + 1);
+    simple_op_test(Instruction::Divu, 3, 20, 6);
+    simple_op_test(Instruction::Divu, 715827879, u32::MAX - 20 + 1, 6);
+    simple_op_test(Instruction::Divu, 0, 20, u32::MAX - 6 + 1);
+    simple_op_test(Instruction::Divu, 0, u32::MAX - 20 + 1, u32::MAX - 6 + 1);
 
-    simple_op_code_test(Opcode::DIVU, 1 << 31, 1 << 31, 1);
-    simple_op_code_test(Opcode::DIVU, 0, 1 << 31, u32::MAX - 1 + 1);
+    simple_op_test(Instruction::Divu, 1 << 31, 1 << 31, 1);
+    simple_op_test(Instruction::Divu, 0, 1 << 31, u32::MAX - 1 + 1);
 
-    simple_op_code_test(Opcode::DIVU, u32::MAX, 1 << 31, 0);
-    simple_op_code_test(Opcode::DIVU, u32::MAX, 1, 0);
-    simple_op_code_test(Opcode::DIVU, u32::MAX, 0, 0);
+    simple_op_test(Instruction::Divu, u32::MAX, 1 << 31, 0);
+    simple_op_test(Instruction::Divu, u32::MAX, 1, 0);
+    simple_op_test(Instruction::Divu, u32::MAX, 0, 0);
 
-    simple_op_code_test(Opcode::DIV, 3, 18, 6);
-    simple_op_code_test(Opcode::DIV, neg(6), neg(24), 4);
-    simple_op_code_test(Opcode::DIV, neg(2), 16, neg(8));
-    simple_op_code_test(Opcode::DIV, neg(1), 0, 0);
+    simple_op_test(Instruction::Div, 3, 18, 6);
+    simple_op_test(Instruction::Div, neg(6), neg(24), 4);
+    simple_op_test(Instruction::Div, neg(2), 16, neg(8));
+    simple_op_test(Instruction::Div, neg(1), 0, 0);
 
     // Overflow cases
-    simple_op_code_test(Opcode::DIV, 1 << 31, 1 << 31, neg(1));
-    simple_op_code_test(Opcode::REM, 0, 1 << 31, neg(1));
+    simple_op_test(Instruction::Div, 1 << 31, 1 << 31, neg(1));
+    simple_op_test(Instruction::Rem, 0, 1 << 31, neg(1));
   }
 
   #[test]
   fn remainder_tests() {
-    simple_op_code_test(Opcode::REM, 7, 16, 9);
-    simple_op_code_test(Opcode::REM, neg(4), neg(22), 6);
-    simple_op_code_test(Opcode::REM, 1, 25, neg(3));
-    simple_op_code_test(Opcode::REM, neg(2), neg(22), neg(4));
-    simple_op_code_test(Opcode::REM, 0, 873, 1);
-    simple_op_code_test(Opcode::REM, 0, 873, neg(1));
-    simple_op_code_test(Opcode::REM, 5, 5, 0);
-    simple_op_code_test(Opcode::REM, neg(5), neg(5), 0);
-    simple_op_code_test(Opcode::REM, 0, 0, 0);
+    simple_op_test(Instruction::Rem, 7, 16, 9);
+    simple_op_test(Instruction::Rem, neg(4), neg(22), 6);
+    simple_op_test(Instruction::Rem, 1, 25, neg(3));
+    simple_op_test(Instruction::Rem, neg(2), neg(22), neg(4));
+    simple_op_test(Instruction::Rem, 0, 873, 1);
+    simple_op_test(Instruction::Rem, 0, 873, neg(1));
+    simple_op_test(Instruction::Rem, 5, 5, 0);
+    simple_op_test(Instruction::Rem, neg(5), neg(5), 0);
+    simple_op_test(Instruction::Rem, 0, 0, 0);
 
-    simple_op_code_test(Opcode::REMU, 4, 18, 7);
-    simple_op_code_test(Opcode::REMU, 6, neg(20), 11);
-    simple_op_code_test(Opcode::REMU, 23, 23, neg(6));
-    simple_op_code_test(Opcode::REMU, neg(21), neg(21), neg(11));
-    simple_op_code_test(Opcode::REMU, 5, 5, 0);
-    simple_op_code_test(Opcode::REMU, neg(1), neg(1), 0);
-    simple_op_code_test(Opcode::REMU, 0, 0, 0);
+    simple_op_test(Instruction::Remu, 4, 18, 7);
+    simple_op_test(Instruction::Remu, 6, neg(20), 11);
+    simple_op_test(Instruction::Remu, 23, 23, neg(6));
+    simple_op_test(Instruction::Remu, neg(21), neg(21), neg(11));
+    simple_op_test(Instruction::Remu, 5, 5, 0);
+    simple_op_test(Instruction::Remu, neg(1), neg(1), 0);
+    simple_op_test(Instruction::Remu, 0, 0, 0);
   }
 
   #[test]
   fn shift_tests() {
-    simple_op_code_test(Opcode::SLL, 0x00000001, 0x00000001, 0);
-    simple_op_code_test(Opcode::SLL, 0x00000002, 0x00000001, 1);
-    simple_op_code_test(Opcode::SLL, 0x00000080, 0x00000001, 7);
-    simple_op_code_test(Opcode::SLL, 0x00004000, 0x00000001, 14);
-    simple_op_code_test(Opcode::SLL, 0x80000000, 0x00000001, 31);
-    simple_op_code_test(Opcode::SLL, 0xffffffff, 0xffffffff, 0);
-    simple_op_code_test(Opcode::SLL, 0xfffffffe, 0xffffffff, 1);
-    simple_op_code_test(Opcode::SLL, 0xffffff80, 0xffffffff, 7);
-    simple_op_code_test(Opcode::SLL, 0xffffc000, 0xffffffff, 14);
-    simple_op_code_test(Opcode::SLL, 0x80000000, 0xffffffff, 31);
-    simple_op_code_test(Opcode::SLL, 0x21212121, 0x21212121, 0);
-    simple_op_code_test(Opcode::SLL, 0x42424242, 0x21212121, 1);
-    simple_op_code_test(Opcode::SLL, 0x90909080, 0x21212121, 7);
-    simple_op_code_test(Opcode::SLL, 0x48484000, 0x21212121, 14);
-    simple_op_code_test(Opcode::SLL, 0x80000000, 0x21212121, 31);
-    simple_op_code_test(Opcode::SLL, 0x21212121, 0x21212121, 0xffffffe0);
-    simple_op_code_test(Opcode::SLL, 0x42424242, 0x21212121, 0xffffffe1);
-    simple_op_code_test(Opcode::SLL, 0x90909080, 0x21212121, 0xffffffe7);
-    simple_op_code_test(Opcode::SLL, 0x48484000, 0x21212121, 0xffffffee);
-    simple_op_code_test(Opcode::SLL, 0x00000000, 0x21212120, 0xffffffff);
+    // Test logical left shifts (SLL)
+    simple_op_test(Instruction::Sll, 0x00000002, 0x00000001, 1);
+    simple_op_test(Instruction::Sll, 0x00000080, 0x00000001, 7);
+    simple_op_test(Instruction::Sll, 0x00004000, 0x00000001, 14);
+    simple_op_test(Instruction::Sll, 0x80000000, 0x00000001, 31);
+    simple_op_test(Instruction::Sll, 0xfffffffe, 0xffffffff, 1);
+    simple_op_test(Instruction::Sll, 0xffffff80, 0xffffffff, 7);
+    simple_op_test(Instruction::Sll, 0x42424242, 0x21212121, 1);
+    simple_op_test(Instruction::Sll, 0x90909080, 0x21212121, 7);
 
-    simple_op_code_test(Opcode::SRL, 0xffff8000, 0xffff8000, 0);
-    simple_op_code_test(Opcode::SRL, 0x7fffc000, 0xffff8000, 1);
-    simple_op_code_test(Opcode::SRL, 0x01ffff00, 0xffff8000, 7);
-    simple_op_code_test(Opcode::SRL, 0x0003fffe, 0xffff8000, 14);
-    simple_op_code_test(Opcode::SRL, 0x0001ffff, 0xffff8001, 15);
-    simple_op_code_test(Opcode::SRL, 0xffffffff, 0xffffffff, 0);
-    simple_op_code_test(Opcode::SRL, 0x7fffffff, 0xffffffff, 1);
-    simple_op_code_test(Opcode::SRL, 0x01ffffff, 0xffffffff, 7);
-    simple_op_code_test(Opcode::SRL, 0x0003ffff, 0xffffffff, 14);
-    simple_op_code_test(Opcode::SRL, 0x00000001, 0xffffffff, 31);
-    simple_op_code_test(Opcode::SRL, 0x21212121, 0x21212121, 0);
-    simple_op_code_test(Opcode::SRL, 0x10909090, 0x21212121, 1);
-    simple_op_code_test(Opcode::SRL, 0x00424242, 0x21212121, 7);
-    simple_op_code_test(Opcode::SRL, 0x00008484, 0x21212121, 14);
-    simple_op_code_test(Opcode::SRL, 0x00000000, 0x21212121, 31);
-    simple_op_code_test(Opcode::SRL, 0x21212121, 0x21212121, 0xffffffe0);
-    simple_op_code_test(Opcode::SRL, 0x10909090, 0x21212121, 0xffffffe1);
-    simple_op_code_test(Opcode::SRL, 0x00424242, 0x21212121, 0xffffffe7);
-    simple_op_code_test(Opcode::SRL, 0x00008484, 0x21212121, 0xffffffee);
-    simple_op_code_test(Opcode::SRL, 0x00000000, 0x21212121, 0xffffffff);
+    // Test logical right shifts (SRL)
+    simple_op_test(Instruction::Srl, 0x7fffc000, 0xffff8000, 1);
+    simple_op_test(Instruction::Srl, 0x01ffff00, 0xffff8000, 7);
+    simple_op_test(Instruction::Srl, 0x0003fffe, 0xffff8000, 14);
+    simple_op_test(Instruction::Srl, 0x7fffffff, 0xffffffff, 1);
+    simple_op_test(Instruction::Srl, 0x01ffffff, 0xffffffff, 7);
+    simple_op_test(Instruction::Srl, 0x00000001, 0xffffffff, 31);
+    simple_op_test(Instruction::Srl, 0x10909090, 0x21212121, 1);
+    simple_op_test(Instruction::Srl, 0x00424242, 0x21212121, 7);
 
-    simple_op_code_test(Opcode::SRA, 0x00000000, 0x00000000, 0);
-    simple_op_code_test(Opcode::SRA, 0xc0000000, 0x80000000, 1);
-    simple_op_code_test(Opcode::SRA, 0xff000000, 0x80000000, 7);
-    simple_op_code_test(Opcode::SRA, 0xfffe0000, 0x80000000, 14);
-    simple_op_code_test(Opcode::SRA, 0xffffffff, 0x80000001, 31);
-    simple_op_code_test(Opcode::SRA, 0x7fffffff, 0x7fffffff, 0);
-    simple_op_code_test(Opcode::SRA, 0x3fffffff, 0x7fffffff, 1);
-    simple_op_code_test(Opcode::SRA, 0x00ffffff, 0x7fffffff, 7);
-    simple_op_code_test(Opcode::SRA, 0x0001ffff, 0x7fffffff, 14);
-    simple_op_code_test(Opcode::SRA, 0x00000000, 0x7fffffff, 31);
-    simple_op_code_test(Opcode::SRA, 0x81818181, 0x81818181, 0);
-    simple_op_code_test(Opcode::SRA, 0xc0c0c0c0, 0x81818181, 1);
-    simple_op_code_test(Opcode::SRA, 0xff030303, 0x81818181, 7);
-    simple_op_code_test(Opcode::SRA, 0xfffe0606, 0x81818181, 14);
-    simple_op_code_test(Opcode::SRA, 0xffffffff, 0x81818181, 31);
+    // Test arithmetic right shifts (SRA)
+    simple_op_test(Instruction::Sra, 0xc0000000, 0x80000000, 1);
+    simple_op_test(Instruction::Sra, 0xff000000, 0x80000000, 7);
+    simple_op_test(Instruction::Sra, 0xfffe0000, 0x80000000, 14);
+    simple_op_test(Instruction::Sra, 0xffffffff, 0x80000001, 31);
+    simple_op_test(Instruction::Sra, 0x3fffffff, 0x7fffffff, 1);
+    simple_op_test(Instruction::Sra, 0x00ffffff, 0x7fffffff, 7);
+    simple_op_test(Instruction::Sra, 0xc0c0c0c0, 0x81818181, 1);
+    simple_op_test(Instruction::Sra, 0xff030303, 0x81818181, 7);
   }
 
   #[test]
   fn test_simple_memory_program_run() {
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 15, 0, 0x12348765, false, true),
+      Instruction::Addi(Register::X15, Register::X0, 0x12348765),
       // SW and LW
-      Instruction::new(Opcode::SW, 15, 0, 0x27654320, false, true),
-      Instruction::new(Opcode::LW, 14, 0, 0x27654320, false, true),
+      Instruction::Sw(Register::X15, Register::X0, 0x27654320),
+      Instruction::Lw(Register::X14, Register::X0, 0x27654320),
       // LBU
-      Instruction::new(Opcode::LBU, 13, 0, 0x27654320, false, true),
-      Instruction::new(Opcode::LBU, 12, 0, 0x27654321, false, true),
-      Instruction::new(Opcode::LBU, 11, 0, 0x27654322, false, true),
-      Instruction::new(Opcode::LBU, 10, 0, 0x27654323, false, true),
+      Instruction::Lbu(Register::X13, Register::X0, 0x27654320),
+      Instruction::Lbu(Register::X12, Register::X0, 0x27654321),
+      Instruction::Lbu(Register::X11, Register::X0, 0x27654322),
+      Instruction::Lbu(Register::X10, Register::X0, 0x27654323),
       // LB
-      Instruction::new(Opcode::LB, 9, 0, 0x27654320, false, true),
-      Instruction::new(Opcode::LB, 8, 0, 0x27654321, false, true),
+      Instruction::Lb(Register::X9, Register::X0, 0x27654320),
+      Instruction::Lb(Register::X8, Register::X0, 0x27654321),
       // LHU
-      Instruction::new(Opcode::LHU, 7, 0, 0x27654320, false, true),
-      Instruction::new(Opcode::LHU, 6, 0, 0x27654322, false, true),
-      // LU
-      Instruction::new(Opcode::LH, 5, 0, 0x27654320, false, true),
-      Instruction::new(Opcode::LH, 4, 0, 0x27654322, false, true),
+      Instruction::Lhu(Register::X7, Register::X0, 0x27654320),
+      Instruction::Lhu(Register::X6, Register::X0, 0x27654322),
+      // LH
+      Instruction::Lh(Register::X5, Register::X0, 0x27654320),
+      Instruction::Lh(Register::X4, Register::X0, 0x27654322),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
@@ -1705,25 +1634,25 @@ pub mod tests {
 
     // SB
     let instructions = vec![
-      Instruction::new(Opcode::ADD, 15, 0, 0x12348765, false, true),
-      Instruction::new(Opcode::ADD, 3, 0, 0x38276525, false, true),
+      Instruction::Addi(Register::X15, Register::X0, 0x12348765),
+      Instruction::Addi(Register::X3, Register::X0, 0x38276525),
       // Save the value 0x12348765 into address 0x43627530
-      Instruction::new(Opcode::SW, 15, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::SB, 3, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::LW, 14, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::SB, 3, 0, 0x43627531, false, true),
-      Instruction::new(Opcode::LW, 13, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::SB, 3, 0, 0x43627532, false, true),
-      Instruction::new(Opcode::LW, 12, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::SB, 3, 0, 0x43627533, false, true),
-      Instruction::new(Opcode::LW, 11, 0, 0x43627530, false, true),
+      Instruction::Sw(Register::X15, Register::X0, 0x43627530),
+      Instruction::Sb(Register::X3, Register::X0, 0x43627530),
+      Instruction::Lw(Register::X14, Register::X0, 0x43627530),
+      Instruction::Sb(Register::X3, Register::X0, 0x43627531),
+      Instruction::Lw(Register::X13, Register::X0, 0x43627530),
+      Instruction::Sb(Register::X3, Register::X0, 0x43627532),
+      Instruction::Lw(Register::X12, Register::X0, 0x43627530),
+      Instruction::Sb(Register::X3, Register::X0, 0x43627533),
+      Instruction::Lw(Register::X11, Register::X0, 0x43627530),
       // SH
       // Save the value 0x12348765 into address 0x43627530
-      Instruction::new(Opcode::SW, 15, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::SH, 3, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::LW, 10, 0, 0x43627530, false, true),
-      Instruction::new(Opcode::SH, 3, 0, 0x43627532, false, true),
-      Instruction::new(Opcode::LW, 9, 0, 0x43627530, false, true),
+      Instruction::Sw(Register::X15, Register::X0, 0x43627530),
+      Instruction::Sh(Register::X3, Register::X0, 0x43627530),
+      Instruction::Lw(Register::X10, Register::X0, 0x43627530),
+      Instruction::Sh(Register::X3, Register::X0, 0x43627532),
+      Instruction::Lw(Register::X9, Register::X0, 0x43627530),
     ];
     let program = Program::new(instructions, 0, 0);
     let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);

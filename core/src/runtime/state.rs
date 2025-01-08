@@ -7,12 +7,12 @@ use super::Registers;
 /// Holds data describing the current state of a program's execution.
 #[derive(Debug, Clone)]
 pub struct ExecutionState {
-  /// The global clock keeps track of how many instrutions have been executed.
+  /// The global clock keeps track of how many instructions have been executed.
   pub global_clk: u64,
 
-  /// The clock increments by 4 (possibly more in syscalls) for each instruction that has been
+  /// The gas counter increments by 4 (possibly more in syscalls) for each instruction that has been
   /// executed.
-  pub clk: u32,
+  pub gas: u32,
 
   /// The program counter.
   pub pc: u32,
@@ -43,7 +43,7 @@ impl ExecutionState {
   pub fn new(pc_start: u32) -> Self {
     Self {
       global_clk: 0,
-      clk: 0,
+      gas: 0,
       pc: pc_start,
       memory: HashMap::default(),
       regs: Registers::new(super::Base::RV32E),

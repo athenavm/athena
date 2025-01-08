@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::Instruction;
-
 use athena_interface::MethodSelector;
+
+use crate::instruction::Instruction;
 
 /// A program that can be executed by the VM.
 #[derive(Debug, Clone, Default)]
@@ -26,4 +26,11 @@ pub struct Program {
 
   /// The initial memory image, useful for global constants.
   pub memory_image: BTreeMap<u32, u32>,
+}
+
+impl Program {
+  pub(crate) fn instruction(&self, pc: u32) -> Option<Instruction> {
+    let idx = ((pc - self.pc_base) / 4) as usize;
+    self.instructions.get(idx).copied()
+  }
 }

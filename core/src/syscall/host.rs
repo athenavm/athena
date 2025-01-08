@@ -117,7 +117,7 @@ impl Syscall for SyscallHostCall {
     let gas_spent = gas_left
       .checked_sub(res.gas_left)
       .expect("host call spent more than available gas");
-    ctx.rt.state.clk += gas_spent;
+    ctx.rt.state.gas += gas_spent;
 
     match res.status_code {
       StatusCode::Success => Ok(Outcome::Result(Some(output_size))),
