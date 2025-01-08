@@ -1,8 +1,8 @@
 # Athena
 
-Athena is a prototype deterministic smart contract engine that serves as the [Spacemesh network VM][2], and Athena is being designed and built by the  [Spacemesh][8] team. However, Athena is designed to be modular and largely protocol-agnostic so [it will run on other chains][9]. Contributions and integrations are welcome.
+Athena is a prototype deterministic smart contract engine that serves as the [Spacemesh network VM][2], and Athena is being designed and built by the [Spacemesh][8] team. However, Athena is designed to be modular and largely protocol-agnostic so [it will run on other chains][9]. Contributions and integrations are welcome.
 
-Athena includes a virtual machine (VM) based on the RISC-V ISA, including support for [RV32IM][10] and [RV32EM][1], an interpreter/compiler for running smart contract code, and related tooling. The VM is modular and features a mature FFI that can be integrated into any language that supports CFFI. For more information on the Athena project and its goals see [Introducing Athena][2] and the [Athena project updates][3].
+Athena includes a virtual machine (VM) based on the RISC-V ISA, including support for [RV32EM][1], an interpreter/compiler for running smart contract code, and related tooling. The VM features a C FFI that can be integrated into any language that supports interop with C. For more information on the Athena project and its goals see [Introducing Athena][2] and the [Athena project updates][3].
 
 ## Project Goals
 - **Developer Experience**: Provide a robust environment with extensive tooling support.
