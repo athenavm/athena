@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use nohash_hasher::BuildNoHashHasher;
 
+use super::Registers;
+
 /// Holds data describing the current state of a program's execution.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ExecutionState {
   /// The global clock keeps track of how many instrutions have been executed.
   pub global_clk: u64,
@@ -17,6 +19,8 @@ pub struct ExecutionState {
 
   /// The memory which instructions operate over.
   pub memory: HashMap<u32, u32, BuildNoHashHasher<u32>>,
+
+  pub(crate) regs: Registers,
 
   /// Uninitialized memory addresses that have a specific value they should be initialized with.
   /// SyscallHintRead uses this to write hint data into uninitialized memory.
@@ -42,6 +46,7 @@ impl ExecutionState {
       clk: 0,
       pc: pc_start,
       memory: HashMap::default(),
+      regs: Registers::new(super::Base::RV32E),
       uninitialized_memory: HashMap::default(),
       input_stream: Vec::new(),
       input_stream_ptr: 0,

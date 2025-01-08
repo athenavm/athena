@@ -199,9 +199,7 @@ impl Syscall for SyscallHostSpawn {
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
     let address = host.spawn(blob);
 
-    let out_addr = ctx
-      .rt
-      .rr(Register::X12, crate::runtime::MemoryAccessPosition::A);
+    let out_addr = ctx.rt.rr(Register::X12);
 
     for (idx, c) in address.as_ref().chunks_exact(4).enumerate() {
       let v = u32::from_le_bytes(c.try_into().unwrap());
@@ -229,9 +227,7 @@ impl Syscall for SyscallHostDeploy {
     };
     tracing::debug!(%address, "deploy succeeded");
 
-    let out_addr = ctx
-      .rt
-      .rr(Register::X12, crate::runtime::MemoryAccessPosition::A);
+    let out_addr = ctx.rt.rr(Register::X12);
 
     for (idx, c) in address.as_ref().chunks_exact(4).enumerate() {
       let v = u32::from_le_bytes(c.try_into().unwrap());
