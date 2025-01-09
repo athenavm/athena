@@ -27,10 +27,6 @@ pub(crate) struct SyscallHintRead;
 
 impl Syscall for SyscallHintRead {
   fn execute(&self, ctx: &mut SyscallContext, ptr: u32, len: u32) -> SyscallResult {
-    if ctx.rt.unconstrained {
-      tracing::error!("hint read should not be used in a unconstrained block");
-      return Err(StatusCode::StaticModeViolation);
-    }
     let data = ctx.rt.state.input_stream[ctx.rt.state.input_stream_ptr..].to_vec();
     if len as usize > data.len() {
       tracing::debug!(
@@ -128,17 +124,6 @@ mod tests {
       Outcome::Result(Some((data[0].len() + data[1].len()) as u32)),
       result
     );
-  }
-
-  #[test]
-  fn hint_read_cant_run_in_unconstrained() {
-    let mut rt = Runtime::new(Program::default(), None, AthenaCoreOpts::default(), None);
-    rt.unconstrained = true;
-    let mut ctx = SyscallContext::new(&mut rt);
-    let syscall = super::SyscallHintRead {};
-
-    let result = syscall.execute(&mut ctx, 0, 0);
-    assert_eq!(Err(StatusCode::StaticModeViolation), result);
   }
 
   #[test]

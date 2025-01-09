@@ -64,20 +64,11 @@ pub struct Runtime<'host> {
   /// A buffer for writing trace events to a file.
   pub trace_buf: Option<BufWriter<File>>,
 
-  /// Whether the runtime is in constrained mode or not.
-  ///
-  /// In unconstrained mode, any events, clock, register, or memory changes are reset after leaving
-  /// the unconstrained block. The only thing preserved is writes to the input stream.
-  pub unconstrained: bool,
-
   /// Max gas for the runtime.
   pub max_gas: Option<u32>,
 
   /// The mapping between syscall codes and their implementations.
   pub syscall_map: HashMap<SyscallCode, Arc<dyn Syscall>>,
-
-  /// The maximum number of cycles for a syscall.
-  pub max_syscall_cycles: u32,
 
   breakpoints: BTreeSet<u32>,
 
@@ -149,11 +140,6 @@ impl<'host> Runtime<'host> {
 
     // Determine the maximum number of cycles for any syscall.
     let syscall_map = default_syscall_map();
-    let max_syscall_cycles = syscall_map
-      .values()
-      .map(|syscall| syscall.num_extra_cycles())
-      .max()
-      .unwrap_or(0);
 
     Self {
       context,
@@ -162,10 +148,8 @@ impl<'host> Runtime<'host> {
       host,
       io_buf: HashMap::new(),
       trace_buf,
-      unconstrained: false,
       max_gas: opts.max_gas(),
       syscall_map,
-      max_syscall_cycles,
       breakpoints: BTreeSet::new(),
       hook_registry: Default::default(),
     }
@@ -623,8 +607,8 @@ impl<'host> Runtime<'host> {
 
     // We're allowed to spend all of our gas, but no more.
     // Gas checking is "lazy" here: it happens _after_ the instruction is executed.
-    if let Some(gas_left) = self.gas_left() {
-      if !self.unconstrained && gas_left < 0 {
+    if let Some(max) = self.max_gas {
+      if self.state.gas > max {
         tracing::debug!("out of gas");
         return Err(ExecutionError::OutOfGas());
       }
@@ -641,11 +625,8 @@ impl<'host> Runtime<'host> {
     Ok(None)
   }
 
-  pub(crate) fn gas_left(&self) -> Option<i64> {
-    // gas left can be negative, if we spent too much on the last instruction
-    self
-      .max_gas
-      .map(|max_gas| max_gas as i64 - self.state.gas as i64)
+  pub(crate) fn gas_left(&self) -> Option<u32> {
+    self.max_gas.map(|g| g.saturating_sub(self.state.gas))
   }
 
   pub fn initialize(&mut self) {
@@ -713,13 +694,8 @@ impl<'host> Runtime<'host> {
 
     self.postprocess();
 
-    // Calculate remaining gas. If we spent too much gas, an error would already have been thrown and
-    // we would never reach this code, hence the assertion.
-    Ok(
-      self
-        .gas_left()
-        .map(|gas_left| u32::try_from(gas_left).expect("Gas conversion error")),
-    )
+    // Calculate remaining gas. If we spent too much gas, it will be 0.
+    Ok(self.gas_left())
   }
 
   fn postprocess(&mut self) {
@@ -772,9 +748,7 @@ impl<'host> Runtime<'host> {
   fn trace_execution(&mut self, instruction: Instruction) {
     // Write the current program counter to the trace buffer for the cycle tracer.
     if let Some(ref mut buf) = self.trace_buf {
-      if !self.unconstrained {
-        buf.write_all(&u32::to_be_bytes(self.state.pc)).unwrap();
-      }
+      buf.write_all(&u32::to_be_bytes(self.state.pc)).unwrap();
     }
 
     tracing::trace!(

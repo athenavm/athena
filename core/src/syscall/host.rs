@@ -67,12 +67,7 @@ impl Syscall for SyscallHostCall {
       .expect("Missing Athena runtime context");
     // get remaining gas
     // note: this does not factor in the cost of the current instruction
-    let gas_left: u32 = ctx
-      .rt
-      .gas_left()
-      .expect("Missing gas information")
-      .try_into()
-      .expect("gas arithmetic error");
+    let gas_left = ctx.rt.gas_left().unwrap_or(u32::MAX);
 
     // note: the host is responsible for checking stack depth, not us
 

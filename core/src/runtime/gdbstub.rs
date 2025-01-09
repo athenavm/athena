@@ -370,13 +370,8 @@ pub fn gdb_event_loop_thread<'h>(
   }
   runtime.postprocess();
 
-  // Calculate remaining gas. If we spent too much gas, an error would already have been thrown and
-  // we would never reach this code, hence the assertion.
-  Ok(
-    runtime
-      .gas_left()
-      .map(|gas_left| u32::try_from(gas_left).expect("Gas conversion error")),
-  )
+  // Calculate remaining gas. If we spent too much gas, it will be zero.
+  Ok(runtime.gas_left())
 }
 
 pub fn run_under_gdb(
