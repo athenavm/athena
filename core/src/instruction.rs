@@ -6,7 +6,7 @@ pub enum Instruction {
   /// RV32IM/RV32EM base instructions
   // U-type
   Lui(Register, u32), // Load Upper Immediate
-  Auipc(Register, i32), // Add Upper Immediate to PC
+  Auipc(Register, u32), // Add Upper Immediate to PC
 
   // J-type
   Jal(Register, i32), // Jump and Link

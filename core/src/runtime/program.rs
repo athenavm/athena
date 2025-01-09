@@ -29,8 +29,19 @@ pub struct Program {
 }
 
 impl Program {
+  pub const fn new(instructions: Vec<Instruction>, pc_start: u32, pc_base: u32) -> Self {
+    Self {
+      instructions,
+      symbol_table: BTreeMap::new(),
+      selector_table: BTreeMap::new(),
+      pc_start,
+      pc_base,
+      memory_image: BTreeMap::new(),
+    }
+  }
+
   pub(crate) fn instruction(&self, pc: u32) -> Option<Instruction> {
-    let idx = ((pc - self.pc_base) / 4) as usize;
-    self.instructions.get(idx).copied()
+    let idx = pc.wrapping_sub(self.pc_base) / 4;
+    self.instructions.get(idx as usize).copied()
   }
 }

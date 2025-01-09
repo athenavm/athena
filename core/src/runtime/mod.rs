@@ -1,7 +1,6 @@
 pub mod gdbstub;
 pub mod hooks;
 mod io;
-mod opcode;
 mod program;
 mod register;
 mod state;
@@ -9,7 +8,6 @@ mod syscall;
 
 use anyhow::anyhow;
 use athena_interface::MethodSelector;
-pub use opcode::*;
 pub use program::*;
 pub use register::*;
 pub use state::*;
@@ -264,8 +262,9 @@ impl<'host> Runtime<'host> {
     self.state.regs.write(register, value)
   }
 
-  /// Execute the instruction and return the new PC
-  fn execute_instruction(&mut self, instruction: Instruction) -> Result<u32, ExecutionError> {
+  /// Execute the instruction
+  /// Sets the PC to the next instruction and increments the clock and gas counters.
+  fn execute_instruction(&mut self, instruction: Instruction) -> Result<(), ExecutionError> {
     self.trace_execution(instruction);
 
     let mut next_pc = self.state.pc.wrapping_add(4);
@@ -280,7 +279,7 @@ impl<'host> Runtime<'host> {
       // Add upper immediate to PC
       Instruction::Auipc(rd, imm) => {
         // NOTE: the immediate is already shifted left by 12
-        let value = self.state.pc.wrapping_add_signed(imm);
+        let value = self.state.pc.wrapping_add(imm);
         self.rw(rd, value);
       }
 
@@ -606,7 +605,7 @@ impl<'host> Runtime<'host> {
     self.state.gas += 4;
     self.state.global_clk += 1;
 
-    Ok(next_pc)
+    Ok(())
   }
 
   #[inline]
@@ -634,13 +633,11 @@ impl<'host> Runtime<'host> {
       tracing::debug!("HALT: zero PC (possibly returned from a function execution");
       return Ok(Some(Event::Halted));
     }
-
-    let relative_pc = self.state.pc.wrapping_sub(self.program.pc_base);
-    let max_pc = self.program.instructions.len() as u32 * 4;
-    if relative_pc >= max_pc {
-      tracing::warn!(relative_pc, max_pc, "HALT: out of instructions");
+    if self.program.instruction(self.state.pc).is_none() {
+      tracing::warn!(pc = self.state.pc, "HALT: out of instructions");
       return Ok(Some(Event::Halted));
     }
+
     Ok(None)
   }
 
@@ -1057,31 +1054,28 @@ pub mod tests {
   fn test_auipc() {
     // Test adding different immediate values to PC
     // PC starts at 0, so we can easily calculate expected results
+    let mut runtime = Runtime::new(Program::default(), None, AthenaCoreOpts::default(), None);
 
-    let instructions = vec![
-      // Add small positive immediate
-      Instruction::Auipc(Register::X5, 1 << 12), // 1 << 12 = 4096
-      // Add larger positive immediate
-      Instruction::Auipc(Register::X6, 0x7FF << 12), // 0x7FF << 12 = 0x7FF000
-      // Add maximum positive immediate
-      Instruction::Auipc(Register::X7, 0xFFFFF << 12), // 0xFFFFF << 12 = 0xFFFFF000
-    ];
-
-    let program = Program::new(instructions, 0, 0);
-    let mut runtime = Runtime::new(program, None, AthenaCoreOpts::default(), None);
-    runtime.execute().unwrap();
-
-    // First AUIPC: PC = 0, imm = 1
-    // Expected: 0 + (1 << 12) = 4096
+    // First AUIPC: PC = 0, imm = 0x1000
+    runtime
+      .execute_instruction(Instruction::Auipc(Register::X5, 0x1000))
+      .unwrap();
     assert_eq!(runtime.register(Register::X5), 4096);
+    assert_eq!(4, runtime.state.pc);
 
-    // Second AUIPC: PC = 4, imm = 0x7FF
-    // Expected: 4 + (0x7FF << 12) = 0x7FF004
+    // Second AUIPC: PC = 4, imm = 0x7FF000
+    runtime
+      .execute_instruction(Instruction::Auipc(Register::X6, 0x7FF000))
+      .unwrap();
     assert_eq!(runtime.register(Register::X6), 0x7FF004);
+    assert_eq!(8, runtime.state.pc);
 
-    // Third AUIPC: PC = 8, imm = 0xFFFFF
-    // Expected: 8 + (0xFFFFF << 12) = 0xFFFFF008
+    // Third AUIPC: PC = 8, imm = 0xFFFFF000
+    runtime
+      .execute_instruction(Instruction::Auipc(Register::X7, 0xFFFFF000))
+      .unwrap();
     assert_eq!(runtime.register(Register::X7), 0xFFFFF008);
+    assert_eq!(12, runtime.state.pc);
   }
 
   #[test]

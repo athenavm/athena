@@ -7,22 +7,11 @@ pub use elf::*;
 use instruction::transpile;
 use std::{collections::BTreeMap, fs::File, io::Read};
 
-use crate::{instruction::Instruction, runtime::Program};
+use crate::runtime::Program;
 
 use athena_interface::MethodSelector;
 
 impl Program {
-  pub const fn new(instructions: Vec<Instruction>, pc_start: u32, pc_base: u32) -> Self {
-    Self {
-      instructions,
-      symbol_table: BTreeMap::new(),
-      selector_table: BTreeMap::new(),
-      pc_start,
-      pc_base,
-      memory_image: BTreeMap::new(),
-    }
-  }
-
   /// Disassemble an ELF to a program that be executed by the VM.
   pub fn from(input: &[u8]) -> anyhow::Result<Self> {
     // Check the magic number

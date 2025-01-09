@@ -174,7 +174,7 @@ impl InstructionProcessor for InstructionTranspilerNew {
   fn process_auipc(&mut self, dec_insn: UType) -> Self::InstructionResult {
     Ok(Instruction::Auipc(
       Register::try_from(dec_insn.rd)?,
-      dec_insn.imm,
+      dec_insn.imm as u32,
     ))
   }
 
