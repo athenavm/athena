@@ -8,11 +8,11 @@ use athena_interface::{payload::Payload, Address, Balance, Encode, MethodSelecto
 pub fn call(
   address: Address,
   input: Option<Vec<u8>>,
-  method: Option<&str>,
+  method: Option<MethodSelector>,
   amount: Balance,
 ) -> Vec<u8> {
   let payload = Payload {
-    selector: method.map(MethodSelector::from),
+    selector: method,
     input: input.unwrap_or_default(),
   };
   let input_payload = payload.encode();

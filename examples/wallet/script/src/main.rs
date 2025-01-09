@@ -107,14 +107,18 @@ mod tests {
     payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, Balance, Encode,
     MessageKind, MethodSelector, StatusCode,
   };
+  use athena_interface::{AthenaContext, Decode, ExecutionResult};
   use athena_runner::vm::AthenaRevision;
   use athena_runner::AthenaVm;
   use athena_sdk::host::MockHostInterface;
   use athena_sdk::{AthenaStdin, ExecutionClient};
+  use athena_vm_sdk::wallet::ProxyArguments;
   use athena_vm_sdk::Pubkey;
   use ed25519_dalek::ed25519::signature::Signer;
   use ed25519_dalek::SigningKey;
   use rand::rngs::OsRng;
+
+  use crate::{ADDRESS_ALICE, ADDRESS_CHARLIE};
 
   fn setup_logger() {
     let _ = tracing_subscriber::fmt()
@@ -305,5 +309,52 @@ mod tests {
     let (mut result, gas_cost) = result.unwrap();
     assert!(gas_cost.is_some());
     assert_eq!(result.read::<u64>(), amount);
+  }
+
+  #[test]
+  fn proxying_calls() {
+    setup_logger();
+
+    let mut stdin = AthenaStdin::new();
+    let owner = Pubkey::default();
+    stdin.write_slice(&owner.0);
+    let args = ProxyArguments {
+      destination: ADDRESS_CHARLIE,
+      method: Some(MethodSelector::from("athexp_fibonacci")),
+      args: Some(vec![1, 2, 3, 4]),
+      amount: 100,
+    };
+    stdin.write_vec(args.encode());
+
+    let sender = ADDRESS_ALICE;
+    let context = AthenaContext::new(sender, Address::default(), 0);
+    let mut host = MockHostInterface::new();
+    host.expect_call().returning(move |msg| {
+      assert_eq!(sender, msg.sender);
+      assert_eq!(args.destination, msg.recipient);
+      assert_eq!(args.amount, msg.value);
+
+      let input = msg.input_data.unwrap();
+      let payload = Payload::decode(&mut input.as_slice()).unwrap();
+      assert_eq!(args.method, payload.selector);
+      assert_eq!(args.args, Some(payload.input));
+
+      ExecutionResult::new(StatusCode::Success, 1_000_000, Some(vec![5, 6, 7, 8, 9]))
+    });
+
+    let selector = MethodSelector::from("athexp_proxy");
+    let result = ExecutionClient::new().execute_function(
+      super::ELF,
+      &selector,
+      stdin,
+      Some(&mut host),
+      Some(25000000),
+      Some(context),
+    );
+    let (result, gas_cost) = result.unwrap();
+    assert!(gas_cost.is_some());
+
+    let output = Vec::<u8>::decode(&mut result.as_slice()).unwrap();
+    assert_eq!(vec![5, 6, 7, 8, 9], output);
   }
 }

@@ -1,5 +1,8 @@
 #![no_main]
-use athena_vm::{entrypoint, types::Address};
+use athena_vm::{
+  entrypoint,
+  types::{Address, MethodSelector},
+};
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::call;
 use std::io::Read;
@@ -22,7 +25,7 @@ impl EntrypointTest {
     let address = Address::from(address);
 
     // recursive call to self
-    call(address, None, Some("athexp_test2"), 0);
+    call(address, None, Some(MethodSelector::from("athexp_test2")), 0);
   }
 
   #[callable]

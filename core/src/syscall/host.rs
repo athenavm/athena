@@ -150,8 +150,8 @@ impl SyscallHostCall {
       }
 
       if !chunks.remainder().is_empty() {
-        let mut value = [0u8; 4];
-        value.copy_from_slice(chunks.remainder());
+        let mut value = ctx.rt.mr(output_ptr).to_le_bytes();
+        value[..chunks.remainder().len()].copy_from_slice(chunks.remainder());
         ctx.rt.mw(output_ptr, u32::from_le_bytes(value));
       }
     };
