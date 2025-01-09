@@ -1551,34 +1551,65 @@ pub mod tests {
   #[test]
   fn shift_tests() {
     // Test logical left shifts (SLL)
+    simple_op_test(Instruction::Sll, 0x00000001, 0x00000001, 0);
     simple_op_test(Instruction::Sll, 0x00000002, 0x00000001, 1);
     simple_op_test(Instruction::Sll, 0x00000080, 0x00000001, 7);
     simple_op_test(Instruction::Sll, 0x00004000, 0x00000001, 14);
     simple_op_test(Instruction::Sll, 0x80000000, 0x00000001, 31);
+    simple_op_test(Instruction::Sll, 0xffffffff, 0xffffffff, 0);
     simple_op_test(Instruction::Sll, 0xfffffffe, 0xffffffff, 1);
     simple_op_test(Instruction::Sll, 0xffffff80, 0xffffffff, 7);
+    simple_op_test(Instruction::Sll, 0xffffc000, 0xffffffff, 14);
+    simple_op_test(Instruction::Sll, 0x80000000, 0xffffffff, 31);
     simple_op_test(Instruction::Sll, 0x42424242, 0x21212121, 1);
+    simple_op_test(Instruction::Sll, 0x21212121, 0x21212121, 0);
     simple_op_test(Instruction::Sll, 0x90909080, 0x21212121, 7);
+    simple_op_test(Instruction::Sll, 0x48484000, 0x21212121, 14);
+    simple_op_test(Instruction::Sll, 0x80000000, 0x21212121, 31);
+    simple_op_test(Instruction::Sll, 0x21212121, 0x21212121, 0xffffffe0);
+    simple_op_test(Instruction::Sll, 0x42424242, 0x21212121, 0xffffffe1);
+    simple_op_test(Instruction::Sll, 0x90909080, 0x21212121, 0xffffffe7);
+    simple_op_test(Instruction::Sll, 0x48484000, 0x21212121, 0xffffffee);
+    simple_op_test(Instruction::Sll, 0x00000000, 0x21212120, 0xffffffff);
 
     // Test logical right shifts (SRL)
+    simple_op_test(Instruction::Srl, 0xffff8000, 0xffff8000, 0);
     simple_op_test(Instruction::Srl, 0x7fffc000, 0xffff8000, 1);
     simple_op_test(Instruction::Srl, 0x01ffff00, 0xffff8000, 7);
     simple_op_test(Instruction::Srl, 0x0003fffe, 0xffff8000, 14);
+    simple_op_test(Instruction::Srl, 0x0001ffff, 0xffff8001, 15);
+    simple_op_test(Instruction::Srl, 0xffffffff, 0xffffffff, 0);
     simple_op_test(Instruction::Srl, 0x7fffffff, 0xffffffff, 1);
     simple_op_test(Instruction::Srl, 0x01ffffff, 0xffffffff, 7);
+    simple_op_test(Instruction::Srl, 0x0003ffff, 0xffffffff, 14);
     simple_op_test(Instruction::Srl, 0x00000001, 0xffffffff, 31);
+    simple_op_test(Instruction::Srl, 0x21212121, 0x21212121, 0);
     simple_op_test(Instruction::Srl, 0x10909090, 0x21212121, 1);
     simple_op_test(Instruction::Srl, 0x00424242, 0x21212121, 7);
+    simple_op_test(Instruction::Srl, 0x00008484, 0x21212121, 14);
+    simple_op_test(Instruction::Srl, 0x00000000, 0x21212121, 31);
+    simple_op_test(Instruction::Srl, 0x21212121, 0x21212121, 0xffffffe0);
+    simple_op_test(Instruction::Srl, 0x10909090, 0x21212121, 0xffffffe1);
+    simple_op_test(Instruction::Srl, 0x00424242, 0x21212121, 0xffffffe7);
+    simple_op_test(Instruction::Srl, 0x00008484, 0x21212121, 0xffffffee);
+    simple_op_test(Instruction::Srl, 0x00000000, 0x21212121, 0xffffffff);
 
     // Test arithmetic right shifts (SRA)
+    simple_op_test(Instruction::Sra, 0x00000000, 0x00000000, 0);
     simple_op_test(Instruction::Sra, 0xc0000000, 0x80000000, 1);
     simple_op_test(Instruction::Sra, 0xff000000, 0x80000000, 7);
     simple_op_test(Instruction::Sra, 0xfffe0000, 0x80000000, 14);
     simple_op_test(Instruction::Sra, 0xffffffff, 0x80000001, 31);
+    simple_op_test(Instruction::Sra, 0x7fffffff, 0x7fffffff, 0);
     simple_op_test(Instruction::Sra, 0x3fffffff, 0x7fffffff, 1);
     simple_op_test(Instruction::Sra, 0x00ffffff, 0x7fffffff, 7);
+    simple_op_test(Instruction::Sra, 0x0001ffff, 0x7fffffff, 14);
+    simple_op_test(Instruction::Sra, 0x00000000, 0x7fffffff, 31);
+    simple_op_test(Instruction::Sra, 0x81818181, 0x81818181, 0);
     simple_op_test(Instruction::Sra, 0xc0c0c0c0, 0x81818181, 1);
     simple_op_test(Instruction::Sra, 0xff030303, 0x81818181, 7);
+    simple_op_test(Instruction::Sra, 0xfffe0606, 0x81818181, 14);
+    simple_op_test(Instruction::Sra, 0xffffffff, 0x81818181, 31);
   }
 
   #[test]
