@@ -15,6 +15,7 @@
 
 pub mod disassembler;
 pub mod host;
+mod instruction;
 pub mod io;
 pub mod runtime;
 pub mod syscall;

@@ -1,7 +1,9 @@
+use anyhow::anyhow;
+
 use super::Base;
 
 /// A register stores a 32-bit value used by operations.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register {
   X0 = 0,
   X1 = 1,
@@ -20,16 +22,10 @@ pub enum Register {
   X14 = 14,
   X15 = 15,
 }
-impl Register {
-  // FIXME: remove all uses
-  pub(crate) fn from_u32(value: u32) -> Self {
-    Self::try_from(value).unwrap()
-  }
-}
 
-impl TryFrom<u32> for Register {
-  type Error = &'static str;
-  fn try_from(value: u32) -> Result<Self, Self::Error> {
+impl TryFrom<usize> for Register {
+  type Error = anyhow::Error;
+  fn try_from(value: usize) -> Result<Self, Self::Error> {
     match value {
       0 => Ok(Register::X0),
       1 => Ok(Register::X1),
@@ -47,7 +43,7 @@ impl TryFrom<u32> for Register {
       13 => Ok(Register::X13),
       14 => Ok(Register::X14),
       15 => Ok(Register::X15),
-      _ => Err("register out of bounds"),
+      _ => Err(anyhow!("register out of bounds")),
     }
   }
 }
@@ -107,9 +103,17 @@ mod tests {
     let mut regs = Registers::new(Base::RV32E);
     for reg in 1..16 {
       let value = reg + 100;
-      let reg = Register::try_from(reg).unwrap();
+      let reg = Register::try_from(reg as usize).unwrap();
       regs.write(reg, value);
       assert_eq!(value, regs.read(reg));
     }
+  }
+
+  #[test]
+  fn rv32e_supports_16_regs() {
+    for reg in 0..16 {
+      assert!(Register::try_from(reg).is_ok());
+    }
+    assert!(Register::try_from(16).is_err());
   }
 }

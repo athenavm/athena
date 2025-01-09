@@ -4,26 +4,14 @@ mod instruction;
 use anyhow::Context;
 use core::panic;
 pub use elf::*;
-pub use instruction::*;
+use instruction::transpile;
 use std::{collections::BTreeMap, fs::File, io::Read};
 
-use crate::runtime::{Instruction, Program};
+use crate::runtime::Program;
 
 use athena_interface::MethodSelector;
 
 impl Program {
-  /// Create a new program.
-  pub const fn new(instructions: Vec<Instruction>, pc_start: u32, pc_base: u32) -> Self {
-    Self {
-      instructions,
-      symbol_table: BTreeMap::new(),
-      selector_table: BTreeMap::new(),
-      pc_start,
-      pc_base,
-      memory_image: BTreeMap::new(),
-    }
-  }
-
   /// Disassemble an ELF to a program that be executed by the VM.
   pub fn from(input: &[u8]) -> anyhow::Result<Self> {
     // Check the magic number
@@ -33,7 +21,7 @@ impl Program {
       let elf = Elf::decode(input).context("decoding ELF")?;
 
       // Transpile the RV32IM instructions.
-      let instructions = transpile(&elf.instructions);
+      let instructions = transpile(&elf.instructions)?;
 
       // Construct the selector table from the symbol table.
       let mut selector_table = BTreeMap::new();
@@ -68,7 +56,7 @@ impl Program {
       }
 
       // short-circuit for Athena binaries
-      let instructions = transpile(&instructions);
+      let instructions = transpile(&instructions)?;
 
       // Return the program.
       Ok(Program::new(instructions, 0, 0))
