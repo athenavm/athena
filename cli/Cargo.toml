@@ -9,7 +9,7 @@ edition.workspace = true
 
 [build-dependencies]
 anyhow = { version = "1.0.95", features = ["backtrace"] }
-vergen-git2 = { version = "1.0.2", default-features = false, features = [
+vergen-git2 = { version = "1.0.5", default-features = false, features = [
   "build",
 ] }
 
