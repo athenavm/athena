@@ -27,7 +27,7 @@ reqwest = { version = "0.12.11", features = [
 indicatif = "0.17.9"
 dirs = "6.0"
 rand = "0.8"
-serde_json = "1.0.134"
+serde_json = "1.0.135"
 yansi = "1.0.1"
 hex = "0.4.3"
 anstyle = "1.0.10"
