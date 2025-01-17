@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "contract_template",
   "fibonacci/script",
   "hello_world/script",
   "io/script",
