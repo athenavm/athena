@@ -70,14 +70,18 @@ go run . coinbase
 ```
 It will print the principal address of the wallet. You need to move funds to it or earn rewards for smeshing on the network as usual.
 
-The balance can be checked at the [explorer](https://explorer-devnet-athena.pages.dev/accounts). Once the account has some funds, it can be spawned:
+The balance can be checked at the [explorer](https://explorer-devnet-athena.pages.dev/accounts). Once the account has some funds, it can be spawned.
+
+The tool needs to talk with some go-spacemesh node connected to the network to publish a transaction to the network.
+Spacemesh doesn't provide a publicly available API at the moment.
+I assume you already have a node at this point which has a `TransactionService` GRPC endpoint exposed at `localhost:9092`.
 ```sh
-go run . spawn --nonce 0 --address <address of public devnet node GRPC API>
+go run . spawn --nonce 0 --address localhost:9092
 ```
 
 Finally, it can be used to **deploy** the contract. Note: the nonce cannot be reused and should be increasing with each TX. The current counter value can also be checked on the explorer on the account page.
 ```sh
-go run . deploy --nonce 1 --path <path to binary>
+go run . deploy --nonce 1 --path <path to binary> --address localhost:9092
 ```
 
 From this point onward, there is no ready tool or SDK to interact with the deployed contract (e.g. call its methods). You can check the SDK for our single- and multi- sig wallets at https://github.com/spacemeshos/go-spacemesh/blob/athena-poc/vm/sdk to see how to create Athena transactions and the code in the CLI tool (vm/cmd/cli) for examples how to send a TX to a node.
