@@ -1,136 +1,119 @@
-# Athena smart contract template
+# Athena Smart Contract Template
 
-This template shows the bare minimum that a smart contract must currently implement
-to be deployed and ran on the Athena-enabled test network.
-
-The contract implements 2 necessary methods:
-
-- spawn
-- verify
-
-Please check the comments in the [code](src/contract.rs) for explanations.
+Welcome to the Athena smart contract template!
+This guide will help you create, test, and deploy smart contracts on the Athena-enabled test network.
+The template provides a minimal implementation with two essential methods: `spawn` and `verify`.
+or detailed explanations of these methods, please refer to the [source code](src/contract.rs).
 
 ## Prerequisites
 
-### Rust installed
+### 1. Install Rust
 
-The template is implememented in the Rust programming language and a working rust toolchain is needed.
-Follow the [official rustup guide](https://rustup.rs) too install it.
+The template is written in Rust.
+To get started, install the Rust toolchain by following the [official rustup guide](https://rustup.rs).
 
-### Athena toolchain
+### 2. Set Up Athena Toolchain
 
-We maintain a [toolchain](https://github.com/athenavm/rustc-rv32e-toolchain) which
-is needed to build the contract code for the Athena (RISC-V RV32EM).
+You'll need our custom [RISC-V RV32EM toolchain](https://github.com/athenavm/rustc-rv32e-toolchain) to build contracts for Athena.
+We provide a convenient `cargo athena` plugin and an `athup` helper script for installation.
 
-This repository contains a `cargo athena` plugin used to build the contracts
-at [cli](../../cli) as well as `athup` helper script to simplify installing it.
-
-To install `cargo athena` download and execute the athup:
+To install `cargo athena`, run:
 
 ```sh
 curl -L https://raw.githubusercontent.com/athenavm/athena/main/athup/athup | bash
 ```
 
-or execute it directly from within this repository at `athup/athup`.
+Alternatively, if you've cloned this repository, run the script directly from `athup/athup`.
 
-### A go-spacemesh node connected to the Athena devnet
+### 3. Connect to Athena Devnet
 
-In order to deploy the contract onto the Spacemesh Athena devnet,
-one needs to have a go-spacemesh node connected to the network.
-There is a special [go-spacemesh release](https://github.com/spacemeshos/go-spacemesh/releases/tag/athena-devnet-13-1.0.1)
-crafted specifially for Athena.
+To deploy contracts, you'll need a go-spacemesh node connected to the Athena devnet.
+Use our dedicated [go-spacemesh release](https://github.com/spacemeshos/go-spacemesh/releases/tag/athena-devnet-13-1.0.1)
+along with this [configuration file](https://configs.spacemesh.network/config.devnet-athena-13.json).
 
 > [!IMPORTANT]
-> A regular go-spacemesh release **will not work**.
+> Standard go-spacemesh releases are not compatible with Athena.
 
-Use it together with [configuration file](https://configs.spacemesh.network/config.devnet-athena-13.json)
-to connect to the network and later publish transactions to the devnet via it.
+## Development Guide
 
-## Building the contract
+### Building Your Contract
 
-To build, simply execute the below command. The built executable is placed at `elf/contract_template`.
+Build the contract with:
 
 ```sh
 cargo athena build
 ```
 
-## Testing the contract
+The compiled binary will be available at `elf/contract_template`.
 
-The template comes with some tests in [tests](tests/test.rs). They can be run with
+### Testing
+
+Run the included tests from [tests](tests/test.rs) with:
 
 ```sh
 cargo test
 ```
 
-Keep in mind there is no `athena` in the command because the tests are built and executed directly on your machine. They spin up the Athena VM and execute the smart contract code inside.
+> [!TIP]
+> Tests run directly on your machine using the Athena VM,
+> so the `athena` flag isn't needed.
 
-## Deploying the contract onto the Athena test network
+### Deployment Process
 
-A contract can be deployed using the standard Spacemesh single-sig wallet.
-It has a `deploy` method designed specifically for this purpose.
-First, you will need a single-sig wallet account with some funds in it.
-One SMH is more than enough.
+#### What you will need
 
-Unfortunately, currently the Spacemesh wallet application doesn't support
-deploying contracts (yet).
-You will need to use the CLI tool developed specifically for the Athena test network.
-It's hosted at [go-spacemesh repository](https://github.com/spacemeshos/go-spacemesh/tree/athena-poc/vm/cmd/client).
+- A single-sig wallet with funds (1 SMH is sufficient)
+- Go installation ([installation guide](https://go.dev/doc/install))
+- Athena CLI tool from the [go-spacemesh repository](https://github.com/spacemeshos/go-spacemesh/tree/athena-poc/vm/cmd/client)
 
-It's written in Go, so you will need a working Go installation to proceed.
-Go can be installed by following the [Go official guide](https://go.dev/doc/install).
-Once it is installed, checkout the code at branch `athena-poc`:
+#### Step-by-Step Deployment
+
+1. Clone the Athena branch:
 
 ```sh
 git clone -b athena-poc https://github.com/spacemeshos/go-spacemesh.git
-
 ```
 
-Next, go to `vm/cmd/client` directory. Create the single-sig wallet keys with
+2. Navigate to `vm/cmd/client` and generate wallet keys:
 
 ```sh
 go run . generateKey
 ```
 
-It will create a `key.hex` containing a private key for the wallet.
+> [!NOTE]
+> The key is stored in `key.hex` file by default.
 
-Now, we need to check the address of the wallet to move some funds to it.
+3. Get your wallet address:
 
 ```sh
 go run . coinbase
 ```
 
-It will print the principal address of the wallet.
-You need to move funds to it or earn rewards for smeshing on the network as usual.
+4. Fund your wallet and verify the balance on the [explorer](https://explorer-devnet-athena.spacemesh.network/accounts)
 
-The balance can be checked at the [explorer](https://explorer-devnet-athena.spacemesh.network/accounts).
-Once the account has some funds, it can be spawned.
-
-The tool needs to talk with some go-spacemesh node connected to
-the network to publish a transaction to the network.
-Spacemesh doesn't provide a publicly available API at the moment.
-
-Follow the steps [to run athena node](#a-go-spacemesh-node-connected-to-the-athena-devnet).
-The node by defualt exposes a `TransactionService` GRPC endpoint exposed at `localhost:9092`.
+5. Spawn your account (requires a running node with GRPC endpoint at localhost:9092):
 
 ```sh
 go run . spawn --nonce 0 --address localhost:9092
 ```
 
-Finally, it can be used to **deploy** the contract.
-
-> [!NOTE]
-> The nonce cannot be reused and should be increasing with each TX.
-> The current counter value can also be checked on the explorer on the account page.
+6. Deploy your contract:
 
 ```sh
 go run . deploy --nonce 1 --path <path to binary> --address localhost:9092
 ```
 
-From this point onward, there is no ready tool or SDK to interact with the deployed contract (e.g. call its methods).
-You can check the SDK for our single- and multi- sig wallets in the [SDK for go-spacemesh wallets](https://github.com/spacemeshos/go-spacemesh/blob/athena-poc/vm/sdk)
-to see how to create Athena transactions and the code in the CLI tool (vm/cmd/cli) for examples how to send a TX to a node.
+> [!NOTE]
+> Each transaction requires an incremental nonce. Check the current nonce on the explorer.
 
-## Contact
+## Further Development
 
-The official Athena VM channel #athena-vm on [Spacemesh Discord](https://discord.gg/spacemesh)
-is the best place to ask for help and share ideas about the Athen VM, SDK, contracts and everything related.
+While there isn't currently a comprehensive SDK for contract interaction,
+you can reference our [wallet SDK](https://github.com/spacemeshos/go-spacemesh/blob/athena-poc/vm/sdk)
+and the CLI tool for examples of creating and sending Athena transactions.
+
+## Community Support
+
+Join us on the #athena-vm channel in [Spacemesh Discord](https://discord.gg/spacemesh)
+for discussions, support, and sharing ideas about Athena VM development.
+We're here to help you build amazing smart contracts!
