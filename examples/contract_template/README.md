@@ -33,6 +33,19 @@ curl -L https://raw.githubusercontent.com/athenavm/athena/main/athup/athup | bas
 
 or execute it directly from within this repository at `athup/athup`.
 
+### A go-spacemesh node connected to the Athena devnet
+
+In order to deploy the contract onto the Spacemesh Athena devnet,
+one needs to have a go-spacemesh node connected to the network.
+There is a special [go-spacemesh release](https://github.com/spacemeshos/go-spacemesh/releases/tag/athena-devnet-13-1.0.1)
+crafted specifially for Athena.
+
+> [!IMPORTANT]
+> A regular go-spacemesh release **will not work**.
+
+Use it together with [configuration file](https://configs.spacemesh.network/config.devnet-athena-13.json)
+to connect to the network and later publish transactions to the devnet via it.
+
 ## Building the contract
 
 To build, simply execute the below command. The built executable is placed at `elf/contract_template`.
@@ -95,7 +108,9 @@ Once the account has some funds, it can be spawned.
 The tool needs to talk with some go-spacemesh node connected to
 the network to publish a transaction to the network.
 Spacemesh doesn't provide a publicly available API at the moment.
-I assume you already have a node at this point which has a `TransactionService` GRPC endpoint exposed at `localhost:9092`.
+
+Follow the steps [to run athena node](#a-go-spacemesh-node-connected-to-the-athena-devnet).
+The node by defualt exposes a `TransactionService` GRPC endpoint exposed at `localhost:9092`.
 
 ```sh
 go run . spawn --nonce 0 --address localhost:9092
