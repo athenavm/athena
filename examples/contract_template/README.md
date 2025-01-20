@@ -114,6 +114,6 @@ and the CLI tool for examples of creating and sending Athena transactions.
 
 ## Community Support
 
-Join us on the #athena-vm channel in [Spacemesh Discord](https://discord.gg/spacemesh)
+Join us on the #athena-vm channel in [Spacemesh Discord](https://discord.com/invite/yVhQ7rC)
 for discussions, support, and sharing ideas about Athena VM development.
 We're here to help you build amazing smart contracts!
