@@ -245,9 +245,24 @@ dependencies = [
 [[package]]
 name = "athena-vm-declare"
 version = "0.6.3"
+dependencies = [
+ "athena-vm-declare-macro 0.6.3",
+]
+
+[[package]]
+name = "athena-vm-declare"
+version = "0.6.3"
 source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
 dependencies = [
- "athena-vm-declare-macro",
+ "athena-vm-declare-macro 0.6.3 (git+https://github.com/athenavm/athena?tag=v0.6.3)",
+]
+
+[[package]]
+name = "athena-vm-declare-macro"
+version = "0.6.3"
+dependencies = [
+ "quote",
+ "syn 2.0.90",
 ]
 
 [[package]]
@@ -477,7 +492,7 @@ dependencies = [
  "athena-runner 0.6.3 (git+https://github.com/athenavm/athena?tag=v0.6.3)",
  "athena-sdk 0.6.3 (git+https://github.com/athenavm/athena?tag=v0.6.3)",
  "athena-vm 0.6.3 (git+https://github.com/athenavm/athena?tag=v0.6.3)",
- "athena-vm-declare",
+ "athena-vm-declare 0.6.3 (git+https://github.com/athenavm/athena?tag=v0.6.3)",
  "athena-vm-sdk 0.6.3 (git+https://github.com/athenavm/athena?tag=v0.6.3)",
  "contract_template",
  "ed25519-dalek",
@@ -1069,6 +1084,18 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+
+[[package]]
+name = "mint"
+version = "0.1.0"
+dependencies = [
+ "athena-interface 0.6.3",
+ "athena-vm 0.6.3",
+ "athena-vm-declare 0.6.3",
+ "athena-vm-sdk 0.6.3",
+ "parity-scale-codec",
+ "wallet",
+]
 
 [[package]]
 name = "mockall"
@@ -1851,6 +1878,17 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "wallet"
+version = "0.1.0"
+dependencies = [
+ "athena-interface 0.6.3",
+ "athena-vm 0.6.3",
+ "athena-vm-declare 0.6.3",
+ "athena-vm-sdk 0.6.3",
+ "parity-scale-codec",
+]
 
 [[package]]
 name = "wallet-script"
