@@ -67,7 +67,7 @@ func TestExecuteEmptyCode(t *testing.T) {
 	defer vm.Destroy()
 
 	addr := Address{}
-	result, err := vm.Execute(nil, Frontier, Call, 1, 999, addr, addr, nil, 0, nil)
+	result, err := vm.Execute(nil, Frontier, Call, 1, 999, addr, addr, Address{}, nil, 0, nil)
 
 	require.Error(t, err)
 	require.Empty(t, result.Output)

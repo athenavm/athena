@@ -7,8 +7,9 @@ use strum_macros::EnumIter;
 use crate::runtime::{Register, Runtime};
 use crate::syscall::precompiles::ed25519::SyscallEd25519Verify;
 use crate::syscall::{
-  SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostCall, SyscallHostDeploy,
-  SyscallHostGetBalance, SyscallHostRead, SyscallHostSpawn, SyscallHostWrite, SyscallWrite,
+  SyscallHalt, SyscallHintLen, SyscallHintRead, SyscallHostCall, SyscallHostContext,
+  SyscallHostDeploy, SyscallHostGetBalance, SyscallHostRead, SyscallHostSpawn, SyscallHostWrite,
+  SyscallWrite,
 };
 
 /// A system call is invoked by the the `ecall` instruction with a specific value in register t0.
@@ -37,6 +38,7 @@ pub enum SyscallCode {
   HOST_GETBALANCE = 0x00_00_00_A3,
   HOST_SPAWN = 0x00_00_00_A4,
   HOST_DEPLOY = 0x00_00_00_A5,
+  HOST_CONTEXT = 0x00_00_00_A6,
 
   /// Executes the `HINT_LEN` precompile.
   HINT_LEN = 0x00_00_00_F0,
@@ -58,6 +60,7 @@ impl SyscallCode {
       0x00_00_00_A3 => SyscallCode::HOST_GETBALANCE,
       0x00_00_00_A4 => SyscallCode::HOST_SPAWN,
       0x00_00_00_A5 => SyscallCode::HOST_DEPLOY,
+      0x00_00_00_A6 => SyscallCode::HOST_CONTEXT,
       0x00_00_00_F0 => SyscallCode::HINT_LEN,
       0x00_00_00_F1 => SyscallCode::HINT_READ,
       _ => panic!("invalid syscall number: {}", value),
@@ -205,6 +208,7 @@ pub fn default_syscall_map() -> HashMap<SyscallCode, Arc<dyn Syscall>> {
   syscall_map.insert(SyscallCode::HOST_DEPLOY, Arc::new(SyscallHostDeploy {}));
   syscall_map.insert(SyscallCode::HINT_LEN, Arc::new(SyscallHintLen {}));
   syscall_map.insert(SyscallCode::HINT_READ, Arc::new(SyscallHintRead {}));
+  syscall_map.insert(SyscallCode::HOST_CONTEXT, Arc::new(SyscallHostContext {}));
 
   syscall_map
 }
@@ -264,6 +268,7 @@ mod tests {
         SyscallCode::HINT_LEN => assert_eq!(code as u32, athena_vm::syscalls::HINT_LEN),
         SyscallCode::HINT_READ => assert_eq!(code as u32, athena_vm::syscalls::HINT_READ),
         SyscallCode::HOST_DEPLOY => assert_eq!(code as u32, athena_vm::syscalls::HOST_DEPLOY),
+        SyscallCode::HOST_CONTEXT => assert_eq!(code as u32, athena_vm::syscalls::HOST_CONTEXT),
       }
     }
   }

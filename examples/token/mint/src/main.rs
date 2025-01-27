@@ -1,3 +1,11 @@
+//! Token mint
+//!
+//! It allows exchanging SMH for the token,
+//! which is then transfered to the chosen
+//! wallet address.
+//!
+//! Every mint account instance represents a
+//! unique token.
 #![no_main]
 
 use athena_interface::{Address, Encode, MethodSelector};
@@ -6,14 +14,16 @@ use athena_vm_declare::{callable, template};
 use athena_vm_sdk::{wallet::SpendArguments, Pubkey};
 use parity_scale_codec::Decode;
 
-/// 1000 Smidge == 1 tokens
-const EXCHANGE_RATE: u64 = 1000;
+/// Storage for the number of already distributed tokens
 const SUPPLY_KEY: [u32; 8] = [0; 8];
+const TOKEN_IDENTIFIER_KEY: [u32; 8] = [1; 8];
 
 #[derive(Debug, Decode, Encode)]
 struct Mint {
   owner: Pubkey,
   max_supply: u64,
+  /// token/smidge ratio (how many smidges per token)
+  token_price: u64,
 }
 
 athena_vm::entrypoint!();
@@ -22,11 +32,14 @@ athena_vm::entrypoint!();
 impl Mint {
   #[callable]
   fn spawn(mint: Mint) -> Address {
-    let mut max_supply = [0u32; 8];
-    max_supply[0] = mint.max_supply as u32;
-    max_supply[1] = (mint.max_supply >> 32) as u32;
-    athena_vm::syscalls::write_storage(&SUPPLY_KEY, &max_supply);
-    athena_vm_sdk::spawn(mint.encode())
+    let address = athena_vm_sdk::spawn(&mint.encode());
+
+    let mut token_identifier_words = [0u32; 8];
+    for (i, c) in address.0.chunks_exact(4).enumerate() {
+      token_identifier_words[i] = u32::from_le_bytes(c.try_into().unwrap());
+    }
+    athena_vm::syscalls::write_storage(&TOKEN_IDENTIFIER_KEY, &token_identifier_words);
+    address
   }
 
   /// Buy exchanges SMH transfered along with the call into
@@ -38,7 +51,7 @@ impl Mint {
     // 1. Check number of received coins
     //    and convert to tokens
     let ctx = athena_vm::syscalls::context::context();
-    let amount = ctx.received * EXCHANGE_RATE;
+    let amount = ctx.received / self.token_price;
     if amount == 0 {
       return;
     }
@@ -46,19 +59,31 @@ impl Mint {
     // 2. Check the remaining supply,
     //    calculate how much is bought,
     //    and update the remaining supply
-    let mut supply_words = athena_vm::syscalls::read_storage(&SUPPLY_KEY);
-    let mut supply = (supply_words[0] as u64) + ((supply_words[1] as u64) << 32);
+    let mut distributed_words = athena_vm::syscalls::read_storage(&SUPPLY_KEY);
+    let mut distributed = (distributed_words[0] as u64) + ((distributed_words[1] as u64) << 32);
+    let supply = self.max_supply.saturating_sub(distributed);
     let bought = std::cmp::min(supply, amount);
-    supply -= bought;
-    supply_words[0] = supply as u32;
-    supply_words[1] = (supply >> 32) as u32;
-    athena_vm::syscalls::write_storage(&SUPPLY_KEY, &supply_words);
+    distributed += bought;
+    distributed_words[0] = distributed as u32;
+    distributed_words[1] = (distributed >> 32) as u32;
+    athena_vm::syscalls::write_storage(&SUPPLY_KEY, &distributed_words);
+
+    let token_identifier_words = athena_vm::syscalls::read_storage(&TOKEN_IDENTIFIER_KEY);
+    let token_identifier: [u8; 24] = bytemuck::cast_slice::<u32, u8>(&token_identifier_words)[..24]
+      .try_into()
+      .unwrap();
 
     // 3. Call receive() on the wallet.
     // It will increase its balance
     athena_vm_sdk::call(
       recipient,
-      Some(wallet::ReceiveArguments { amount }.encode()),
+      Some(
+        wallet::ReceiveArguments {
+          token_identifier: Address(token_identifier),
+          amount,
+        }
+        .encode(),
+      ),
       Some(MethodSelector::from("athexp_receive")),
       0,
     );

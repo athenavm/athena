@@ -97,6 +97,8 @@ extern "C"
      */
     athcon_address sender;
 
+    athcon_address sender_template;
+
     /**
      * The message input data.
      *

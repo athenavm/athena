@@ -196,7 +196,7 @@ func (vm *VM) Execute(
 	kind CallKind,
 	depth int,
 	gas int64,
-	recipient, sender Address,
+	recipient, sender, sender_template Address,
 	input []byte,
 	value uint64,
 	code []byte,
@@ -208,12 +208,13 @@ func (vm *VM) Execute(
 		}
 	}
 	msg := C.struct_athcon_message{
-		kind:      C.enum_athcon_call_kind(kind),
-		depth:     C.int32_t(depth),
-		gas:       C.int64_t(gas),
-		recipient: *athconAddress(recipient),
-		sender:    *athconAddress(sender),
-		value:     C.uint64_t(value),
+		kind:            C.enum_athcon_call_kind(kind),
+		depth:           C.int32_t(depth),
+		gas:             C.int64_t(gas),
+		recipient:       *athconAddress(recipient),
+		sender:          *athconAddress(sender),
+		sender_template: *athconAddress(sender_template),
+		value:           C.uint64_t(value),
 	}
 	if len(input) > 0 {
 		// Allocate memory for input data in C.

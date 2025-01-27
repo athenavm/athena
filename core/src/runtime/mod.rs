@@ -766,7 +766,10 @@ pub mod tests {
   use crate::{
     host::MockHostInterface, instruction::Instruction, runtime::ExecutionError, utils::with_max_gas,
   };
-  use athena_interface::{Address, AthenaContext, ExecutionResult, StatusCode, ADDRESS_LENGTH};
+  use athena_interface::{
+    Address, AthenaContext, CallerBuilder, ExecutionResult, StatusCode, ADDRESS_LENGTH,
+  };
+  use mockall::predicate::eq;
 
   use crate::{
     runtime::Register,
@@ -801,7 +804,8 @@ pub mod tests {
       Instruction::Add(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let ctx = AthenaContext::new(Address::default(), caller, 0);
 
     // failure
     let mut runtime = Runtime::new(
@@ -914,7 +918,8 @@ pub mod tests {
       .expect_call()
       .once()
       .returning(|_| ExecutionResult::new(StatusCode::Success, 1000, None));
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let ctx = AthenaContext::new(Address::default(), caller, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
 
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
@@ -944,7 +949,9 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
 
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let callee = Address::from([0x77; 24]);
+    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let ctx = AthenaContext::new(callee, caller, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut host = MockHostInterface::new();
     host
@@ -978,11 +985,16 @@ pub mod tests {
       Instruction::Ecall,
     ];
     let program = Program::new(instructions, 0, 0);
+    let callee = Address([0x77; 24]);
+    let caller = CallerBuilder::new(Address([0x88; 24])).build();
 
-    let ctx = AthenaContext::new(Address::default(), Address::default(), 0);
+    let ctx = AthenaContext::new(callee, caller, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut host = MockHostInterface::new();
-    host.expect_get_balance().return_const(1111u64);
+    host
+      .expect_get_balance()
+      .with(eq(callee))
+      .return_const(1111u64);
 
     let mut runtime = Runtime::new(program, Some(&mut host), opts, Some(ctx));
     let gas_left = runtime.execute().expect("execution failed");

@@ -1,3 +1,9 @@
+//! Multi-token wallet
+//!
+//! It keeps and allows spending various tokens
+//! created by different mints. Every mint
+//! instance creates a unique token, which
+//! is identified by the address of the mint.
 #![no_main]
 
 use athena_interface::{Address, MethodSelector};
@@ -5,15 +11,13 @@ use athena_vm::entrypoint;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::Pubkey;
 use parity_scale_codec::{Decode, Encode};
-use wallet::ReceiveArguments;
-
-const BALANCE_KEY: [u32; 8] = [0u32; 8];
+use wallet::{ReceiveArguments, SpendArguments};
 
 #[derive(Debug, Decode, Encode)]
 struct Wallet {
   owner: Pubkey,
-  mint: Address,
-  template: Address,
+  mint_template: Address,
+  wallet_template: Address,
 }
 
 athena_vm::entrypoint!();
@@ -27,40 +31,65 @@ impl Wallet {
 
   #[callable]
   fn receive(&self, args: ReceiveArguments) {
-    // 1. Only accept calls from:
+    // 1. Only accept calls from the following templates:
     // - the mint (exchange)
-    // - another wallet
+    // - another wallet (transfer)
     let ctx = athena_vm::syscalls::context::context();
-    // FIXME: This breaks if the mint isn't a singleton...
-    assert!(ctx.caller == self.mint || ctx.caller_template == self.template);
+    assert!(
+      ctx.caller_template == self.mint_template || ctx.caller_template == self.wallet_template
+    );
 
     // 2. increase the balance
-    let mut balance_words = athena_vm::syscalls::read_storage(&[0u32; 8]);
+    let balance_key = self.balance_key(&args.token_identifier);
+    let mut balance_words = athena_vm::syscalls::read_storage(&balance_key);
     let mut balance = (balance_words[0] as u64) + ((balance_words[1] as u64) << 32);
     balance = balance.saturating_add(args.amount);
     balance_words[0] = balance as u32;
     balance_words[1] = (balance >> 32) as u32;
-    athena_vm::syscalls::write_storage(&BALANCE_KEY, &balance_words);
+    athena_vm::syscalls::write_storage(&balance_key, &balance_words);
+  }
+
+  fn balance_key(&self, token_id: &Address) -> [u32; 8] {
+    let mut balance_key = [0; 8];
+    for (i, chunk) in token_id.0.chunks_exact(4).enumerate() {
+      balance_key[i] = u32::from_le_bytes(chunk.try_into().unwrap())
+    }
+    balance_key
   }
 
   #[callable]
-  fn spend(&self, recipient: Address, amount: u64) {
+  fn spend(&self, args: SpendArguments) {
     // 1. Decrease the balance
-    let mut balance_words = athena_vm::syscalls::read_storage(&[0u32; 8]);
+    let balance_key = self.balance_key(&args.token_identifier);
+    let mut balance_words = athena_vm::syscalls::read_storage(&balance_key);
     let mut balance = (balance_words[0] as u64) + ((balance_words[1] as u64) << 32);
-    balance = balance.saturating_sub(amount);
+    assert!(args.amount <= balance);
+
+    balance -= args.amount;
     balance_words[0] = balance as u32;
     balance_words[1] = (balance >> 32) as u32;
-    athena_vm::syscalls::write_storage(&BALANCE_KEY, &balance_words);
+    athena_vm::syscalls::write_storage(&balance_key, &balance_words);
 
     // 2. Call receive() on the other wallet
     // It will increase its balance.
     athena_vm_sdk::call(
-      recipient,
-      Some(wallet::ReceiveArguments { amount }.encode()),
+      args.recipient,
+      Some(
+        wallet::ReceiveArguments {
+          token_identifier: args.token_identifier,
+          amount: args.amount,
+        }
+        .encode(),
+      ),
       Some(MethodSelector::from("athexp_receive")),
       0,
     );
+  }
+
+  #[callable]
+  fn max_spend(&self) -> u64 {
+    // This wallet doesn't manage SMH and it cannot spend it.
+    0
   }
 
   #[callable]

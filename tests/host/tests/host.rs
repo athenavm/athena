@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, error::Error};
 
 use athena_interface::{
-  Address, AthenaContext, AthenaMessage, Balance, Bytes32, ExecutionResult, StorageStatus,
+  Address, AthenaContext, AthenaMessage, Balance, Bytes32, CallerBuilder, ExecutionResult,
+  StorageStatus,
 };
 use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 
@@ -50,7 +51,11 @@ fn test() {
   let elf = include_bytes!("../elf/host-test");
   let mut host = Host::default();
   let stdin = AthenaStdin::new();
-  let context = AthenaContext::new(Address::from([0xCC; 24]), Address::default(), 0);
+  let context = AthenaContext::new(
+    Address::from([0xCC; 24]),
+    CallerBuilder::new(Address::default()).build(),
+    0,
+  );
   let result =
     ExecutionClient::new().execute(elf, stdin, Some(&mut host), Some(100_000), Some(context));
   // result will be Err if asserts in the test failed

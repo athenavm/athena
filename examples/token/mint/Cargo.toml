@@ -10,6 +10,7 @@ athena-vm = { path = "../../../vm/entrypoint" }
 athena-vm-declare = { path = "../../../vm/declare" }
 athena-vm-sdk = { path = "../../../vm/sdk" }
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
+bytemuck = { version = "1.21.0" }
 
 [profile.release]
 lto = true

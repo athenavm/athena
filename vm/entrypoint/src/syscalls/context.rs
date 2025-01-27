@@ -1,13 +1,6 @@
 use std::mem::MaybeUninit;
 
-use athena_interface::Address;
-
-#[repr(C)]
-pub struct Context {
-  pub received: u64,
-  pub caller: Address,
-  pub caller_template: Address,
-}
+use athena_interface::Context;
 
 pub fn context() -> Context {
   let ctx = MaybeUninit::<Context>::uninit();

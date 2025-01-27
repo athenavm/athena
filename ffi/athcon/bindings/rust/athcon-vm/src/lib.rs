@@ -57,6 +57,7 @@ pub struct ExecutionMessage {
   gas: i64,
   recipient: Address,
   sender: Address,
+  pub sender_template: Address,
   input: Option<Vec<u8>>,
   value: u64,
 }
@@ -129,6 +130,7 @@ impl ExecutionMessage {
       gas,
       recipient,
       sender,
+      sender_template: Address::default(),
       input: input.map(|s| s.to_vec()),
       value,
     }
@@ -246,6 +248,7 @@ impl<'a> ExecutionContext<'a> {
       gas: message.gas(),
       recipient: *message.recipient(),
       sender: *message.sender(),
+      sender_template: ffi::athcon_address::default(),
       input_data,
       input_size,
       value: message.value,
@@ -343,7 +346,7 @@ extern "C" fn release_stack_result(result: *const ffi::athcon_result) {
 }
 
 impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
-  type Error = String;
+  type Error = &'static str;
 
   fn try_from(message: &ffi::athcon_message) -> Result<Self, Self::Error> {
     Ok(ExecutionMessage {
@@ -352,9 +355,10 @@ impl TryFrom<&ffi::athcon_message> for ExecutionMessage {
       gas: message.gas,
       recipient: message.recipient,
       sender: message.sender,
+      sender_template: message.sender_template,
       input: if message.input_data.is_null() {
         if message.input_size != 0 {
-          return Err("msg.input_data is null but msg.input_size is not 0".to_string());
+          return Err("msg.input_data is null but msg.input_size is not 0");
         }
         None
       } else if message.input_size == 0 {
@@ -556,6 +560,7 @@ mod tests {
       gas: 4466,
       recipient,
       sender,
+      sender_template: sender,
       input_data: std::ptr::null(),
       input_size: 0,
       value,

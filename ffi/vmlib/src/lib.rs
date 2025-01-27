@@ -60,10 +60,13 @@ impl AthconVm for AthenaVMWrapper {
     let mut host = WrappedHostInterface::new(execution_context);
 
     // Execute the code and proxy the result back to the caller
-    let execution_result =
-      self
-        .athena_vm
-        .execute(&mut host, RevisionWrapper::from(rev).0, athena_msg.0, code);
+    let execution_result = self.athena_vm.execute(
+      &mut host,
+      RevisionWrapper::from(rev).0,
+      athena_msg.0,
+      code,
+      Address(message.sender_template.bytes),
+    );
     ExecutionResultWrapper(execution_result).into()
   }
 }
