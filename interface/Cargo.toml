@@ -10,4 +10,4 @@ edition.workspace = true
 [dependencies]
 blake3 = "1.5.5"
 hex = "0.4.3"
-parity-scale-codec = { version = "3.6.12", features = ["derive"] }
+parity-scale-codec = { version = "3.7.1", features = ["derive"] }

@@ -13,4 +13,4 @@ athena-interface = { path = "../../../../../interface" }
 athena-vm-sdk = { path = "../../../../../vm/sdk", default-features = false }
 
 [dev-dependencies]
-parity-scale-codec = "3.6.12"
+parity-scale-codec = "3.7.1"
