@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use athena_interface::{
-  payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, Balance, Bytes32,
-  CallerBuilder, ExecutionResult, StorageStatus,
+  payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, Balance, Bytes32, Caller,
+  ExecutionResult, StorageStatus,
 };
 use athena_runner::{vm::AthenaRevision, AthenaVm};
 use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
@@ -65,7 +65,10 @@ fn recursive_calling() {
   let mut stdin = AthenaStdin::new();
   let mut host = Host { code: elf.to_vec() };
   let callee = Address::from([0x77; 24]);
-  let caller = CallerBuilder::new(Address([0x88; 24])).build();
+  let caller = Caller {
+    account: Address([0x88; 24]),
+    template: Address::default(),
+  };
   stdin.write(&(callee.as_ref(), 6u32));
 
   let context = AthenaContext::new(callee, caller, 0);
@@ -86,7 +89,10 @@ fn gas_limiting() {
   let mut stdin = AthenaStdin::new();
   let mut host = Host { code: elf.to_vec() };
   let callee = Address::from([0x77; 24]);
-  let caller = CallerBuilder::new(Address([0x88; 24])).build();
+  let caller = Caller {
+    account: Address([0x88; 24]),
+    template: Address::default(),
+  };
   stdin.write(&(callee.as_ref(), 6u32));
 
   let context = AthenaContext::new(callee, caller, 0);

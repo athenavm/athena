@@ -19,7 +19,7 @@ pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 
 #[derive(Clone, Debug, Decode, Encode, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
+pub struct MethodSelector(pub [u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
   fn from(value: &str) -> Self {

@@ -767,7 +767,7 @@ pub mod tests {
     host::MockHostInterface, instruction::Instruction, runtime::ExecutionError, utils::with_max_gas,
   };
   use athena_interface::{
-    Address, AthenaContext, CallerBuilder, ExecutionResult, StatusCode, ADDRESS_LENGTH,
+    Address, AthenaContext, Caller, ExecutionResult, StatusCode, ADDRESS_LENGTH,
   };
   use mockall::predicate::eq;
 
@@ -804,7 +804,10 @@ pub mod tests {
       Instruction::Add(Register::X15, Register::X14, Register::X13),
     ];
     let program = Program::new(instructions, 0, 0);
-    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let caller = Caller {
+      account: Address([0x88; 24]),
+      template: Address::default(),
+    };
     let ctx = AthenaContext::new(Address::default(), caller, 0);
 
     // failure
@@ -918,7 +921,10 @@ pub mod tests {
       .expect_call()
       .once()
       .returning(|_| ExecutionResult::new(StatusCode::Success, 1000, None));
-    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let caller = Caller {
+      account: Address([0x88; 24]),
+      template: Address::default(),
+    };
     let ctx = AthenaContext::new(Address::default(), caller, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
 
@@ -950,7 +956,10 @@ pub mod tests {
     let program = Program::new(instructions, 0, 0);
 
     let callee = Address::from([0x77; 24]);
-    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let caller = Caller {
+      account: Address([0x88; 24]),
+      template: Address::default(),
+    };
     let ctx = AthenaContext::new(callee, caller, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);
     let mut host = MockHostInterface::new();
@@ -986,7 +995,10 @@ pub mod tests {
     ];
     let program = Program::new(instructions, 0, 0);
     let callee = Address([0x77; 24]);
-    let caller = CallerBuilder::new(Address([0x88; 24])).build();
+    let caller = Caller {
+      account: Address([0x88; 24]),
+      template: Address::default(),
+    };
 
     let ctx = AthenaContext::new(callee, caller, 0);
     let opts = AthenaCoreOpts::default().with_options(vec![with_max_gas(100000)]);

@@ -16,32 +16,7 @@ pub struct AthenaContext {
 #[derive(Debug, Clone)]
 pub struct Caller {
   pub account: Address,
-  pub template: Option<Address>,
-}
-
-#[derive(Debug)]
-pub struct CallerBuilder {
-  caller: Caller,
-}
-
-impl CallerBuilder {
-  pub fn new(address: Address) -> CallerBuilder {
-    Self {
-      caller: Caller {
-        account: address,
-        template: None,
-      },
-    }
-  }
-
-  pub fn build(self) -> Caller {
-    self.caller
-  }
-
-  pub fn template(mut self, template: Address) -> Self {
-    self.caller.template = Some(template);
-    self
-  }
+  pub template: Address,
 }
 
 impl AthenaContext {
@@ -61,4 +36,5 @@ pub struct Context {
   pub received: u64,
   pub caller: Address,
   pub caller_template: Address,
+  pub callee: Address,
 }

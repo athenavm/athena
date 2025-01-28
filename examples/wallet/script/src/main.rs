@@ -9,7 +9,7 @@ use host::*;
 
 use std::error::Error;
 
-use athena_interface::{Address, AthenaContext, CallerBuilder, Encode, MethodSelector};
+use athena_interface::{Address, AthenaContext, Caller, Encode, MethodSelector};
 use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{wallet::SpendArguments, Pubkey};
 
@@ -44,13 +44,13 @@ fn main() {
   );
   host.set_balance(&ADDRESS_ALICE, 10000);
   let address = spawn(&mut host, &owner).expect("spawning wallet program");
-  println!(
-    "spawned a wallet program at {address} for {}",
-    hex::encode(owner.0),
-  );
+  println!("spawned a wallet program at {address}",);
 
   // send some coins
-  let caller = CallerBuilder::new(Address::from([0xBB; 24])).build();
+  let caller = Caller {
+    account: address,
+    template: Address::from([0xBB; 24]),
+  };
   let context = AthenaContext::new(ADDRESS_ALICE, caller, 0);
 
   let mut stdin = AthenaStdin::new();
@@ -105,7 +105,7 @@ mod tests {
     payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, Balance, Encode,
     MessageKind, MethodSelector, StatusCode,
   };
-  use athena_interface::{AthenaContext, CallerBuilder, Decode, ExecutionResult};
+  use athena_interface::{AthenaContext, Caller, Decode, ExecutionResult};
   use athena_runner::vm::AthenaRevision;
   use athena_runner::AthenaVm;
   use athena_sdk::host::MockHostInterface;
@@ -327,7 +327,14 @@ mod tests {
     stdin.write_vec(args.encode());
 
     let sender = ADDRESS_ALICE;
-    let context = AthenaContext::new(sender, CallerBuilder::new(Address::default()).build(), 0);
+    let context = AthenaContext::new(
+      sender,
+      Caller {
+        account: Address::default(),
+        template: Address::default(),
+      },
+      0,
+    );
     let mut host = MockHostInterface::new();
     host.expect_call().returning(move |msg| {
       // the callee becomes the sender in the proxied call

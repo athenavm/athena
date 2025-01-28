@@ -15,8 +15,9 @@ impl Syscall for SyscallHostContext {
 
     let context = Context {
       received: athena_ctx.received,
+      callee: athena_ctx.callee,
       caller: athena_ctx.caller.account,
-      caller_template: athena_ctx.caller.template.unwrap_or_default(),
+      caller_template: athena_ctx.caller.template,
     };
 
     if (address % 4) != 0 {
@@ -262,7 +263,7 @@ impl Syscall for SyscallHostDeploy {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{Address, AthenaContext, CallerBuilder, ExecutionResult};
+  use athena_interface::{Address, AthenaContext, Caller, ExecutionResult};
 
   use crate::{
     host::MockHostInterface,
@@ -280,7 +281,10 @@ mod tests {
       .withf(|m| m.depth == 1)
       .returning(|_| ExecutionResult::new(StatusCode::Success, 0, None));
 
-    let caller = CallerBuilder::new(Address::default()).build();
+    let caller = Caller {
+      account: Address::default(),
+      template: Address::default(),
+    };
     let context = AthenaContext::new(Address::default(), caller, 0);
     let mut runtime = runtime::Runtime::new(
       Program::new(vec![], 0, 0),

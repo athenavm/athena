@@ -1,8 +1,7 @@
 use std::{collections::BTreeMap, error::Error};
 
 use athena_interface::{
-  Address, AthenaContext, AthenaMessage, Balance, Bytes32, CallerBuilder, ExecutionResult,
-  StorageStatus,
+  Address, AthenaContext, AthenaMessage, Balance, Bytes32, Caller, ExecutionResult, StorageStatus,
 };
 use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 
@@ -53,7 +52,10 @@ fn test() {
   let stdin = AthenaStdin::new();
   let context = AthenaContext::new(
     Address::from([0xCC; 24]),
-    CallerBuilder::new(Address::default()).build(),
+    Caller {
+      account: Address::default(),
+      template: Address::default(),
+    },
     0,
   );
   let result =
