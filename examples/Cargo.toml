@@ -3,7 +3,7 @@ members = [
   "contract_template",
   "fibonacci/script",
   "hello_world/script",
-  "io/script",
+  "io/script", "token/mint", "token/wallet",
   "wallet/script",
 ]
 resolver = "2"

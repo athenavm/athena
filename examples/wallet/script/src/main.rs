@@ -9,7 +9,7 @@ use host::*;
 
 use std::error::Error;
 
-use athena_interface::{Address, AthenaContext, Encode, MethodSelector};
+use athena_interface::{Address, AthenaContext, Caller, Encode, MethodSelector};
 use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
 use athena_vm_sdk::{wallet::SpendArguments, Pubkey};
 
@@ -44,14 +44,14 @@ fn main() {
   );
   host.set_balance(&ADDRESS_ALICE, 10000);
   let address = spawn(&mut host, &owner).expect("spawning wallet program");
-  println!(
-    "spawned a wallet program at {address} for {}",
-    hex::encode(owner.0),
-  );
+  println!("spawned a wallet program at {address}",);
 
   // send some coins
-  let address_bob = Address::from([0xBB; 24]);
-  let context = AthenaContext::new(ADDRESS_ALICE, address_bob, 0);
+  let caller = Caller {
+    account: address,
+    template: Address::from([0xBB; 24]),
+  };
+  let context = AthenaContext::new(ADDRESS_ALICE, caller, 0);
 
   let mut stdin = AthenaStdin::new();
   let wallet = host
@@ -70,9 +70,7 @@ fn main() {
   assert!(alice_balance >= 120);
   println!(
     "sending {} coins {} -> {}",
-    args.amount,
-    context.address(),
-    args.recipient,
+    args.amount, context.caller.account, args.recipient,
   );
   // calculate method selector
   let method_selector = MethodSelector::from("athexp_spend");
@@ -107,7 +105,7 @@ mod tests {
     payload::ExecutionPayloadBuilder, payload::Payload, Address, AthenaMessage, Balance, Encode,
     MessageKind, MethodSelector, StatusCode,
   };
-  use athena_interface::{AthenaContext, Decode, ExecutionResult};
+  use athena_interface::{AthenaContext, Caller, Decode, ExecutionResult};
   use athena_runner::vm::AthenaRevision;
   use athena_runner::AthenaVm;
   use athena_sdk::host::MockHostInterface;
@@ -241,6 +239,7 @@ mod tests {
           Balance::default(),
         ),
         super::ELF,
+        Address::default(),
       );
 
       // the call should succeed, and it should return false
@@ -274,6 +273,7 @@ mod tests {
         Balance::default(),
       ),
       super::ELF,
+      Address::default(),
     );
 
     // the call should succeed, and it should return true
@@ -327,9 +327,17 @@ mod tests {
     stdin.write_vec(args.encode());
 
     let sender = ADDRESS_ALICE;
-    let context = AthenaContext::new(sender, Address::default(), 0);
+    let context = AthenaContext::new(
+      sender,
+      Caller {
+        account: Address::default(),
+        template: Address::default(),
+      },
+      0,
+    );
     let mut host = MockHostInterface::new();
     host.expect_call().returning(move |msg| {
+      // the callee becomes the sender in the proxied call
       assert_eq!(sender, msg.sender);
       assert_eq!(args.destination, msg.recipient);
       assert_eq!(args.amount, msg.value);

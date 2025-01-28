@@ -4,8 +4,8 @@ mod io;
 mod memory;
 mod sys;
 
+pub mod context;
 pub mod precompiles;
-
 pub use halt::*;
 pub use host::*;
 pub use io::*;
@@ -37,3 +37,4 @@ pub const HOST_CALL: u32 = 0x00_00_00_A2;
 pub const HOST_GETBALANCE: u32 = 0x00_00_00_A3;
 pub const HOST_SPAWN: u32 = 0x00_00_00_A4;
 pub const HOST_DEPLOY: u32 = 0x00_00_00_A5;
+pub const HOST_CONTEXT: u32 = 0x00_00_00_A6;

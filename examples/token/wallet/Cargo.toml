@@ -1,0 +1,17 @@
+[package]
+name = "wallet"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+athena-interface = { path = "../../../interface" }
+athena-vm = { path = "../../../vm/entrypoint" }
+athena-vm-declare = { path = "../../../vm/declare" }
+athena-vm-sdk = { path = "../../../vm/sdk" }
+parity-scale-codec = { version = "3.6.12", features = ["derive"] }
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

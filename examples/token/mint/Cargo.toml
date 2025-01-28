@@ -1,0 +1,19 @@
+[package]
+name = "mint"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wallet = { path = "../wallet" }
+athena-interface = { path = "../../../interface" }
+athena-vm = { path = "../../../vm/entrypoint" }
+athena-vm-declare = { path = "../../../vm/declare" }
+athena-vm-sdk = { path = "../../../vm/sdk" }
+parity-scale-codec = { version = "3.6.12", features = ["derive"] }
+bytemuck = { version = "1.21.0" }
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

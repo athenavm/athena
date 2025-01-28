@@ -4,6 +4,7 @@
 
 mod context;
 pub mod payload;
+use bytemuck::NoUninit;
 pub use context::*;
 
 pub use parity_scale_codec::{Decode, Encode};
@@ -18,7 +19,7 @@ pub type Bytes32 = [u8; BYTES32_LENGTH];
 pub type Bytes = [u8];
 
 #[derive(Clone, Debug, Decode, Encode, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MethodSelector([u8; METHOD_SELECTOR_LENGTH]);
+pub struct MethodSelector(pub [u8; METHOD_SELECTOR_LENGTH]);
 
 impl From<&str> for MethodSelector {
   fn from(value: &str) -> Self {
@@ -37,7 +38,8 @@ impl std::fmt::Display for MethodSelector {
   }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Decode, Encode)]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Decode, Encode, NoUninit)]
 pub struct Address(pub [u8; ADDRESS_LENGTH]);
 
 impl From<&Address> for [u8; ADDRESS_LENGTH] {

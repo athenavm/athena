@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use athena_interface::{
-  payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, Balance, Bytes32,
+  payload::ExecutionPayload, Address, AthenaContext, AthenaMessage, Balance, Bytes32, Caller,
   ExecutionResult, StorageStatus,
 };
 use athena_runner::{vm::AthenaRevision, AthenaVm};
@@ -38,6 +38,7 @@ impl HostInterface for Host {
       AthenaRevision::AthenaFrontier,
       msg,
       &self.code.clone(),
+      Address::default(),
     )
   }
 
@@ -63,10 +64,14 @@ fn recursive_calling() {
   let elf = include_bytes!("../elf/recursive-call-test");
   let mut stdin = AthenaStdin::new();
   let mut host = Host { code: elf.to_vec() };
-  let template_address = Address::from([0x77; 24]);
-  stdin.write(&(template_address.as_ref(), 6u32));
+  let callee = Address::from([0x77; 24]);
+  let caller = Caller {
+    account: Address([0x88; 24]),
+    template: Address::default(),
+  };
+  stdin.write(&(callee.as_ref(), 6u32));
 
-  let context = AthenaContext::new(template_address, template_address, 0);
+  let context = AthenaContext::new(callee, caller, 0);
   let result =
     ExecutionClient::new().execute(elf, stdin, Some(&mut host), Some(100000000), Some(context));
 
@@ -83,10 +88,14 @@ fn gas_limiting() {
   let elf = include_bytes!("../elf/recursive-call-test");
   let mut stdin = AthenaStdin::new();
   let mut host = Host { code: elf.to_vec() };
-  let template_address = Address::from([0x77; 24]);
-  stdin.write(&(template_address.as_ref(), 6u32));
+  let callee = Address::from([0x77; 24]);
+  let caller = Caller {
+    account: Address([0x88; 24]),
+    template: Address::default(),
+  };
+  stdin.write(&(callee.as_ref(), 6u32));
 
-  let context = AthenaContext::new(template_address, template_address, 0);
+  let context = AthenaContext::new(callee, caller, 0);
   let result =
     ExecutionClient::new().execute(elf, stdin, Some(&mut host), Some(100), Some(context));
   assert!(result.is_err());

@@ -1,7 +1,7 @@
 use athena_core::runtime::ExecutionError;
 use athena_interface::{
   payload::{ExecutionPayload, Payload},
-  AthenaContext, AthenaMessage, Decode, ExecutionResult, StatusCode,
+  Address, AthenaContext, AthenaMessage, Caller, Decode, ExecutionResult, StatusCode,
 };
 
 use athena_sdk::{host::HostInterface, AthenaStdin, ExecutionClient};
@@ -56,8 +56,14 @@ impl AthenaVm {
     _rev: AthenaRevision,
     msg: AthenaMessage,
     code: &[u8],
+    caller_template: Address,
   ) -> ExecutionResult {
-    let context = AthenaContext::new(msg.recipient, msg.sender, msg.depth);
+    let caller = Caller {
+      account: msg.sender,
+      template: caller_template,
+    };
+    let mut context = AthenaContext::new(msg.recipient, caller, msg.depth);
+    context.received = msg.value;
 
     let mut stdin = AthenaStdin::new();
     let execution_payload = match msg
@@ -161,6 +167,7 @@ mod tests {
         Balance::default(),
       ),
       &[],
+      Address::default(),
     );
     assert_eq!(StatusCode::Failure, result.status_code);
   }
@@ -190,6 +197,7 @@ mod tests {
         Balance::default(),
       ),
       elf,
+      Address::default(),
     );
     // this should fail: in noentrypoint mode, this panics.
     assert_eq!(result.status_code, StatusCode::Failure);
@@ -213,6 +221,7 @@ mod tests {
         Balance::default(),
       ),
       elf,
+      Address::default(),
     );
     // this should succeed
     assert_eq!(result.status_code, StatusCode::Success);
@@ -236,6 +245,7 @@ mod tests {
         Balance::default(),
       ),
       elf,
+      Address::default(),
     );
     // this should also succeed
     assert_eq!(result.status_code, StatusCode::Success);
@@ -259,6 +269,7 @@ mod tests {
         Balance::default(),
       ),
       elf,
+      Address::default(),
     );
     // this should fail, as this method is not `callable`
     assert_eq!(result.status_code, StatusCode::Failure);
@@ -273,7 +284,11 @@ mod tests {
     let stdin = AthenaStdin::new();
     let mut host = MockHostInterface::new();
     host.expect_get_balance().return_const(9999u64);
-    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    let caller = Caller {
+      account: Address([0x88; 24]),
+      template: Address::default(),
+    };
+    let ctx = AthenaContext::new(ADDRESS_ALICE, caller, 0);
     let (mut output, _) = client
       .execute(elf, stdin, Some(&mut host), Some(1000), Some(ctx))
       .unwrap();
@@ -293,7 +308,11 @@ mod tests {
     host
       .expect_call()
       .returning(|_| ExecutionResult::new(StatusCode::CallDepthExceeded, 0, None));
-    let ctx = AthenaContext::new(ADDRESS_ALICE, ADDRESS_ALICE, 0);
+    let caller = Caller {
+      account: Address([0x88; 24]),
+      template: Address::default(),
+    };
+    let ctx = AthenaContext::new(ADDRESS_ALICE, caller, 0);
     let res = client.execute(elf, stdin, Some(&mut host), Some(1_000_000), Some(ctx));
     assert!(matches!(
       res,

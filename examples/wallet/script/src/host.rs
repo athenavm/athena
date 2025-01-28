@@ -201,7 +201,13 @@ impl HostInterface for MockHost {
         None => msg,
       };
 
-      AthenaVm::new().execute(self, AthenaRevision::AthenaFrontier, msg, &code)
+      AthenaVm::new().execute(
+        self,
+        AthenaRevision::AthenaFrontier,
+        msg,
+        &code,
+        Address::default(),
+      )
     } else {
       let gas_left = msg.gas.checked_sub(1).expect("gas underflow");
       ExecutionResult::new(StatusCode::Success, gas_left, None)

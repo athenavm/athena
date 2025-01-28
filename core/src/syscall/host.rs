@@ -1,7 +1,35 @@
 use std::cmp::min;
 
 use crate::runtime::{Outcome, Register, Syscall, SyscallContext, SyscallResult};
-use athena_interface::{Address, AthenaMessage, MessageKind, StatusCode};
+use athena_interface::{Address, AthenaMessage, Context, MessageKind, StatusCode};
+
+pub(crate) struct SyscallHostContext;
+
+impl Syscall for SyscallHostContext {
+  fn execute(&self, ctx: &mut SyscallContext, address: u32, _: u32) -> SyscallResult {
+    let athena_ctx = ctx
+      .rt
+      .context
+      .as_ref()
+      .expect("Missing Athena runtime context");
+
+    let context = Context {
+      received: athena_ctx.received,
+      callee: athena_ctx.callee,
+      caller: athena_ctx.caller.account,
+      caller_template: athena_ctx.caller.template,
+    };
+
+    if (address % 4) != 0 {
+      return Err(StatusCode::InvalidMemoryAccess);
+    }
+
+    let context_bytes = bytemuck::bytes_of(&context);
+    ctx.mw_slice(address, bytemuck::cast_slice::<u8, u32>(context_bytes));
+
+    Ok(Outcome::Result(None))
+  }
+}
 
 pub(crate) struct SyscallHostRead;
 
@@ -17,7 +45,7 @@ impl Syscall for SyscallHostRead {
 
     // read value from host
     let host = ctx.rt.host.as_mut().expect("Missing host interface");
-    let value = host.get_storage(athena_ctx.address(), &key);
+    let value = host.get_storage(&athena_ctx.callee, &key);
 
     // set return value
     ctx.mw_slice(arg1, &bytemuck::cast::<_, [u32; 8]>(value));
@@ -41,7 +69,7 @@ impl Syscall for SyscallHostWrite {
 
     // write value to host
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
-    let status_code = host.set_storage(athena_ctx.address(), &key, &value);
+    let status_code = host.set_storage(&athena_ctx.callee, &key, &value);
 
     Ok(Outcome::Result(Some(status_code as u32)))
   }
@@ -92,10 +120,10 @@ impl Syscall for SyscallHostCall {
     // construct the outbound message
     let msg = AthenaMessage::new(
       MessageKind::Call,
-      athena_ctx.depth() + 1,
+      athena_ctx.depth + 1,
       gas_left,
       address,
-      *athena_ctx.address(),
+      athena_ctx.callee,
       input,
       amount,
     );
@@ -172,7 +200,7 @@ impl Syscall for SyscallHostGetBalance {
 
     // get value from host
     let host = ctx.rt.host.as_deref_mut().expect("Missing host interface");
-    let balance = host.get_balance(athena_ctx.address());
+    let balance = host.get_balance(&athena_ctx.callee);
     let balance_high = (balance >> 32) as u32;
     let balance_low = balance as u32;
     let balance_slice = [balance_low, balance_high];
@@ -235,7 +263,7 @@ impl Syscall for SyscallHostDeploy {
 
 #[cfg(test)]
 mod tests {
-  use athena_interface::{Address, AthenaContext, ExecutionResult};
+  use athena_interface::{Address, AthenaContext, Caller, ExecutionResult};
 
   use crate::{
     host::MockHostInterface,
@@ -253,7 +281,11 @@ mod tests {
       .withf(|m| m.depth == 1)
       .returning(|_| ExecutionResult::new(StatusCode::Success, 0, None));
 
-    let context = AthenaContext::new(Address::default(), Address::default(), 0);
+    let caller = Caller {
+      account: Address::default(),
+      template: Address::default(),
+    };
+    let context = AthenaContext::new(Address::default(), caller, 0);
     let mut runtime = runtime::Runtime::new(
       Program::new(vec![], 0, 0),
       Some(&mut host),

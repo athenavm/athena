@@ -89,7 +89,7 @@ func (host *testHostContext) Call(
 	}
 
 	encoded := EncodedExecutionPayload(nil, input)
-	result, err := host.vm.Execute(host, Frontier, Call, depth+1, gas, recipient, sender, encoded, 0, p)
+	result, err := host.vm.Execute(host, Frontier, Call, depth+1, gas, recipient, sender, Address{}, encoded, 0, p)
 	if err != nil {
 		return nil, gas, fmt.Errorf("executing call: %w", err)
 	}
@@ -125,7 +125,7 @@ func TestGetBalance(t *testing.T) {
 	host := newHost(vm)
 	addr := randomAddress()
 	host.balances[addr] = 1000
-	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, nil, 0, MINIMAL_TEST_CODE)
+	result, err := vm.Execute(host, Frontier, Call, 1, 100, addr, addr, Address{}, nil, 0, MINIMAL_TEST_CODE)
 	require.NoError(t, err)
 	require.EqualValues(t, result.GasLeft, 68)
 	require.Len(t, result.Output, 32)
@@ -152,7 +152,7 @@ func TestCall(t *testing.T) {
 
 	encoded, err := scale.Marshal(executionPayload)
 	require.NoError(t, err)
-	result, err := vm.Execute(host, Frontier, Call, 0, 100000, addr, addr, encoded, 0, RECURSIVE_CALL_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 0, 100000, addr, addr, Address{}, encoded, 0, RECURSIVE_CALL_TEST)
 	require.NoError(t, err)
 	require.Len(t, result.Output, 4)
 	value := binary.LittleEndian.Uint32(result.Output)
@@ -170,7 +170,7 @@ func TestSpawn(t *testing.T) {
 	payload := vm.Lib.EncodeTxSpawn(pubkey)
 	executionPayload := EncodedExecutionPayload(nil, payload)
 
-	result, err := vm.Execute(host, Frontier, Call, 1, 1000000, principal, principal, executionPayload, 0, WALLET_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 1000000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 	require.Len(t, result.Output, 24)
 
@@ -189,7 +189,7 @@ func TestSpend(t *testing.T) {
 		pubkey := Bytes32([32]byte{1, 1, 2, 2, 3, 3, 4, 4})
 		executionPayload := EncodedExecutionPayload(nil, vm.Lib.EncodeTxSpawn(pubkey))
 
-		result, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, executionPayload, 0, WALLET_TEST)
+		result, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 		require.NoError(t, err)
 		require.Len(t, result.Output, 24)
 
@@ -204,7 +204,7 @@ func TestSpend(t *testing.T) {
 		host.programs[walletAddress],
 		vm.Lib.EncodeTxSpend(recipient, 100),
 	)
-	_, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, executionPayload, 0, WALLET_TEST)
+	_, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 
 	// Step 3: Check balance
@@ -225,7 +225,7 @@ func TestVerify(t *testing.T) {
 		pubkey := Bytes32(pubkey)
 		executionPayload := EncodedExecutionPayload(nil, vm.Lib.EncodeTxSpawn(pubkey))
 
-		result, err := vm.Execute(host, Frontier, Call, 1, 10000000, principal, principal, executionPayload, 0, WALLET_TEST)
+		result, err := vm.Execute(host, Frontier, Call, 1, 10000000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 		require.NoError(t, err)
 		require.Len(t, result.Output, 24)
 
@@ -253,7 +253,7 @@ func TestVerify(t *testing.T) {
 
 	executionPayload := EncodedExecutionPayload(host.programs[walletAddress], payloadEncoded)
 
-	result, err := vm.Execute(host, Frontier, Call, 1, 100000, principal, principal, executionPayload, 0, WALLET_TEST)
+	result, err := vm.Execute(host, Frontier, Call, 1, 100000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 	require.Zero(t, result.Output[0])
 
@@ -271,7 +271,7 @@ func TestVerify(t *testing.T) {
 
 	executionPayload = EncodedExecutionPayload(host.programs[walletAddress], payloadEncoded)
 
-	result, err = vm.Execute(host, Frontier, Call, 1, 100000, principal, principal, executionPayload, 0, WALLET_TEST)
+	result, err = vm.Execute(host, Frontier, Call, 1, 100000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 	require.Equal(t, uint8(1), result.Output[0])
 }

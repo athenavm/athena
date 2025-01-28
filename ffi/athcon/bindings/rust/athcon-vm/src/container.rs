@@ -117,6 +117,7 @@ mod tests {
       gas: 0,
       recipient: ::athcon_sys::athcon_address::default(),
       sender: ::athcon_sys::athcon_address::default(),
+      sender_template: ::athcon_sys::athcon_address::default(),
       input_data: std::ptr::null(),
       input_size: 0,
       value: 0,
