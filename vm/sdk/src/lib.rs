@@ -29,7 +29,3 @@ cfg_if! {
 
 #[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Pubkey(pub Bytes32);
-
-pub trait VerifiableTemplate {
-  fn verify(&self, tx: Vec<u8>, signature: [u8; 64]) -> bool;
-}

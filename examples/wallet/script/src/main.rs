@@ -110,7 +110,7 @@ mod tests {
   use athena_runner::AthenaVm;
   use athena_sdk::host::MockHostInterface;
   use athena_sdk::{AthenaStdin, ExecutionClient};
-  use athena_vm_sdk::wallet::ProxyArguments;
+  use athena_vm_sdk::wallet::{ProxyArguments, SpendArguments};
   use athena_vm_sdk::Pubkey;
   use ed25519_dalek::ed25519::signature::Signer;
   use ed25519_dalek::SigningKey;
@@ -293,9 +293,8 @@ mod tests {
 
     let mut stdin = AthenaStdin::new();
     stdin.write_slice(Pubkey::default().0.as_slice());
-    stdin.write_vec(athena_vm_sdk::wallet::encode_spend_inner(
-      &recipient, amount,
-    ));
+  let args = SpendArguments {    recipient ,    amount,  };
+    stdin.write_vec(args.encode());
 
     let selector = MethodSelector::from("athexp_max_spend");
     let result = ExecutionClient::new().execute_function(

@@ -72,11 +72,7 @@ type Library struct {
 	// handle to the opened shared library. Must be closed with Dlclose.
 	libHandle uintptr
 
-	create func() *C.struct_athcon_vm
-
-	encodeTxSpawn func(*C.athcon_bytes32) *C.athcon_bytes
-	encodeTxSpend func(*C.athcon_address, C.uint64_t) *C.athcon_bytes
-
+	create    func() *C.struct_athcon_vm
 	freeBytes func(*C.athcon_bytes)
 }
 
@@ -90,10 +86,8 @@ func LoadLibrary(path string) (*Library, error) {
 		libHandle: libHandle,
 	}
 	purego.RegisterLibFunc(&lib.create, libHandle, "athcon_create")
-	purego.RegisterLibFunc(&lib.encodeTxSpawn, libHandle, "athcon_encode_tx_spawn")
-	purego.RegisterLibFunc(&lib.encodeTxSpend, libHandle, "athcon_encode_tx_spend")
-
 	purego.RegisterLibFunc(&lib.freeBytes, libHandle, "athcon_free_bytes")
+
 	return lib, nil
 }
 
@@ -271,21 +265,4 @@ func athconAddress(address Address) *C.athcon_address {
 		out.bytes[i] = C.uint8_t(address[i])
 	}
 	return &out
-}
-
-func (l *Library) EncodeTxSpawn(pubkey Bytes32) []byte {
-	encoded := l.encodeTxSpawn(athconBytes32(pubkey))
-	defer l.freeBytes(encoded)
-	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
-	return tx
-}
-
-func (l *Library) EncodeTxSpend(recipient Address, amount uint64) []byte {
-	encoded := l.encodeTxSpend(
-		athconAddress(recipient),
-		C.uint64_t(amount),
-	)
-	defer l.freeBytes(encoded)
-	tx := C.GoBytes(unsafe.Pointer(encoded.ptr), C.int(encoded.size))
-	return tx
 }

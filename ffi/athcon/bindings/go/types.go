@@ -21,13 +21,13 @@ const MethodSelectorLength = 4
 type MethodSelector [MethodSelectorLength]byte
 
 // FromString converts a string to a MethodSelector, similar to the Rust From<&str> implementation.
-func FromString(value string) (MethodSelector, error) {
+func FromString(value string) MethodSelector {
 	var selector MethodSelector
 	hasher := blake3.New()
 	hasher.Write([]byte(value))
 	hasher.Digest().Read(selector[:])
 
-	return selector, nil
+	return selector
 }
 
 // String implements the fmt.Stringer interface for MethodSelector, similar to Rust's Display trait.
@@ -54,4 +54,8 @@ func EncodedExecutionPayload(state []byte, encodedPayload []byte) []byte {
 	}
 
 	return append(encodedState, encodedPayload...)
+}
+
+func EncodePayload(selector MethodSelector, input []byte) ([]byte, error) {
+	return scale.Marshal(Payload{Selector: &selector, Input: input})
 }

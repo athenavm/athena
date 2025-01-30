@@ -159,6 +159,18 @@ func TestCall(t *testing.T) {
 	require.Equal(t, uint32(2), value)
 }
 
+func encodeSpawnArguments(_ *testing.T, pubkey [32]byte) []byte {
+	return pubkey[:]
+}
+
+func encodeSpendArguments(_ *testing.T, recipient Address, amount uint64) []byte {
+	type spendArguments struct {
+		Recipient Address
+		Amount    uint64
+	}
+	return scale.MustMarshal(spendArguments{Recipient: recipient, Amount: amount})
+}
+
 func TestSpawn(t *testing.T) {
 	vm, _ := Load(libPath(t))
 	defer vm.Destroy()
@@ -167,7 +179,8 @@ func TestSpawn(t *testing.T) {
 	principal := randomAddress()
 	pubkey := Bytes32([32]byte{1, 1, 2, 2, 3, 3, 4, 4})
 
-	payload := vm.Lib.EncodeTxSpawn(pubkey)
+	payload, err := EncodePayload(FromString("athexp_spawn"), encodeSpawnArguments(t, pubkey))
+	require.NoError(t, err)
 	executionPayload := EncodedExecutionPayload(nil, payload)
 
 	result, err := vm.Execute(host, Frontier, Call, 1, 1000000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
@@ -187,7 +200,9 @@ func TestSpend(t *testing.T) {
 	var walletAddress Address
 	{
 		pubkey := Bytes32([32]byte{1, 1, 2, 2, 3, 3, 4, 4})
-		executionPayload := EncodedExecutionPayload(nil, vm.Lib.EncodeTxSpawn(pubkey))
+		payload, err := EncodePayload(FromString("athexp_spawn"), encodeSpawnArguments(t, pubkey))
+		require.NoError(t, err)
+		executionPayload := EncodedExecutionPayload(nil, payload)
 
 		result, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 		require.NoError(t, err)
@@ -200,11 +215,10 @@ func TestSpend(t *testing.T) {
 	host.balances[principal] = 1000
 	recipient := randomAddress()
 
-	executionPayload := EncodedExecutionPayload(
-		host.programs[walletAddress],
-		vm.Lib.EncodeTxSpend(recipient, 100),
-	)
-	_, err := vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
+	payload, err := EncodePayload(FromString("athexp_spend"), encodeSpendArguments(t, recipient, 100))
+	require.NoError(t, err)
+	executionPayload := EncodedExecutionPayload(host.programs[walletAddress], payload)
+	_, err = vm.Execute(host, Frontier, Call, 1, 10000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 	require.NoError(t, err)
 
 	// Step 3: Check balance
@@ -223,7 +237,9 @@ func TestVerify(t *testing.T) {
 	var walletAddress Address
 	{
 		pubkey := Bytes32(pubkey)
-		executionPayload := EncodedExecutionPayload(nil, vm.Lib.EncodeTxSpawn(pubkey))
+		payload, err := EncodePayload(FromString("athexp_spawn"), encodeSpawnArguments(t, pubkey))
+		require.NoError(t, err)
+		executionPayload := EncodedExecutionPayload(nil, payload)
 
 		result, err := vm.Execute(host, Frontier, Call, 1, 10000000, principal, principal, Address{}, executionPayload, 0, WALLET_TEST)
 		require.NoError(t, err)
@@ -242,8 +258,7 @@ func TestVerify(t *testing.T) {
 	signatureEncoded, err := scale.Marshal(signature)
 	require.NoError(t, err)
 
-	selector, err := FromString("athexp_verify")
-	require.NoError(t, err)
+	selector := FromString("athexp_verify")
 	payload := Payload{
 		Selector: &selector,
 		Input:    append(txEncoded, signatureEncoded...),

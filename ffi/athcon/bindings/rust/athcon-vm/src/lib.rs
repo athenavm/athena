@@ -2,7 +2,6 @@
 
 pub mod bytes;
 mod container;
-pub mod encode_tx;
 mod types;
 
 use core::ptr::null;
