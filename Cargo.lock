@@ -120,7 +120,6 @@ version = "0.7.0"
 dependencies = [
  "athcon-sys",
  "athena-interface",
- "athena-vm-sdk",
  "parity-scale-codec",
 ]
 

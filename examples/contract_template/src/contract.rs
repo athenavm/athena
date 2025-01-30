@@ -21,7 +21,7 @@ use athena_interface::Address;
 //  NOTE: `IntoResult` is automatically implemented for types that implement
 //  `parity_scale_codec::Encode`.
 use athena_vm_declare::{callable, template};
-use athena_vm_sdk::{spawn, Pubkey, VerifiableTemplate};
+use athena_vm_sdk::{spawn, Pubkey};
 use parity_scale_codec::{Decode, Encode};
 
 #[derive(Decode, Encode)]
@@ -45,10 +45,7 @@ impl Contract {
     let instance = Contract { owner: pubkey };
     spawn(&instance.encode())
   }
-}
 
-#[template]
-impl VerifiableTemplate for Contract {
   /// The verify method is required and is called before executing every method of the contract.
   /// It typically verifies the signature of the TX using the public key persisted in the
   /// account's immutable state.

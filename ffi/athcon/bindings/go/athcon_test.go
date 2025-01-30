@@ -100,22 +100,3 @@ func TestErrorMessage(t *testing.T) {
 	check(Error{Code: 4, Err: fmt.Errorf("custom error")}, "invalid instruction: custom error")
 	check(Error{Code: 1000, Err: fmt.Errorf("custom error")}, "<unknown>: custom error")
 }
-
-func TestLibraryEncodeTx(t *testing.T) {
-	lib, err := LoadLibrary(libPath(t))
-	require.NoError(t, err)
-	t.Run("spawn", func(t *testing.T) {
-		tx := lib.EncodeTxSpawn(Bytes32{9, 8, 7, 6})
-		require.NotEmpty(t, tx)
-
-		tx2 := lib.EncodeTxSpawn(Bytes32{1, 2, 3, 4})
-		require.NotEqual(t, tx, tx2)
-	})
-	t.Run("spend", func(t *testing.T) {
-		tx := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 191239)
-		require.NotEmpty(t, tx)
-
-		tx2 := lib.EncodeTxSpend(Address{1, 2, 3, 4}, 80972)
-		require.NotEqual(t, tx, tx2)
-	})
-}

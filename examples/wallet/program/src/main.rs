@@ -7,7 +7,7 @@ use athena_interface::Address;
 use athena_vm::entrypoint;
 use athena_vm_declare::{callable, template};
 use athena_vm_sdk::wallet::{ProxyArguments, SpendArguments, WalletProgram};
-use athena_vm_sdk::{call, spawn, Pubkey, VerifiableTemplate};
+use athena_vm_sdk::{call, spawn, Pubkey};
 use parity_scale_codec::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode)]
@@ -56,7 +56,7 @@ impl WalletProgram for Wallet {
 }
 
 #[template]
-impl VerifiableTemplate for Wallet {
+impl Wallet {
   #[callable]
   fn verify(&self, tx: alloc::vec::Vec<u8>, signature: [u8; 64]) -> bool {
     athena_vm_sdk::precompiles::ed25519::verify(&tx, &self.owner.0, &signature)
