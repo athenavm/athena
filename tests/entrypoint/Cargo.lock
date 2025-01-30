@@ -59,9 +59,7 @@ version = "0.7.0"
 dependencies = [
  "athena-interface",
  "athena-vm",
- "cfg-if",
  "parity-scale-codec",
- "serde",
 ]
 
 [[package]]

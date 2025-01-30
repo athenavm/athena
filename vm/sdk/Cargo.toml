@@ -8,12 +8,6 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-athena-vm = { path = "../entrypoint", optional = true }
+athena-vm = { path = "../entrypoint" }
 athena-interface = { path = "../../interface" }
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
-cfg-if = "1.0.0"
-serde = { version = "1.0", features = ["derive"] }
-
-[features]
-default = ["vm"]
-vm = ["dep:athena-vm"]

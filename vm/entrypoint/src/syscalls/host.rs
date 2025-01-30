@@ -1,6 +1,3 @@
-#[cfg(target_os = "zkvm")]
-use core::arch::asm;
-
 use athena_interface::{Address, StorageStatus};
 
 /// Call a function in a foreign program.
@@ -23,7 +20,7 @@ pub fn call(
   #[cfg(target_os = "zkvm")]
   unsafe {
     let size: usize;
-    asm!(
+    core::arch::asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_CALL,
         in("a0") address,
@@ -47,7 +44,7 @@ pub fn read_storage(key: &[u32; 8]) -> [u32; 8] {
   #[cfg(target_os = "zkvm")]
   unsafe {
     let mut result = *key;
-    asm!(
+    core::arch::asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_READ,
         in("a0") result.as_mut_ptr(),
@@ -65,7 +62,7 @@ pub fn write_storage(key: &[u32; 8], value: &[u32; 8]) -> StorageStatus {
   #[cfg(target_os = "zkvm")]
   unsafe {
     let status: u32;
-    asm!(
+    core::arch::asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_WRITE,
         in("a0") key.as_ptr(),
@@ -84,7 +81,7 @@ pub fn get_balance() -> u64 {
   #[cfg(target_os = "zkvm")]
   unsafe {
     let mut balance = std::mem::MaybeUninit::<u64>::uninit();
-    asm!(
+    core::arch::asm!(
         "ecall",
         in("t0") crate::syscalls::HOST_GETBALANCE,
         in("a0") balance.as_mut_ptr(),
@@ -112,24 +109,30 @@ pub fn get_balance() -> u64 {
 /// The address of spawned program is obtained via sharing a
 /// variable located on the stack. The host must write the address,
 /// initializing the variable.
-#[cfg(target_os = "zkvm")]
+#[allow(unused_variables)]
 pub fn spawn(blob: &[u8]) -> athena_interface::Address {
-  let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
+  #[cfg(target_os = "zkvm")]
+  {
+    let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
 
-  unsafe {
-    asm!(
-        "ecall",
-        in("t0") crate::syscalls::HOST_SPAWN,
-        in("a0") blob.as_ptr(),
-        in("a1") blob.len(),
-        in("a2") result.as_mut_ptr(),
-    )
+    unsafe {
+      core::arch::asm!(
+          "ecall",
+          in("t0") crate::syscalls::HOST_SPAWN,
+          in("a0") blob.as_ptr(),
+          in("a1") blob.len(),
+          in("a2") result.as_mut_ptr(),
+      )
+    }
+
+    // SAFETY: the host initialized the data in the `result` variable
+    // by writing to the memory address pointed to in the `a2` register.
+    // In the case the host failed it would not return here.
+    unsafe { result.assume_init() }
   }
 
-  // SAFETY: the host initialized the data in the `result` variable
-  // by writing to the memory address pointed to in the `a2` register.
-  // In the case the host failed it would not return here.
-  unsafe { result.assume_init() }
+  #[cfg(not(target_os = "zkvm"))]
+  unreachable!()
 }
 
 /// Deploy a new template.
@@ -141,19 +144,25 @@ pub fn spawn(blob: &[u8]) -> athena_interface::Address {
 /// The address of the deployed template is obtained via sharing a
 /// variable located on the stack. The host must write the address,
 /// initializing the variable.
-#[cfg(target_os = "zkvm")]
+#[allow(unused_variables)]
 pub fn deploy(blob: &[u8]) -> athena_interface::Address {
-  let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
+  #[cfg(target_os = "zkvm")]
+  {
+    let mut result = std::mem::MaybeUninit::<athena_interface::Address>::uninit();
 
-  unsafe {
-    asm!(
-        "ecall",
-        in("t0") crate::syscalls::HOST_DEPLOY,
-        in("a0") blob.as_ptr(),
-        in("a1") blob.len(),
-        in("a2") result.as_mut_ptr(),
-    )
+    unsafe {
+      core::arch::asm!(
+          "ecall",
+          in("t0") crate::syscalls::HOST_DEPLOY,
+          in("a0") blob.as_ptr(),
+          in("a1") blob.len(),
+          in("a2") result.as_mut_ptr(),
+      )
+    }
+
+    unsafe { result.assume_init() }
   }
 
-  unsafe { result.assume_init() }
+  #[cfg(not(target_os = "zkvm"))]
+  unreachable!()
 }

@@ -1,6 +1,3 @@
-#![cfg_attr(target_os = "zkvm", no_main)]
-
-#[cfg(target_os = "zkvm")]
 athena_vm::entrypoint!(main);
 
 use athena_vm::syscalls::{read_storage, write_storage};

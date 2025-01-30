@@ -1,4 +1,3 @@
-#![no_main]
 athena_vm::entrypoint!(main);
 
 use serde::{Deserialize, Serialize};
