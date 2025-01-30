@@ -34,14 +34,13 @@ pub fn template(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let c_func_name = format_ident!("athexp_{method_name}");
 
         c_functions.push(quote! {
-          #[cfg(all(any(target_arch = "riscv32"), target_feature = "e"))]
           #[no_mangle]
           #[link_section = #section_name]
           pub unsafe extern "C" fn #c_func_name() {
             #call;
           }
 
-          #[cfg(all(any(target_arch = "riscv32"), target_feature = "e"))]
+          #[cfg(target_os = "zkvm")]
           #[used]
           #[link_section = ".note.athena_export"]
           static #static_name: ::athena_vm_declare::abi::ExportMetadata = ::athena_vm_declare::abi::ExportMetadata {

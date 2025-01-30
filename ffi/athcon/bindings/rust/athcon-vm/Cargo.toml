@@ -9,7 +9,3 @@ edition.workspace = true
 
 [dependencies]
 athcon-sys = { path = "../athcon-sys" }
-athena-interface = { path = "../../../../../interface" }
-
-[dev-dependencies]
-parity-scale-codec = "3.6.12"

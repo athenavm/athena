@@ -1,6 +1,6 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::too_many_arguments)]
 
-pub mod bytes;
+mod bytes;
 mod container;
 mod types;
 

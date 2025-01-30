@@ -8,7 +8,6 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-anyhow = "1.0.95"
 athena-core = { path = "../core" }
 athena-interface = { path = "../interface" }
 

@@ -5,21 +5,21 @@ edition = "2021"
 
 [dependencies]
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
-athena-interface = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
-athena-vm = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
-athena-vm-declare = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
-athena-vm-sdk = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
+athena-interface = { path = "../../interface" }
+athena-vm = { path = "../../vm/entrypoint" }
+athena-vm-declare = { path = "../../vm/declare" }
+athena-vm-sdk = { path = "../../vm/sdk" }
 
 [dev-dependencies]
 contract_template = { path = ".", features = ["unittest"] }
-athena-sdk = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
-athena-runner = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
+athena-sdk = { path = "../../sdk" }
+athena-runner = { path = "../../runner" }
 ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
 rand = "0.8.5"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [build-dependencies]
-athena-builder = { git = "https://github.com/athenavm/athena", tag = "v0.6.3" }
+athena-builder = { path = "../../builder/" }
 
 # Required to automatically build the VM program in unittests
 # Used in build.rs

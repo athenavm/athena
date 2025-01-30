@@ -1,6 +1,5 @@
 #![cfg_attr(target_os = "zkvm", no_main)]
 
-#[cfg(target_os = "zkvm")]
 mod contract;
 
 #[cfg(target_os = "zkvm")]

@@ -1,8 +1,6 @@
 extern crate alloc;
 
-#[cfg(target_os = "zkvm")]
 pub mod heap;
-
 pub mod helpers;
 pub mod io;
 pub mod program;
@@ -21,22 +19,18 @@ pub mod types {
 macro_rules! entrypoint {
   () => {
     fn main() {
-      panic!("No entrypoint found");
+      panic!("this program has no main() - call one of its methods instead");
     }
     entrypoint!(main);
   };
   ($entry:path) => {
-    const VM_ENTRY: fn() = $entry;
-
-    use $crate::heap::SimpleAlloc;
-
+    #[cfg(target_os = "zkvm")]
     #[global_allocator]
-    static HEAP: SimpleAlloc = SimpleAlloc;
+    static HEAP: $crate::heap::SimpleAlloc = $crate::heap::SimpleAlloc;
 
     mod vm_generated_main {
-      #[no_mangle]
       fn main() {
-        super::VM_ENTRY()
+        $entry()
       }
     }
   };

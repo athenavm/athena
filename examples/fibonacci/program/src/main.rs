@@ -5,7 +5,6 @@
 //
 // Under the hood, we wrap your main function with some extra code so that it behaves properly
 // inside the VM.
-#![no_main]
 athena_vm::entrypoint!(main);
 
 pub fn main() {

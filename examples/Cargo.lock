@@ -80,16 +80,6 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "athena-builder"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "anyhow",
- "cargo_metadata",
- "clap",
-]
-
-[[package]]
-name = "athena-builder"
 version = "0.7.0"
 dependencies = [
  "anyhow",
@@ -99,35 +89,11 @@ dependencies = [
 
 [[package]]
 name = "athena-core"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "anyhow",
- "athena-builder 0.6.3",
- "athena-interface 0.6.3",
- "bincode",
- "bytemuck",
- "ed25519-dalek",
- "elf",
- "gdbstub",
- "hex",
- "mockall",
- "nohash-hasher",
- "rrs-lib",
- "serde",
- "strum",
- "strum_macros",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "athena-core"
 version = "0.7.0"
 dependencies = [
  "anyhow",
- "athena-builder 0.7.0",
- "athena-interface 0.7.0",
+ "athena-builder",
+ "athena-interface",
  "bincode",
  "bytemuck",
  "ed25519-dalek",
@@ -146,16 +112,6 @@ dependencies = [
 
 [[package]]
 name = "athena-interface"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "blake3",
- "hex",
- "parity-scale-codec",
-]
-
-[[package]]
-name = "athena-interface"
 version = "0.7.0"
 dependencies = [
  "blake3",
@@ -166,26 +122,12 @@ dependencies = [
 
 [[package]]
 name = "athena-runner"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "athena-builder 0.6.3",
- "athena-core 0.6.3",
- "athena-interface 0.6.3",
- "athena-sdk 0.6.3",
- "bincode",
- "hex",
- "tracing",
-]
-
-[[package]]
-name = "athena-runner"
 version = "0.7.0"
 dependencies = [
- "athena-builder 0.7.0",
- "athena-core 0.7.0",
- "athena-interface 0.7.0",
- "athena-sdk 0.7.0",
+ "athena-builder",
+ "athena-core",
+ "athena-interface",
+ "athena-sdk",
  "bincode",
  "hex",
  "tracing",
@@ -193,47 +135,19 @@ dependencies = [
 
 [[package]]
 name = "athena-sdk"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "anyhow",
- "athena-builder 0.6.3",
- "athena-core 0.6.3",
- "athena-interface 0.6.3",
- "vergen-git2",
-]
-
-[[package]]
-name = "athena-sdk"
 version = "0.7.0"
 dependencies = [
- "anyhow",
- "athena-builder 0.7.0",
- "athena-core 0.7.0",
- "athena-interface 0.7.0",
+ "athena-builder",
+ "athena-core",
+ "athena-interface",
  "vergen-git2",
-]
-
-[[package]]
-name = "athena-vm"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "athena-interface 0.6.3",
- "bincode",
- "bytemuck",
- "cfg-if",
- "getrandom",
- "parity-scale-codec",
- "rand",
- "serde",
 ]
 
 [[package]]
 name = "athena-vm"
 version = "0.7.0"
 dependencies = [
- "athena-interface 0.7.0",
+ "athena-interface",
  "bincode",
  "bytemuck",
  "cfg-if",
@@ -245,26 +159,9 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-declare"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "athena-vm-declare-macro 0.6.3",
-]
-
-[[package]]
-name = "athena-vm-declare"
 version = "0.7.0"
 dependencies = [
- "athena-vm-declare-macro 0.7.0",
-]
-
-[[package]]
-name = "athena-vm-declare-macro"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "quote",
- "syn 2.0.90",
+ "athena-vm-declare-macro",
 ]
 
 [[package]]
@@ -277,25 +174,11 @@ dependencies = [
 
 [[package]]
 name = "athena-vm-sdk"
-version = "0.6.3"
-source = "git+https://github.com/athenavm/athena?tag=v0.6.3#66ff76c86e08ec7c049122dac131421c507bf0c6"
-dependencies = [
- "athena-interface 0.6.3",
- "athena-vm 0.6.3",
- "cfg-if",
- "parity-scale-codec",
- "serde",
-]
-
-[[package]]
-name = "athena-vm-sdk"
 version = "0.7.0"
 dependencies = [
- "athena-interface 0.7.0",
- "athena-vm 0.7.0",
- "cfg-if",
+ "athena-interface",
+ "athena-vm",
  "parity-scale-codec",
- "serde",
 ]
 
 [[package]]
@@ -502,13 +385,13 @@ checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 name = "contract_template"
 version = "0.1.0"
 dependencies = [
- "athena-builder 0.6.3",
- "athena-interface 0.6.3",
- "athena-runner 0.6.3",
- "athena-sdk 0.6.3",
- "athena-vm 0.6.3",
- "athena-vm-declare 0.6.3",
- "athena-vm-sdk 0.6.3",
+ "athena-builder",
+ "athena-interface",
+ "athena-runner",
+ "athena-sdk",
+ "athena-vm",
+ "athena-vm-declare",
+ "athena-vm-sdk",
  "contract_template",
  "ed25519-dalek",
  "parity-scale-codec",
@@ -727,8 +610,8 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 name = "fibonacci-script"
 version = "0.1.0"
 dependencies = [
- "athena-builder 0.7.0",
- "athena-sdk 0.7.0",
+ "athena-builder",
+ "athena-sdk",
  "tracing-subscriber",
 ]
 
@@ -823,8 +706,8 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello_world-script"
 version = "0.1.0"
 dependencies = [
- "athena-builder 0.7.0",
- "athena-sdk 0.7.0",
+ "athena-builder",
+ "athena-sdk",
  "tracing-subscriber",
 ]
 
@@ -1004,8 +887,8 @@ dependencies = [
 name = "io-script"
 version = "0.1.0"
 dependencies = [
- "athena-builder 0.7.0",
- "athena-sdk 0.7.0",
+ "athena-builder",
+ "athena-sdk",
  "serde",
  "tracing-subscriber",
 ]
@@ -1104,10 +987,10 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "mint"
 version = "0.1.0"
 dependencies = [
- "athena-interface 0.7.0",
- "athena-vm 0.7.0",
- "athena-vm-declare 0.7.0",
- "athena-vm-sdk 0.7.0",
+ "athena-interface",
+ "athena-vm",
+ "athena-vm-declare",
+ "athena-vm-sdk",
  "bytemuck",
  "parity-scale-codec",
  "wallet",
@@ -1899,10 +1782,10 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "wallet"
 version = "0.1.0"
 dependencies = [
- "athena-interface 0.7.0",
- "athena-vm 0.7.0",
- "athena-vm-declare 0.7.0",
- "athena-vm-sdk 0.7.0",
+ "athena-interface",
+ "athena-vm",
+ "athena-vm-declare",
+ "athena-vm-sdk",
  "parity-scale-codec",
 ]
 
@@ -1910,11 +1793,11 @@ dependencies = [
 name = "wallet-script"
 version = "0.1.0"
 dependencies = [
- "athena-builder 0.7.0",
- "athena-interface 0.7.0",
- "athena-runner 0.7.0",
- "athena-sdk 0.7.0",
- "athena-vm-sdk 0.7.0",
+ "athena-builder",
+ "athena-interface",
+ "athena-runner",
+ "athena-sdk",
+ "athena-vm-sdk",
  "blake3",
  "ed25519-dalek",
  "hex",
