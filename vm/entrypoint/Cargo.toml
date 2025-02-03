@@ -14,5 +14,5 @@ bytemuck = "1.21.0"
 cfg-if = "1.0.0"
 getrandom = { version = "0.2.14", features = ["custom"] }
 serde = { version = "1.0.217", features = ["derive"] }
-rand = "0.8.5"
+rand = "0.9.0"
 parity-scale-codec = "*"
