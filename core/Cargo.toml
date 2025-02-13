@@ -18,7 +18,7 @@ rrs-lib = { git = "https://github.com/GregAC/rrs.git" }
 hex = "0.4.3"
 tracing = "0.1.41"
 strum_macros = "0.26"
-strum = "0.26"
+strum = "0.27"
 thiserror = "2.0.11"
 anyhow = "1.0.95"
 mockall = "0.13.1"
