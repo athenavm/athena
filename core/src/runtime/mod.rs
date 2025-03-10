@@ -1015,7 +1015,10 @@ pub mod tests {
     // check result: we expect the u64 value to be split into two 32-bit words
     let value_low = runtime.mr(memloc);
     let value_high = runtime.mr(memloc + 4);
-    assert_eq!(u64::from(value_high) << 32 | u64::from(value_low), 1111u64);
+    assert_eq!(
+      (u64::from(value_high) << 32) | u64::from(value_low),
+      1111u64
+    );
   }
 
   #[test]
