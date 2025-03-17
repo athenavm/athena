@@ -19,7 +19,7 @@ athena-sdk = { path = "../sdk" }
 athena-builder = { path = "../builder" }
 cargo_metadata = "0.19.1"
 clap = { version = "4.5.31", features = ["derive", "env"] }
-reqwest = { version = "0.12.11", features = [
+reqwest = { version = "0.12.14", features = [
   "blocking",
   "json",
   "rustls-tls",
