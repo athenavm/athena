@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install mdbook-linkcheck
         run: |
@@ -49,7 +49,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v2
         with:
