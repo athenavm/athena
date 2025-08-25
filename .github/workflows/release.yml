@@ -26,7 +26,7 @@ jobs:
       release_name: ${{ steps.release_info.outputs.release_name }}
       changelog: ${{ steps.build_changelog.outputs.changelog }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -105,7 +105,7 @@ jobs:
             platform: win32
             arch: amd64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -219,7 +219,7 @@ jobs:
       contents: write # to delete a release
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Moves the `nightly` tag to `HEAD`
       - name: Move nightly tag
@@ -247,7 +247,7 @@ jobs:
     needs: [prepare, release, cleanup]
     if: failure()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
