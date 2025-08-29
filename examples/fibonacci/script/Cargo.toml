@@ -6,7 +6,7 @@ default-run = "fibonacci-script"
 
 [dependencies]
 athena-sdk = { path = "../../../sdk" }
-tracing-subscriber = "0.3.18"
+tracing-subscriber = "0.3.20"
 
 [build-dependencies]
 athena-builder = { path = "../../../builder" }
